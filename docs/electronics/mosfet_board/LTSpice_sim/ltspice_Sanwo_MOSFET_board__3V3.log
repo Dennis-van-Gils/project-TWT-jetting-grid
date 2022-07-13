@@ -1,0 +1,21 @@
+Circuit: * E:\Work\PoF_2015\Setups\211123_TWT_jet_grid\Electronics\mosfet_board\LTSpice_sim\ltspice_Sanwo_MOSFET_board__3V3.asc
+
+.OP point found by inspection.
+
+Date: Wed Jan 12 20:43:38 2022
+Total elapsed time: 0.022 seconds.
+
+tnom = 27
+temp = 27
+method = modified trap
+totiter = 132
+traniter = 132
+tranpoints = 65
+accept = 65
+rejected = 0
+matrix size = 4
+fillins = 0
+solver = Normal
+Matrix Compiler1:       6 opcodes  0.0/[0.0]/0.0
+Matrix Compiler2: off  [0.0]/0.1/0.0
+

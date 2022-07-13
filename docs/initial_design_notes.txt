@@ -1,0 +1,90 @@
+Solenoid water valve
+--------------------
+
+Number of valves:
+Decided: 112, 28 per side, pref 12 mm inner diam
+
+Typical 24V water solenoid valve draws 250 mA
+
+Requirements solenoid valve:
+- operate at 24 V (preferably: keep the current below 290 mA for the PVT312 solid state relay)
+- diameter ~ 10 mm, 1/2", 3/8"
+- fast acting ~ 0.5 to 1 sec
+- direct or indirect (requires P_diff) controlled
+
+
+Circuitry
+---------
+
+Use Arduino + Millipede board (MCP23017, 16 ch, I2C) + MOSFET board
+Add a square matrix LED panel for jet visualisation.
+
+Centipede: 64 channels extra DIO from I2C
+Can probably take in 3.3 V I2C
+
+
+  MOSFETS
+  -------
+
+Google: https://www.google.com/search?q=mosfet+board+16+channels&client=firefox-b-d&biw=1509&bih=934&sxsrf=AOaemvJO6wwmgFGnOk4NJ1rpOsNPfvxfmA:1638218075573&tbm=isch&source=iu&ictx=1&fir=AU-XXLih75zALM%252CS97yPO1Kx7uSEM%252C_%253B9pQUPeZW437mgM%252CEUD3R4LZVhkzxM%252C_%253Bhjt8wuJb8bHoEM%252CFV8Iuv8lZduGGM%252C_%253BljEDhoefagN5KM%252Cti9fFwPpx9osCM%252C_%253BCxuMXcBo8yG1DM%252CEUD3R4LZVhkzxM%252C_%253Be8bhNiFRVqvsCM%252CFV8Iuv8lZduGGM%252C_%253BFx3XZ33hJDuYoM%252CSX-uN8D8Pt4YaM%252C_%253BxeoLwY-jtr72NM%252CGLllsm-Hn3OM_M%252C_%253BPi-L7esW3UOClM%252CdukqlienmSXj_M%252C_%253B2DBUNCfDyTJj9M%252CGLllsm-Hn3OM_M%252C_&vet=1&usg=AI4_-kRFkAliVR6oQi8AF89qi7QxvJARFg&sa=X&ved=2ahUKEwioxNXztb70AhXdh_0HHbOiAd8Q9QF6BAgDEAE#imgrc=TQaBvuL1G480wM
+  
+Perhaps go with mosfets instead of solid state relays.
+background: https://www.omron-ap.com/service_support/FAQ/FAQ02243/index.asp
+not sold anymore: https://nl.aliexpress.com/item/295106416.html
+good, but discontinued https://www.seeedstudio.com/16-Ch-High-Current-Driver-Shield-Kit-v2-p-793.html
+
+
+Candidates MOSFET boards:
+  1)  http://www.icstation.com/channel-amplifier-module-isolated-transistor-controller-signal-converter-16bit-protector-optocoupler-p-14065.html
+      https://www.joom.com/en/products/5ee21e888b45130101fa9668
+      https://nl.aliexpress.com/item/32802013615.html?spm=a2g0o.productlist.0.0.1ad72fd72K1Lzm&algo_pvid=5d4b663b-750f-42e6-8c23-180898b16d44&algo_exp_id=5d4b663b-750f-42e6-8c23-180898b16d44-46&pdp_ext_f=%7B%22sku_id%22%3A%2264206637981%22%7D
+      
+      Brand: Sanwo
+      specs: optocoupled, < 1 ms response, 1 kHz switching freq, with LED indicators
+             NPN in, NPN out
+      eur 32
+
+  2)  https://de.aliexpress.com/item/33014054266.html
+      http://en.ginri.com/products-id60.html
+      https://nl.aliexpress.com/item/32838587215.html?spm=a2g0o.productlist.0.0.21df7e0bMamRsn&algo_pvid=8064bbcf-e388-47e7-9a27-8b6d5d5a820e&algo_exp_id=8064bbcf-e388-47e7-9a27-8b6d5d5a820e-31&pdp_ext_f=%7B%22sku_id%22%3A%2265134071861%22%7D
+      
+      Brand: Ginri
+      specs: > 5 kHz switching
+             NPN or PNP in, PNP out
+      eur 46.12
+      
+
+
+Design
+------
+Add master mechanical relay to control ENA_relays?
+Decision: No. Relays should stay powered as they are to prevent
+waterhammer when they would otherwise all close simultaneously in case
+of EM stop or MCU restart.
+
+
+Pumps
+-----
+Looking for 3-5 bar and 350l/min.
+
+
+Flow meter ?
+---------------
+Before intake of pump
+Decision: no, we only rely on pressure
+
+
+Pressure sensor?
+-----------------
+Perhaps 1 on each manifold?
+Decision: yes
+Put manual restriction valve before each manifold to tune equal pressure distribution
+
+
+How many valves will be enabled simultaneously?
+-----------------------------------------------
+If we choose to open all 112 valves it will draw 112 * 0.265 A = 30 A.
+And the power draw will be 30 A * 24 V = 720 W.
+This is fairly large. Not impossible, but I have to design for this.
+
+Decision: Design for all valves open simultaneously at once, during measurement just 30
