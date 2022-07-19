@@ -23,8 +23,8 @@ added to the IIR filter.
 Dennis van Gils, 15-07-2022
 */
 
-#ifndef DvG_IIR_LP_DAQ_h
-#define DvG_IIR_LP_DAQ_h
+#ifndef DVG_IIR_LP_DAQ_H_
+#define DVG_IIR_LP_DAQ_H_
 
 #include <Arduino.h>
 
