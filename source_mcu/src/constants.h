@@ -42,10 +42,6 @@ struct Omega_Calib {
   float full_range_bar;
 };
 
-float mA2bar(float mA, const Omega_Calib calib) {
-  return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
-}
-
 // Omega calibration parameters supplied with the pressure transducers
 //   sensor #1 - Serial BG042821D030, Job WHS0059544, Date 30-03-22022
 //   sensor #2 - Serial BG042821D032, Job WHS0059544, Date 30-03-22022
@@ -55,5 +51,9 @@ const Omega_Calib OMEGA_1_CALIB{4.035, 16.015, 7.0};
 const Omega_Calib OMEGA_2_CALIB{4.024, 16.002, 7.0};
 const Omega_Calib OMEGA_3_CALIB{4.004, 16.057, 7.0};
 const Omega_Calib OMEGA_4_CALIB{3.995, 16.001, 7.0};
+
+float mA2bar(float mA, const Omega_Calib calib) {
+  return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
+}
 
 #endif

@@ -56,10 +56,16 @@ Dennis van Gils, 19-07-2022
 #include <Arduino.h>
 #include <SPI.h>
 
-// Maximal SPI clock frequency for MCP3204 (R click) and MCP3201 (T click)
-// running at 3.3V is 1 MHz.
+// Maximal SPI clock frequency for the MCP3201 ADC chip (R click) and MCP4921
+// DAC chip (T click) running at 3.3V is 1 MHz
 const SPISettings RT_CLICK_SPI(1000000, MSBFIRST, SPI_MODE0);
+
+// Junk byte
 const byte RT_CLICK_JUNK = 0xFF;
+
+// Currents less than this value are considered to signal a fault state, such as
+// a broken wire or a disconnected device. Typical value is 3.8 mA.
+const float R_CLICK_FAULT_mA = 3.8;
 
 /*******************************************************************************
   RT_Click_Calibration
@@ -214,14 +220,18 @@ public:
     pinMode(CS_pin_, OUTPUT);
   }
 
-  // Transform the bit value into a current [mA] given the calibration params
+  // Transform the bit value into a current [mA] given the calibration params.
+  // Currents less than 3.8 mA are considered to signal a fault state, such as
+  // a broken wire or a disconnected device. In that case the return value will
+  // be NAN.
   float bitval2mA(float bitval) {
     // NB: Keep input argument of type 'float' to accomodate for a running
     // average that could have been applied to the bit value, hence making it
     // fractional.
-    return (calib_.p1_mA + (bitval - calib_.p1_bitval) /
-                               float(calib_.p2_bitval - calib_.p1_bitval) *
-                               (calib_.p2_mA - calib_.p1_mA));
+    float mA = calib_.p1_mA + (bitval - calib_.p1_bitval) /
+                                  float(calib_.p2_bitval - calib_.p1_bitval) *
+                                  (calib_.p2_mA - calib_.p1_mA);
+    return (mA > R_CLICK_FAULT_mA ? mA : NAN);
   }
 
   // Read out the R click once and return the bit value
@@ -242,7 +252,9 @@ public:
     return (uint32_t)((data_HI << 8) | data_LO) >> 1;
   }
 
-  // Read out the R click once and return the current in [mA]
+  // Read out the R click once and return the current in [mA], unless the R
+  // click is in a fault state (e.g, a broken wire or disconnected device) in
+  // which case the return value will be NAN.
   float read_mA() { return bitval2mA(R_Click::read_bitval()); }
 
   // This method should be called frequently inside the main loop to allow for
@@ -282,7 +294,8 @@ public:
   float get_LP_bitval() { return DAQ_LP_value_; }
 
   // Return the current low-pass filter output value of the oversampled R click
-  // readings as [mA].
+  // readings as [mA], unless the R click is in a fault state (e.g, a broken
+  // wire or disconnected device) in which case the return value will be NAN.
   // NOTE: Params `DAQ_interval_ms` and `DAQ_LP_filter_Hz` must have been set in
   // the constructor and `poll_oversampling()` must be repeatedly called.
   float get_LP_mA() { return bitval2mA(DAQ_LP_value_); }
