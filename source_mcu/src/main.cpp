@@ -6,6 +6,8 @@ Dennis van Gils
 19-07-2022
 */
 
+// https://google.github.io/styleguide/cppguide.html#Variable_Names
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
