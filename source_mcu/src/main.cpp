@@ -1,18 +1,18 @@
-/*******************************************************************************
-  TWT jetting grid
+/*
+TWT jetting grid
 
-  https://github.com/Dennis-van-Gils/
-  Dennis van Gils
-  15-07-2022
-*******************************************************************************/
+https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
+Dennis van Gils
+19-07-2022
+*/
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
 
-#include "DvG_IIR_LP_DAQ.h"
 #include "DvG_RT_Click_mA.h"
 #include "DvG_SerialCommand.h"
+#include "constants.h"
 
 // Serial command listener
 DvG_SerialCommand sc(Serial);
@@ -22,35 +22,13 @@ DvG_SerialCommand sc(Serial);
 char buf[BUFLEN]{'\0'};
 
 /*------------------------------------------------------------------------------
-  MIKROE 4-20mA R click boards for reading out the OMEGA pressure sensors
+  MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
 ------------------------------------------------------------------------------*/
 
-// Cable Select pins
-#define PIN_CS_PRESSURE_1 10
-#define PIN_CS_PRESSURE_2 9
-#define PIN_CS_PRESSURE_3 5
-#define PIN_CS_PRESSURE_4 6
-
-// Calibrated against a multimeter @ 14-07-2022 by DPM van Gils
-R_Click R_click_1(PIN_CS_PRESSURE_1, 3.99, 791, 20.00, 3971);
-R_Click R_click_2(PIN_CS_PRESSURE_2, 3.98, 784, 19.57, 3881);
-R_Click R_click_3(PIN_CS_PRESSURE_3, 3.96, 774, 19.68, 3908);
-R_Click R_click_4(PIN_CS_PRESSURE_4, 3.98, 828, 19.83, 3981);
-
-// The R click boards fluctuate a lot in their read-outs and need to be
-// oversampled and subsequently low-pass filtered.
-#define DAQ_INTERVAL_MS 2  // Polling interval for readings [ms]
-#define DAQ_LP_FILTER_Hz 2 // Low-pass filter cut-off frequency [Hz]
-
-uint32_t read_R_click_1() { return R_click_1.read_bitval(); }
-uint32_t read_R_click_2() { return R_click_2.read_bitval(); }
-uint32_t read_R_click_3() { return R_click_3.read_bitval(); }
-uint32_t read_R_click_4() { return R_click_4.read_bitval(); }
-
-IIR_LP_DAQ R_click_1_DAQ(DAQ_INTERVAL_MS, DAQ_LP_FILTER_Hz, read_R_click_1);
-IIR_LP_DAQ R_click_2_DAQ(DAQ_INTERVAL_MS, DAQ_LP_FILTER_Hz, read_R_click_2);
-IIR_LP_DAQ R_click_3_DAQ(DAQ_INTERVAL_MS, DAQ_LP_FILTER_Hz, read_R_click_3);
-IIR_LP_DAQ R_click_4_DAQ(DAQ_INTERVAL_MS, DAQ_LP_FILTER_Hz, read_R_click_4);
+R_Click R_click_1(PIN_R_CLICK_1, R_CLICK_1_CALIB, DAQ_DT, DAQ_LP);
+R_Click R_click_2(PIN_R_CLICK_2, R_CLICK_2_CALIB, DAQ_DT, DAQ_LP);
+R_Click R_click_3(PIN_R_CLICK_3, R_CLICK_3_CALIB, DAQ_DT, DAQ_LP);
+R_Click R_click_4(PIN_R_CLICK_4, R_CLICK_4_CALIB, DAQ_DT, DAQ_LP);
 
 /*------------------------------------------------------------------------------
   Holds actuator states and sensor readings
@@ -132,52 +110,29 @@ void loop() {
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
-  if (R_click_1_DAQ.poll_update()) {
-    state.pres_1_bitval = R_click_1_DAQ.get_value();
-    state.pres_1_mA = R_click_1.bitval2mA(state.pres_1_bitval);
-
-    // Taken from Omega calibration sheet supplied with pressure transducer
-    // Serial: BG042821D030
-    // Calibration job : WHS0059544
-    // Calibration date: 30-03-22022
-    state.pres_1_bar = (state.pres_1_mA - 4.035) / 16.015 * 7.0;
+  if (R_click_1.poll_oversampling()) {
+    // DEBUG: Show obtained DT interval
+    // Serial.println(R_click_1.get_last_obtained_DAQ_DT());
   }
-
-  if (R_click_2_DAQ.poll_update()) {
-    state.pres_2_bitval = R_click_2_DAQ.get_value();
-    state.pres_2_mA = R_click_2.bitval2mA(state.pres_2_bitval);
-
-    // Taken from Omega calibration sheet supplied with pressure transducer
-    // Serial: BG042821D032
-    // Calibration job : WHS0059544
-    // Calibration date: 30-03-22022
-    state.pres_2_bar = (state.pres_2_mA - 4.024) / 16.002 * 7.0;
-  }
-
-  if (R_click_3_DAQ.poll_update()) {
-    state.pres_3_bitval = R_click_3_DAQ.get_value();
-    state.pres_3_mA = R_click_3.bitval2mA(state.pres_3_bitval);
-
-    // Taken from Omega calibration sheet supplied with pressure transducer
-    // Serial: BG042821D034
-    // Calibration job : WHS0059544
-    // Calibration date: 30-03-22022
-    state.pres_3_bar = (state.pres_3_mA - 4.004) / 16.057 * 7.0;
-  }
-
-  if (R_click_4_DAQ.poll_update()) {
-    state.pres_4_bitval = R_click_4_DAQ.get_value();
-    state.pres_4_mA = R_click_4.bitval2mA(state.pres_4_bitval);
-
-    // Taken from Omega calibration sheet supplied with pressure transducer
-    // Serial: BG042821D041
-    // Calibration job : WHS0059544
-    // Calibration date: 30-03-22022
-    state.pres_4_bar = (state.pres_4_mA - 3.995) / 16.001 * 7.0;
-  }
+  R_click_2.poll_oversampling();
+  R_click_3.poll_oversampling();
+  R_click_4.poll_oversampling();
 
   if (now - tick > 1000) {
     tick = now;
+
+    state.pres_1_bitval = R_click_1.get_LP_bitval();
+    state.pres_2_bitval = R_click_2.get_LP_bitval();
+    state.pres_3_bitval = R_click_3.get_LP_bitval();
+    state.pres_4_bitval = R_click_4.get_LP_bitval();
+    state.pres_1_mA = R_click_1.get_LP_mA();
+    state.pres_2_mA = R_click_2.get_LP_mA();
+    state.pres_3_mA = R_click_3.get_LP_mA();
+    state.pres_4_mA = R_click_4.get_LP_mA();
+    state.pres_1_bar = mA2bar(state.pres_1_mA, OMEGA_1_CALIB);
+    state.pres_2_bar = mA2bar(state.pres_2_mA, OMEGA_2_CALIB);
+    state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
+    state.pres_4_bar = mA2bar(state.pres_4_mA, OMEGA_4_CALIB);
 
     // clang-format off
     snprintf(buf, BUFLEN,
