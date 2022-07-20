@@ -1,54 +1,71 @@
 /*
-DvG_RT_click_mA
+  DvG_RT_Click_mA
 
-A library for the 4-20 mA current controllers of MIKROE:
-  - 4-20 mA R click (receiver)
-  - 4-20 mA T click (transmitter)
+  A library for the 4-20 mA current loop controllers of MIKROE:
+    - 4-20 mA R click (MIKROE-1387, receiver)
+    - 4-20 mA T click (MIKROE-1296, transmitter)
 
-Both controllers operate over the SPI bus. Maximal SPI clock frequency for
-the MCP3201 ADC chip (R click) and MCP4921 DAC chip (T click) running at 3.3V
-is 1 MHz.
+  Both controllers operate over the SPI bus.
 
-Single R click readings tend to fluctuate a lot. To combat the large
-fluctuations this library also allows for oversampling and subsequently low-pass
-filtering the R click readings. The applied low-pass filter is a single-pole
-infinite-impulse response (IIR) filter, which is very memory efficient.
+  Single R click readings tend to fluctuate a lot. To combat the large
+  fluctuations this library also allows for oversampling and subsequently
+  low-pass filtering the R click readings. The applied low-pass filter is a
+  single-pole infinite-impulse response (IIR) filter, which is very memory
+  efficient.
 
-EXAMPLE 1: R click usage WITHOUT OVERSAMPLING
-  '''
-  #include "DvG_RT_Click_mA.h"
+  Dennis van Gils
+  20-07-2022
 
-  R_Click R_click(6, RT_Click_Calibration{3.99, 20.00, 791, 3971});
 
-  void setup() {
-    R_click.begin();
-  }
 
-  void loop() {
-    R_click.read_mA();
-  }
-  '''
+  EXAMPLE 1: R click usage WITHOUT OVERSAMPLING
+    '''
+    #include "DvG_RT_Click_mA.h"
 
-EXAMPLE 2: R click usage WITH OVERSAMPLING
-  '''
-  include "DvG_RT_Click_mA.h"
+    R_Click R_click(5, RT_Click_Calibration{4.03, 19.93, 832, 3999});
 
-  const uint32_t DAQ_DT = 2; // Desired oversampling interval [ms]
-  const float DAQ_LP = 2.;   // Low-pass filter cut-off frequency [Hz]
-  R_Click R_click(6, RT_Click_Calibration{3.99, 20.00, 791, 3971},
-                  DAQ_DT, DAQ_LP);
+    void setup() {
+      R_click.begin();
+    }
 
-  void setup() {
-    R_click.begin();
-  }
+    void loop() {
+      R_click.read_mA();
+    }
+    '''
 
-  void loop() {
-    R_click.poll_oversampling();
-    R_click.get_LP_mA();
-  }
-  '''
+  EXAMPLE 2: R click usage WITH OVERSAMPLING
+    '''
+    #include "DvG_RT_Click_mA.h"
 
-Dennis van Gils, 20-07-2022
+    const uint32_t DAQ_DT = 2; // Desired oversampling interval [ms]
+    const float DAQ_LP = 10.;  // Low-pass filter cut-off frequency [Hz]
+    R_Click R_click(5, RT_Click_Calibration{4.03, 19.93, 832, 3999},
+                    DAQ_DT, DAQ_LP);
+
+    void setup() {
+      R_click.begin();
+    }
+
+    void loop() {
+      R_click.poll_oversampling();
+      R_click.get_LP_mA();
+    }
+    '''
+
+  EXAMPLE 3: T click usage
+    '''
+    #include "DvG_RT_Click_mA.h"
+
+    T_Click T_click(6, RT_Click_Calibration{4.02, 19.99, 800, 3980});
+
+    void setup() {
+      T_click.begin();
+    }
+
+    void loop() {
+      T_click.set_mA(12.0);
+    }
+    '''
 */
 
 #ifndef DVG_RT_CLICK_MA_H_
@@ -57,12 +74,11 @@ Dennis van Gils, 20-07-2022
 #include <Arduino.h>
 #include <SPI.h>
 
-// Maximal SPI clock frequency for the MCP3201 ADC chip (R click) and MCP4921
-// DAC chip (T click) running at 3.3V is 1 MHz
-const SPISettings RT_CLICK_SPI(1000000, MSBFIRST, SPI_MODE0);
-
-// Junk byte
-const byte RT_CLICK_JUNK = 0xFF;
+// Maximum SPI clock frequencies taken from the datasheets:
+// - MCP3201 ADC chip (R click): 1.6 MHz
+// - MCP4921 DAC chip (T click): 20 MHz
+// Hence, we fix the default SPI clock to a comfortable 1 MHz for both.
+const SPISettings DEFAULT_RT_CLICK_SPI_SETTINGS(1000000, MSBFIRST, SPI_MODE0);
 
 // Currents less than this value are considered to signal a fault state, such as
 // a broken wire or a disconnected device. Typical value is 3.8 mA.
@@ -119,6 +135,7 @@ bits 11 to 0 - D11:D0: DAC Input Data bits. Bit x is ignored
 
 class T_Click {
 private:
+  SPISettings SPI_settings_ = DEFAULT_RT_CLICK_SPI_SETTINGS;
   uint8_t CS_pin_;             // Cable select pin
   RT_Click_Calibration calib_; // Calibration parameters [bitval] to [mA]
   uint16_t bitval_;            // Last set bit value
@@ -132,13 +149,18 @@ public:
     calib_ = calib;
   }
 
-  // Start SPI and set up the cable select SPI pin
+  // Adjust the initially set SPI clock frequency of 1 MHz to another frequency.
+  // The maximum SPI clock frequency reported by the datasheet of the MCP4921
+  // DAC chip (T click) is 20 MHz.
+  void adjust_SPI_clock_frequency(uint32_t clk_freq_Hz) {
+    SPI_settings_ = SPISettings(clk_freq_Hz, MSBFIRST, SPI_MODE0);
+  }
+
+  // Start SPI and set up the cable select SPI pin. The output is set to 4 mA.
   void begin() {
     SPI.begin();
     digitalWrite(CS_pin_, HIGH); // Disable the slave SPI device for now
     pinMode(CS_pin_, OUTPUT);
-
-    // Force output to 4 mA at the start
     set_mA(4.0);
   }
 
@@ -163,7 +185,7 @@ public:
     bitval_HI |= 0x30;                 // 0x30 = 48
     bitval_LO = bitval_;
 
-    SPI.beginTransaction(RT_CLICK_SPI);
+    SPI.beginTransaction(SPI_settings_);
     digitalWrite(CS_pin_, LOW);  // Enable slave device
     SPI.transfer(bitval_HI);     // Transfer high byte
     SPI.transfer(bitval_LO);     // Transfer low byte
@@ -181,6 +203,7 @@ public:
 
 class R_Click {
 private:
+  SPISettings SPI_settings_ = DEFAULT_RT_CLICK_SPI_SETTINGS;
   uint8_t CS_pin_;             // Cable select pin
   RT_Click_Calibration calib_; // Calibration parameters [bitval] to [mA]
 
@@ -217,6 +240,13 @@ public:
     DAQ_LP_filter_Hz_ = DAQ_LP_filter_Hz;
   }
 
+  // Adjust the initially set SPI clock frequency of 1 MHz to another frequency.
+  // The maximum SPI clock frequency reported by the datasheet of the MCP3201
+  // ADC chip (R click) is 1.6 MHz.
+  void adjust_SPI_clock_frequency(uint32_t clk_freq_Hz) {
+    SPI_settings_ = SPISettings(clk_freq_Hz, MSBFIRST, SPI_MODE0);
+  }
+
   // Start SPI and set up the cable select SPI pin
   void begin() {
     SPI.begin();
@@ -245,10 +275,10 @@ public:
 
     // The standard Arduino SPI library handles data of 8 bits long
     // The MIKROE R Click shield is 12 bits, hence transfer in two steps
-    SPI.beginTransaction(RT_CLICK_SPI);
+    SPI.beginTransaction(SPI_settings_);
     digitalWrite(CS_pin_, LOW); // Enable slave device
-    data_HI = SPI.transfer(RT_CLICK_JUNK) & 0x1F;
-    data_LO = SPI.transfer(RT_CLICK_JUNK);
+    data_HI = SPI.transfer(0xFF) & 0x1F;
+    data_LO = SPI.transfer(0xFF);
     digitalWrite(CS_pin_, HIGH); // Disable slave device
     SPI.endTransaction();
 
