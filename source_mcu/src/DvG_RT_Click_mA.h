@@ -6,7 +6,8 @@ A library for the 4-20 mA current controllers of MIKROE:
   - 4-20 mA T click (transmitter)
 
 Both controllers operate over the SPI bus. Maximal SPI clock frequency for
-MCP3204 (R click) and MCP3201 (T click) running at 3.3V is 1 MHz.
+the MCP3201 ADC chip (R click) and MCP4921 DAC chip (T click) running at 3.3V
+is 1 MHz.
 
 Single R click readings tend to fluctuate a lot. To combat the large
 fluctuations this library also allows for oversampling and subsequently low-pass
@@ -47,7 +48,7 @@ EXAMPLE 2: R click usage WITH OVERSAMPLING
   }
   '''
 
-Dennis van Gils, 19-07-2022
+Dennis van Gils, 20-07-2022
 */
 
 #ifndef DVG_RT_CLICK_MA_H_
@@ -78,6 +79,7 @@ const float R_CLICK_FAULT_mA = 3.8;
 //   param 2: Calibration point 2, float [mA]
 //   param 3: Calibration point 1, uint16_t [bitval]
 //   param 4: Calibration point 2, uint16_t [bitval]
+// Typical calibration values: {4.0, 20.0, 800, 3980}
 struct RT_Click_Calibration {
   float p1_mA;        // Calibration point 1 [mA]
   float p2_mA;        // Calibration point 2 [mA]
@@ -119,7 +121,7 @@ class T_Click {
 private:
   uint8_t CS_pin_;             // Cable select pin
   RT_Click_Calibration calib_; // Calibration parameters [bitval] to [mA]
-  uint16_t set_bitval_;        // Last set bit value
+  uint16_t bitval_;            // Last set bit value
 
 public:
   // Constructor
@@ -140,24 +142,26 @@ public:
     set_mA(4.0);
   }
 
+  // Transform the current [mA] into a bit value given the calibration params.
+  uint16_t mA2bitval(float mA) {
+    return (int)round((mA - calib_.p1_mA) / (calib_.p2_mA - calib_.p1_mA) *
+                          (calib_.p2_bitval - calib_.p1_bitval) +
+                      calib_.p1_bitval);
+  }
+
   // Set the output current [mA]
   void set_mA(float mA_value) {
-    uint16_t bitval;
     byte bitval_HI;
     byte bitval_LO;
 
     // Transform current [mA] to [bitval]
-    bitval =
-        (int)round((mA_value - calib_.p1_mA) / (calib_.p2_mA - calib_.p1_mA) *
-                       (calib_.p2_bitval - calib_.p1_bitval) +
-                   calib_.p1_bitval);
-    set_bitval_ = bitval;
+    bitval_ = mA2bitval(mA_value);
 
     // The standard Arduino SPI library handles data of 8 bits long.
     // The MIKROE T Click shield is 12 bits, hence transfer in two steps.
-    bitval_HI = (bitval >> 8) & 0x0F; // 0x0F = 15
-    bitval_HI |= 0x30;                // 0x30 = 48
-    bitval_LO = bitval;
+    bitval_HI = (bitval_ >> 8) & 0x0F; // 0x0F = 15
+    bitval_HI |= 0x30;                 // 0x30 = 48
+    bitval_LO = bitval_;
 
     SPI.beginTransaction(RT_CLICK_SPI);
     digitalWrite(CS_pin_, LOW);  // Enable slave device
@@ -168,7 +172,7 @@ public:
   }
 
   // Return the bit value belonging to the last set current
-  uint16_t get_last_set_bitval() { return set_bitval_; }
+  uint16_t get_last_set_bitval() { return bitval_; }
 };
 
 /*******************************************************************************
@@ -235,7 +239,7 @@ public:
   }
 
   // Read out the R click once and return the bit value
-  uint32_t read_bitval() {
+  uint16_t read_bitval() {
     byte data_HI;
     byte data_LO;
 
@@ -249,7 +253,7 @@ public:
     SPI.endTransaction();
 
     // Reconstruct bit value
-    return (uint32_t)((data_HI << 8) | data_LO) >> 1;
+    return (uint16_t)((data_HI << 8) | data_LO) >> 1;
   }
 
   // Read out the R click once and return the current in [mA], unless the R
