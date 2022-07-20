@@ -18,6 +18,20 @@
 
 
 
+  TODO:
+    x) Apply vscode recommendations
+      "recommendations": [
+          "platformio.platformio-ide",
+          "ms-vscode.cpptools",
+          "xaver.clang-format"
+      ],
+
+    x) Format docstrings like
+         https://developer.lsst.io/cpp/api-docs.html
+         https://www.doxygen.nl/manual/commands.html
+
+
+
   EXAMPLE 1: R click usage WITHOUT OVERSAMPLING
     '''
     #include "DvG_RT_Click_mA.h"
@@ -142,6 +156,7 @@ private:
   R_Click
 *******************************************************************************/
 
+// Constructor description goes here
 class R_Click {
 public:
   // Constructor
@@ -171,6 +186,19 @@ public:
   // Currents less than 3.8 mA are considered to signal a fault state, such as
   // a broken wire or a disconnected device. In that case the return value will
   // be NAN.
+
+  /**
+   * \brief Transform the bit value into a current [mA] given the calibration
+   * params.
+   *
+   * Currents less than 3.8 mA are considered to signal a fault state, such as
+   * a broken wire or a disconnected device. In that case the return value will
+   * be NAN.
+   *
+   * \param bitval the bit value to transform into a current [mA]
+   * \return The current in mA, or NAN when the device is in a fault state.
+   *
+   */
   float bitval2mA(float bitval);
 
   // Read out the R click once and return the bit value
