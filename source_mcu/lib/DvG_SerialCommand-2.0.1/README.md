@@ -13,7 +13,7 @@ Example usage on an Arduino:
 DvG_SerialCommand sc(Ser);
 
 void setup() {
-  Ser.begin(9600);  // Open port
+  Ser.begin(115200);  // Open port
 }
 
 void loop() {
@@ -24,7 +24,7 @@ void loop() {
 
     // Your command string comparison routines and actions here
     if (strcmp(strCmd, "id?") == 0) {
-      Ser.println("My Arduino");
+      Ser.println("Arduino, Blinker");
     }
   }
 }
