@@ -3,7 +3,7 @@ TWT jetting grid
 
 https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
 Dennis van Gils
-19-07-2022
+21-07-2022
 */
 
 // https://google.github.io/styleguide/cppguide.html#Variable_Names
@@ -12,8 +12,8 @@ Dennis van Gils
 #include <SPI.h>
 #include <Wire.h>
 
-#include "DvG_RT_Click_mA.h"
 #include "DvG_SerialCommand.h"
+#include "MIKROE_4_20mA_RT_Click.h"
 #include "constants.h"
 
 // Serial command listener

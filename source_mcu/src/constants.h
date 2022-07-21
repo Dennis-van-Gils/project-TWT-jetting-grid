@@ -2,13 +2,13 @@
 Constants of the TWT jetting grid
 
 Dennis van Gils
-19-07-2022
+21-07-2022
 */
 
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
-#include "DvG_RT_Click_mA.h"
+#include "MIKROE_4_20mA_RT_Click.h"
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
