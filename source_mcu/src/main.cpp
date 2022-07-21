@@ -123,14 +123,14 @@ void loop() {
   if (now - tick > 1000) {
     tick = now;
 
-    state.pres_1_bitval = R_click_1.get_LP_bitval();
-    state.pres_2_bitval = R_click_2.get_LP_bitval();
-    state.pres_3_bitval = R_click_3.get_LP_bitval();
-    state.pres_4_bitval = R_click_4.get_LP_bitval();
-    state.pres_1_mA = R_click_1.get_LP_mA();
-    state.pres_2_mA = R_click_2.get_LP_mA();
-    state.pres_3_mA = R_click_3.get_LP_mA();
-    state.pres_4_mA = R_click_4.get_LP_mA();
+    state.pres_1_bitval = R_click_1.get_oversampled_bitval();
+    state.pres_2_bitval = R_click_2.get_oversampled_bitval();
+    state.pres_3_bitval = R_click_3.get_oversampled_bitval();
+    state.pres_4_bitval = R_click_4.get_oversampled_bitval();
+    state.pres_1_mA = R_click_1.get_oversampled_mA();
+    state.pres_2_mA = R_click_2.get_oversampled_mA();
+    state.pres_3_mA = R_click_3.get_oversampled_mA();
+    state.pres_4_mA = R_click_4.get_oversampled_mA();
     state.pres_1_bar = mA2bar(state.pres_1_mA, OMEGA_1_CALIB);
     state.pres_2_bar = mA2bar(state.pres_2_mA, OMEGA_2_CALIB);
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
