@@ -260,8 +260,8 @@ public:
    * allow for oversampling and subsequent low-pass filtering of the R Click
    * readings.
    *
-   * @return true A new sample has been read and added to the filter
-   * @return false Not time yet to read out a new sample
+   * @return True when a new sample has been read and added to the filter.
+   * Otherwise false, because it was not yet time to read out a new sample.
    *
    * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have been
    * passed to the constructor.
@@ -284,12 +284,12 @@ public:
    * @brief Return the currently known oversampled and low-pass filtered R Click
    * reading in mA.
    *
-   * @return The current in mA, or NAN when the device is in a fault state, see
-   * @see read_mA() for more details
+   * @return The current in mA, or NAN when the device is in a fault state. See
+   * @ref read_mA() for more details on the fault state.
    *
-   * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have been
-   * passed to the constructor and @ref poll_oversampling() must be repeatedly
-   * called.
+   * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have
+   * been passed to the constructor and @ref poll_oversampling() must be
+   * repeatedly called.
    */
   float get_LP_mA();
 
