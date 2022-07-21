@@ -159,8 +159,8 @@ bool R_Click::poll_oversampling() {
   }
 }
 
-float R_Click::get_LP_bitval() { return DAQ_LP_value_; }
+float R_Click::get_oversampled_bitval() { return DAQ_LP_value_; }
 
-float R_Click::get_LP_mA() { return bitval2mA(DAQ_LP_value_); }
+float R_Click::get_oversampled_mA() { return bitval2mA(DAQ_LP_value_); }
 
 uint32_t R_Click::get_last_obtained_DAQ_DT() { return DAQ_obtained_DT_; }

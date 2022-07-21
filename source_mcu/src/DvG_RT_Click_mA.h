@@ -1,12 +1,13 @@
 /**
  * @file DvG_RT_Click_mA.h
  * @author Dennis P.M. van Gils (vangils.dennis@gmail.com)
- * @link https://github.com/Dennis-van-Gils/
+ * @version https://github.com/Dennis-van-Gils
  * @version 1.0
  * @date 2022-07-21
  *
  * @brief A library for the 4-20 mA R & T Click Boards of MIKROE.
  *
+ * Supported:
  * - 4-20 mA R Click (MIKROE-1387): 4-20 mA current loop receiver
  * - 4-20 mA T Click (MIKROE-1296): 4-20 mA current loop transmitter
  *
@@ -18,14 +19,10 @@
  * single-pole infinite-impulse response (IIR) filter, which is very memory
  * efficient.
  *
- * @copyright Copyright (c) 2022
- * @section license License
- *
- * MIT license, all text here must be included in any redistribution.
- * See the LICENSE.txt file for details.
+ * @copyright MIT License. See the LICENSE.txt file for details.
  */
 
-/**
+/*
   EXAMPLE 1: R Click usage WITHOUT OVERSAMPLING
   '''
     #include "DvG_RT_Click_mA.h"
@@ -76,6 +73,7 @@
  * Maximum SPI clock frequencies taken from the datasheets:
  * - MCP3201 ADC chip (R Click): 1.6 MHz
  * - MCP4921 DAC chip (T Click): 20 MHz
+ *
  * Hence, we fix the default SPI clock to a comfortable 1 MHz for both.
  */
 const SPISettings DEFAULT_RT_CLICK_SPI_SETTINGS(1000000, MSBFIRST, SPI_MODE0);
@@ -189,7 +187,10 @@ private:
 class R_Click {
 public:
   /**
-   * @brief Construct a new R Click object without oversampling.
+   * @brief Construct a new R Click object.
+   *
+   * Methods @ref read_bitval() and @ref read_mA() can be used to get the
+   * instanteneous R Click reading.
    *
    * @param CS_pin Cable select SPI pin
    * @param calib Structure holding the [bitval] to [mA] calibration parameters
@@ -197,7 +198,17 @@ public:
   R_Click(uint8_t CS_pin, const RT_Click_Calibration calib);
 
   /**
-   * @brief Construct a new R Click object with oversampling.
+   * @brief Construct a new R Click object that uses oversampling and subsequent
+   * low-pass filtering of the R Click readings.
+   *
+   * Method @ref poll_oversampling() should be repeatedly called in the main
+   * loop, ideally at a faster pace than the desired oversampling frequency. It
+   * will then periodically add new readings to a running single-pole
+   * infinite-impulse reponse (IIR) low-pass filter.
+   *
+   * Methods @ref get_oversampled_bitval() and @ref get_oversampled_mA() can be
+   * used to get the currently known oversampled and low-pass filtered R Click
+   * reading.
    *
    * @param CS_pin Cable select SPI pin
    * @param calib Structure holding the [bitval] to [mA] calibration parameters
@@ -263,8 +274,8 @@ public:
    * @return True when a new sample has been read and added to the filter.
    * Otherwise false, because it was not yet time to read out a new sample.
    *
-   * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have been
-   * passed to the constructor.
+   * @note Args `DAQ_interval_ms` and `DAQ_LP_filter_Hz` must have been passed
+   * to the constructor.
    */
   bool poll_oversampling();
 
@@ -274,11 +285,10 @@ public:
    *
    * @return The fractional bit value
    *
-   * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have been
-   * passed to the constructor and @ref poll_oversampling() must be repeatedly
-   * called.
+   * @note Args `DAQ_interval_ms` and `DAQ_LP_filter_Hz` must have been passed
+   * to the constructor and @ref poll_oversampling() must be repeatedly called.
    */
-  float get_LP_bitval();
+  float get_oversampled_bitval();
 
   /**
    * @brief Return the currently known oversampled and low-pass filtered R Click
@@ -287,11 +297,10 @@ public:
    * @return The current in mA, or NAN when the device is in a fault state. See
    * @ref read_mA() for more details on the fault state.
    *
-   * @note Args @ref DAQ_interval_ms and @ref DAQ_LP_filter_Hz must have
-   * been passed to the constructor and @ref poll_oversampling() must be
-   * repeatedly called.
+   * @note Args `DAQ_interval_ms` and `DAQ_LP_filter_Hz` must have been passed
+   * to the constructor and @ref poll_oversampling() must be repeatedly called.
    */
-  float get_LP_mA();
+  float get_oversampled_mA();
 
   /**
    * @brief Return the last obtained interval of the oversampled R Click
