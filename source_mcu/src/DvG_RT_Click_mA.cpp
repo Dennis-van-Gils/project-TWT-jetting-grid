@@ -1,12 +1,13 @@
-/*
-  DvG_RT_Click_mA.cpp
-*/
+/**
+ * @file DvG_RT_Click_mA.cpp
+ */
 
 #include "DvG_RT_Click_mA.h"
 
 /*******************************************************************************
   T_Click
 *******************************************************************************/
+
 /*
 Additional notes from John Cabrer, wildseyed@gmail.com
 
@@ -56,13 +57,13 @@ uint16_t T_Click::mA2bitval(float mA) {
                          calib_.p1_bitval);
 }
 
-void T_Click::set_mA(float mA_value) {
+void T_Click::set_mA(float mA) {
   byte bitval_HI;
   byte bitval_LO;
 
   // The standard Arduino SPI library handles data of 8 bits long.
   // The MIKROE T Click shield is 12 bits, hence transfer in two steps.
-  bitval_ = mA2bitval(mA_value);
+  bitval_ = mA2bitval(mA);
   bitval_HI = (bitval_ >> 8) & 0x0F; // 0x0F = 15
   bitval_HI |= 0x30;                 // 0x30 = 48
   bitval_LO = bitval_;
@@ -131,7 +132,7 @@ uint16_t R_Click::read_bitval() {
   return (uint16_t)((data_HI << 8) | data_LO) >> 1;
 }
 
-float R_Click::read_mA() { return bitval2mA(R_Click::read_bitval()); }
+float R_Click::read_mA() { return bitval2mA(read_bitval()); }
 
 bool R_Click::poll_oversampling() {
   uint32_t now = micros();
