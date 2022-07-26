@@ -1,0 +1,24 @@
+# Datatypes (KEYWORD1)
+RT_Click_Calibration	KEYWORD1
+R_Click	KEYWORD1
+T_Click	KEYWORD1
+
+# Methods and Functions (KEYWORD2)
+begin	KEYWORD2
+bitval2mA	KEYWORD2
+get_EMA_bitval	KEYWORD2
+get_EMA_mA	KEYWORD2
+get_EMA_obtained_interval	KEYWORD2
+get_last_set_bitval	KEYWORD2
+mA2bitval	KEYWORD2
+poll_EMA	KEYWORD2
+read_bitval	KEYWORD2
+read_mA	KEYWORD2
+set_mA	KEYWORD2
+set_SPI_clock	KEYWORD2
+
+# Instances (KEYWORD2)
+
+# Constants (LITERAL1)
+DEFAULT_RT_CLICK_SPI_SETTINGS	LITERAL1
+R_CLICK_FAULT_mA	LITERAL1
