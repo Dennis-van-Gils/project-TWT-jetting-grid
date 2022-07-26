@@ -3,7 +3,7 @@ TWT jetting grid
 
 https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
 Dennis van Gils
-21-07-2022
+26-07-2022
 */
 
 // https://google.github.io/styleguide/cppguide.html#Variable_Names
@@ -11,6 +11,8 @@ Dennis van Gils
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+
+#include "Adafruit_NeoPixel.h"
 
 #include "DvG_SerialCommand.h"
 #include "MIKROE_4_20mA_RT_Click.h"
@@ -22,6 +24,12 @@ DvG_SerialCommand sc(Serial);
 // Common character buffer
 #define BUFLEN 128
 char buf[BUFLEN]{'\0'};
+
+/*------------------------------------------------------------------------------
+  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+------------------------------------------------------------------------------*/
+
+Adafruit_NeoPixel strip(LED_COUNT, PIN_LED_MATRIX, NEO_GRB + NEO_KHZ800);
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
@@ -78,6 +86,19 @@ void setup() {
   R_click_3.begin();
   R_click_4.begin();
 
+  // LED matrix
+  strip.begin();
+  if (false) {
+    strip.fill(strip.Color(0, 0, 5));
+  } else {
+    uint32_t rgbcolor;
+    for (uint16_t idx = 0; idx < LED_COUNT; idx++) {
+      rgbcolor = strip.ColorHSV(idx * 65535 / LED_COUNT, 255, 10);
+      strip.setPixelColor(idx, rgbcolor);
+    }
+  }
+  strip.show();
+
   /*
   // Set RGB LED to blue: We're setting up
   neo.begin();
@@ -112,25 +133,28 @@ void loop() {
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
-  if (R_click_1.poll_oversampling()) {
-    // DEBUG: Show obtained DT interval
-    // Serial.println(R_click_1.get_last_obtained_DAQ_DT());
+  if (R_click_1.poll_EMA()) {
+    // DEBUG: Alarm when obtained DT interval is too large
+    if (R_click_1.get_EMA_obtained_interval() > 3000) {
+      Serial.print("Warning. Large EMA DT: ");
+      Serial.println(R_click_1.get_EMA_obtained_interval());
+    }
   }
-  R_click_2.poll_oversampling();
-  R_click_3.poll_oversampling();
-  R_click_4.poll_oversampling();
+  R_click_2.poll_EMA();
+  R_click_3.poll_EMA();
+  R_click_4.poll_EMA();
 
   if (now - tick > 1000) {
     tick = now;
 
-    state.pres_1_bitval = R_click_1.get_oversampled_bitval();
-    state.pres_2_bitval = R_click_2.get_oversampled_bitval();
-    state.pres_3_bitval = R_click_3.get_oversampled_bitval();
-    state.pres_4_bitval = R_click_4.get_oversampled_bitval();
-    state.pres_1_mA = R_click_1.get_oversampled_mA();
-    state.pres_2_mA = R_click_2.get_oversampled_mA();
-    state.pres_3_mA = R_click_3.get_oversampled_mA();
-    state.pres_4_mA = R_click_4.get_oversampled_mA();
+    state.pres_1_bitval = R_click_1.get_EMA_bitval();
+    state.pres_2_bitval = R_click_2.get_EMA_bitval();
+    state.pres_3_bitval = R_click_3.get_EMA_bitval();
+    state.pres_4_bitval = R_click_4.get_EMA_bitval();
+    state.pres_1_mA = R_click_1.get_EMA_mA();
+    state.pres_2_mA = R_click_2.get_EMA_mA();
+    state.pres_3_mA = R_click_3.get_EMA_mA();
+    state.pres_4_mA = R_click_4.get_EMA_mA();
     state.pres_1_bar = mA2bar(state.pres_1_mA, OMEGA_1_CALIB);
     state.pres_2_bar = mA2bar(state.pres_2_mA, OMEGA_2_CALIB);
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);

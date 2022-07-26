@@ -2,13 +2,20 @@
 Constants of the TWT jetting grid
 
 Dennis van Gils
-21-07-2022
+26-07-2022
 */
 
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
 #include "MIKROE_4_20mA_RT_Click.h"
+
+/*------------------------------------------------------------------------------
+  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+------------------------------------------------------------------------------*/
+
+const uint8_t PIN_LED_MATRIX = 11;
+const uint16_t LED_COUNT = 256;
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
@@ -28,8 +35,8 @@ const RT_Click_Calibration R_CLICK_4_CALIB{3.98, 19.83, 828, 3981};
 
 // Single R click readings fluctuate a lot and so will be oversampled and
 // subsequently low-pass filtered as data-acquisition (DAQ) routine.
-const uint32_t DAQ_DT = 2; // Desired oversampling interval [ms]
-const float DAQ_LP = 2.;   // Low-pass filter cut-off frequency [Hz]
+const uint32_t DAQ_DT = 2000; // Desired oversampling interval [us]
+const float DAQ_LP = 10.;     // Low-pass filter cut-off frequency [Hz]
 
 /*------------------------------------------------------------------------------
   OMEGA pressure sensors, type PXM309-007GI
