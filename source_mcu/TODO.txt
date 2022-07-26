@@ -1,0 +1,3 @@
+Research LED matrix control
+- https://github.com/FastLED/FastLED/blob/master/examples/XYMatrix/XYMatrix.ino
+- https://www.youtube.com/watch?v=zYZkbfmCuEY
