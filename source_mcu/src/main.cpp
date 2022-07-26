@@ -14,6 +14,7 @@ Dennis van Gils
 
 #include "Adafruit_NeoPixel.h"
 
+#include "Centipede.h"
 #include "DvG_SerialCommand.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "constants.h"
@@ -30,6 +31,14 @@ char buf[BUFLEN]{'\0'};
 ------------------------------------------------------------------------------*/
 
 Adafruit_NeoPixel strip(LED_COUNT, PIN_LED_MATRIX, NEO_GRB + NEO_KHZ800);
+
+/*------------------------------------------------------------------------------
+  Macetech Centipede boards
+------------------------------------------------------------------------------*/
+
+// One object controls both Centipede boards over ports 0 to 7
+uint8_t cp_port;
+Centipede cp;
 
 /*------------------------------------------------------------------------------
   Holds actuator states and sensor readings
@@ -133,6 +142,15 @@ void setup() {
     }
   }
   strip.show();
+
+  // Centipedes
+  Wire.begin();
+  cp.initialize();
+
+  for (cp_port = 0; cp_port < 8; cp_port++) {
+    cp.portMode(cp_port, 0);  // Set all channels to output
+    cp.portWrite(cp_port, 0); // Set all channels LOW
+  }
 
   /*
   // Set RGB LED to blue: We're setting up
