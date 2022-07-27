@@ -1,3 +1,16 @@
 Research LED matrix control
 - https://github.com/FastLED/FastLED/blob/master/examples/XYMatrix/XYMatrix.ino
 - https://www.youtube.com/watch?v=zYZkbfmCuEY
+
+Protocol:
+	[HEADER]
+	Name: Protocol nr 1
+	Stats: delta T = 2 s, delta X = 2.5 (info to be able to generate this protocol)
+	[DATA]
+	[timestamp in ms]    [list of open valves in grid (-7,-7) to (7,7)]
+	0       -7,-2    3,2    1,2    4,-2
+	500     -6,-4    3,6    -3,2
+	1000    ..... 
+	
+  - Plain ASCII, tab delimited, rows ending with '\n' , not '\n\r'
+  - Assume each row all valves are turned off, unless listed 
