@@ -12,11 +12,11 @@ Dennis van Gils
 #include <SPI.h>
 #include <Wire.h>
 
-#include "Adafruit_NeoPixel.h"
-
 #include "Centipede.h"
 #include "DvG_SerialCommand.h"
+#include "FastLED.h" // API: http://fastled.io/docs/3.1/index.html
 #include "MIKROE_4_20mA_RT_Click.h"
+
 #include "constants.h"
 
 // Serial command listener
@@ -28,9 +28,10 @@ char buf[BUFLEN]{'\0'};
 
 /*------------------------------------------------------------------------------
   LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+  WS2812 or SK6812 type
 ------------------------------------------------------------------------------*/
 
-Adafruit_NeoPixel strip(LED_COUNT, PIN_LED_MATRIX, NEO_GRB + NEO_KHZ800);
+CRGB leds[LED_COUNT];
 
 /*------------------------------------------------------------------------------
   Macetech Centipede boards
@@ -38,7 +39,7 @@ Adafruit_NeoPixel strip(LED_COUNT, PIN_LED_MATRIX, NEO_GRB + NEO_KHZ800);
 
 // One object controls both Centipede boards over ports 0 to 7
 uint8_t cp_port;
-Centipede cp;
+// Centipede cp;
 
 /*------------------------------------------------------------------------------
   Holds actuator states and sensor readings
@@ -131,19 +132,20 @@ void setup() {
   R_click_4.begin();
 
   // LED matrix
-  strip.begin();
-  if (false) {
-    strip.fill(strip.Color(0, 0, 5));
-  } else {
-    uint32_t rgbcolor;
-    for (uint16_t idx = 0; idx < LED_COUNT; idx++) {
-      rgbcolor = strip.ColorHSV(idx * 65535 / LED_COUNT, 255, 10);
-      strip.setPixelColor(idx, rgbcolor);
-    }
-  }
-  strip.show();
+  // NOTE: It takes roughly 30 us to write to one WS2812 LED. Hence, for the
+  // full 16x16 matrix the theoretical max fps is around 130 Hz. We must cap
+  // the refresh rate to lower values. If we don't we get flickering of the LED
+  // strip. Confirmed and tested: <= 80 Hz.
+  FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, LED_COUNT);
+  FastLED.setCorrection(UncorrectedColor);
+  // FastLED.setCorrection(TypicalSMD5050);
+  // FastLED.setMaxRefreshRate(80); // FPS
+  FastLED.setBrightness(5);
+  fill_rainbow(leds, LED_COUNT, 0, 1);
+  FastLED.show();
 
   // Centipedes
+  /*
   Wire.begin();
   cp.initialize();
 
@@ -151,6 +153,7 @@ void setup() {
     cp.portMode(cp_port, 0);  // Set all channels to output
     cp.portWrite(cp_port, 0); // Set all channels LOW
   }
+  */
 
   /*
   // Set RGB LED to blue: We're setting up
@@ -167,20 +170,29 @@ void setup() {
 // -----------------------------------------------------------------------------
 //  loop
 // -----------------------------------------------------------------------------
+uint8_t idx_led = 0;
 
 void loop() {
   char *str_cmd; // Incoming serial command string
   uint32_t now = millis();
   static uint32_t tick = now;
+  static uint32_t tock = now;
+  static uint32_t tack = now;
+  static uint32_t utick = micros();
 
+  /*
   // Process incoming serial commands
-  if (sc.available()) {
-    str_cmd = sc.getCmd();
+  if (now - tack > 50) {
+    tack = now;
+    if (sc.available()) {
+      str_cmd = sc.getCmd();
 
-    if (strcmp(str_cmd, "id?") == 0) {
-      Serial.println("Arduino, TWT jetting grid");
+      if (strcmp(str_cmd, "id?") == 0) {
+        Serial.println("Arduino, TWT jetting grid");
+      }
     }
   }
+  */
 
   // ---------------------------------------------------------------------------
   //   Update R click readings
@@ -188,8 +200,8 @@ void loop() {
 
   if (R_click_poll_EMA_collectively()) {
     // DEBUG: Alarm when obtained DT interval is too large
-    if (EMA_obtained_interval > 3000) {
-      Serial.print("Warning. Large EMA DT: ");
+    if (EMA_obtained_interval > DAQ_DT * 1.05) {
+      Serial.print("WARNING: Large EMA DT ");
       Serial.println(EMA_obtained_interval);
     }
   }
@@ -206,6 +218,11 @@ void loop() {
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
     state.pres_4_bar = mA2bar(state.pres_4_mA, OMEGA_4_CALIB);
 
+    // Notes on printing to serial:
+    //   Using `snprintf()` to print a large array of formatted values to a
+    //   buffer followed by a single `Serial.print(buf)` is many times faster
+    //   than multiple dumb `Serial.print(value, 3); Serial.write('\t')`
+    //   statements. The former is ~ 320 us, the latter > 3400 us !!!
     // clang-format off
     snprintf(buf, BUFLEN,
              "%.2f\t%.2f\t%.2f\t%.2f\t\t"
@@ -219,8 +236,9 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-
     Serial.print(buf);
+
+    Serial.println(FastLED.getFPS());
   }
 
   /*
@@ -231,4 +249,21 @@ void loop() {
     neo.show();
   }
   */
+
+  // Animate LED matrix
+  EVERY_N_MILLIS(10) { fadeToBlackBy(leds, LED_COUNT, 1); }
+  EVERY_N_MILLIS(100) {
+    leds[idx_led] = ColorFromPalette(RainbowColors_p, idx_led);
+    idx_led++;
+  }
+
+  // Send out LED data to the strip. `delay()` keeps the framerate modest and
+  // allows for brightness dithering. It will invoke FastLED.show() - sending
+  // out the LED data - at least once during the delay.
+  // FastLED.delay(0);
+  EVERY_N_MILLIS(20) {
+    // utick = micros();
+    FastLED.show(); // Takes 8000 us to write to all 256 leds, confirmed
+    // Serial.println(micros() - utick);
+  }
 }
