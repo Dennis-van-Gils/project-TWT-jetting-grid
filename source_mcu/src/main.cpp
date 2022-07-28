@@ -46,6 +46,17 @@ CRGB leds[LED_COUNT];
 
 // One object controls both Centipede boards over ports 0 to 7
 uint8_t cp_port;
+uint8_t cp_value;
+
+uint16_t cp0_value = 0;
+uint16_t cp1_value = 0;
+uint16_t cp2_value = 0;
+uint16_t cp3_value = 0;
+uint16_t cp4_value = 0;
+uint16_t cp5_value = 0;
+uint16_t cp6_value = 0;
+uint16_t cp7_value = 0;
+
 Centipede cp;
 
 /*------------------------------------------------------------------------------
@@ -206,7 +217,12 @@ void setup() {
 // -----------------------------------------------------------------------------
 //  loop
 // -----------------------------------------------------------------------------
-uint8_t idx_led = 0;
+
+int8_t pcs_x = -7;
+int8_t pcs_y = 7;
+
+uint16_t idx_valve = 1;
+uint16_t idx_led = 0;
 
 void loop() {
   char *str_cmd; // Incoming serial command string
@@ -236,8 +252,8 @@ void loop() {
   if (R_click_poll_EMA_collectively()) {
     // DEBUG: Alarm when obtained DT interval is too large
     if (EMA_obtained_interval > DAQ_DT * 1.05) {
-      Serial.print("WARNING: Large EMA DT ");
-      Serial.println(EMA_obtained_interval);
+      // Serial.print("WARNING: Large EMA DT ");
+      // Serial.println(EMA_obtained_interval);
     } else {
       // Serial.println("*");
     }
@@ -275,7 +291,7 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    Serial.print(buf); // Takes 320 µs per call
+    // Serial.print(buf); // Takes 320 µs per call
 
     // Serial.println(FastLED.getFPS());
   }
@@ -289,22 +305,99 @@ void loop() {
   }
   */
 
-  // Centipedes
-  // For-loop takes 457 µs in total @ 1 MHz I2C clock
-  EVERY_N_MILLIS(20) {
-    // utick = micros();
-    for (cp_port = 0; cp_port < 8; cp_port++) {
-      cp.portWrite(cp_port, idx_led << cp_port);
-    }
-    // Serial.println(micros() - utick);
-  }
-
   // Animate LED matrix
-  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, LED_COUNT, 1); }
+  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, LED_COUNT, 5); }
+  /*
   EVERY_N_MILLIS(100) {
-    // leds[idx_led] = ColorFromPalette(RainbowColors_p, idx_led);
     leds[idx_led] = CRGB::Red;
     idx_led++;
+  }
+  */
+
+  // Centipedes
+  // For-loop takes 457 µs in total @ 1 MHz I2C clock
+  EVERY_N_MILLIS(100) {
+    // utick = micros();
+
+    // Fade any previous red pixels as blue
+    for (idx_led = 0; idx_led < LED_COUNT; idx_led++) {
+      if (leds[idx_led].r > 0) {
+        leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
+      }
+    }
+
+    idx_led = PCS2LED(pcs_x, pcs_y);
+    leds[idx_led] = CRGB::Red;
+
+    idx_valve = PCS2valve(pcs_x, pcs_y);
+    cp_port = valve2cp_port(idx_valve);
+    cp_value = valve2cp_value(idx_valve);
+
+    Serial.print("valve: ");
+    Serial.print(idx_valve);
+    Serial.print(" @ cp ");
+    Serial.print(cp_port);
+    Serial.print(", ");
+    Serial.println(cp_value);
+
+    cp0_value = 0;
+    cp1_value = 0;
+    cp2_value = 0;
+    cp3_value = 0;
+    cp4_value = 0;
+    cp5_value = 0;
+    cp6_value = 0;
+    cp7_value = 0;
+
+    uint16_t foo;
+    bitSet(foo, cp_value);
+
+    switch (cp_port) {
+      case 0:
+        cp0_value |= foo;
+        break;
+      case 1:
+        cp1_value |= foo;
+        break;
+      case 2:
+        cp2_value |= foo;
+        break;
+      case 3:
+        cp3_value |= foo;
+        break;
+      case 4:
+        cp4_value |= foo;
+        break;
+      case 5:
+        cp5_value |= foo;
+        break;
+      case 6:
+        cp6_value |= foo;
+        break;
+      case 7:
+        cp7_value |= foo;
+        break;
+    }
+
+    cp.portWrite(0, cp0_value);
+    cp.portWrite(1, cp1_value);
+    cp.portWrite(2, cp2_value);
+    cp.portWrite(3, cp3_value);
+    cp.portWrite(4, cp4_value);
+    cp.portWrite(5, cp5_value);
+    cp.portWrite(6, cp6_value);
+    cp.portWrite(7, cp7_value);
+
+    // Serial.println(micros() - utick);
+
+    pcs_x++;
+    if (pcs_x == 8) {
+      pcs_x = -7;
+      pcs_y--;
+      if (pcs_y == -8) {
+        pcs_y = 7;
+      }
+    }
   }
 
   // Send out LED data to the strip.
