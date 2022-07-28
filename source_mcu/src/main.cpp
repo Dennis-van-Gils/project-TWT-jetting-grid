@@ -3,10 +3,14 @@ TWT jetting grid
 
 https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
 Dennis van Gils
-26-07-2022
+28-07-2022
 */
 
-// https://google.github.io/styleguide/cppguide.html#Variable_Names
+/*
+- Google CPP style guide:
+https://google.github.io/styleguide/cppguide.html#Variable_Names
+- FastLED API           : http://fastled.io/docs/3.1/index.html
+*/
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -14,7 +18,7 @@ Dennis van Gils
 
 #include "Centipede.h"
 #include "DvG_SerialCommand.h"
-#include "FastLED.h" // API: http://fastled.io/docs/3.1/index.html
+#include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 
 #include "constants.h"
@@ -25,6 +29,9 @@ DvG_SerialCommand sc(Serial);
 // Common character buffer
 #define BUFLEN 128
 char buf[BUFLEN]{'\0'};
+
+// DEBUG: timer
+uint32_t utick = micros();
 
 /*------------------------------------------------------------------------------
   LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
@@ -39,7 +46,7 @@ CRGB leds[LED_COUNT];
 
 // One object controls both Centipede boards over ports 0 to 7
 uint8_t cp_port;
-// Centipede cp;
+Centipede cp;
 
 /*------------------------------------------------------------------------------
   Holds actuator states and sensor readings
@@ -103,10 +110,14 @@ bool R_click_poll_EMA_collectively() {
       EMA_3_bitval = R_click_3.read_bitval();
       EMA_4_bitval = R_click_4.read_bitval();
     } else {
+      // Block takes 94 µs @ 1   MHz SPI clock
+      // Block takes 67 µs @ 1.7 MHz SPI clock
+      // utick = micros();
       EMA_1_bitval += alpha * (R_click_1.read_bitval() - EMA_1_bitval);
       EMA_2_bitval += alpha * (R_click_2.read_bitval() - EMA_2_bitval);
       EMA_3_bitval += alpha * (R_click_3.read_bitval() - EMA_3_bitval);
       EMA_4_bitval += alpha * (R_click_4.read_bitval() - EMA_4_bitval);
+      // Serial.println(micros() - utick);
     }
     EMA_tick = now;
     return true;
@@ -126,34 +137,59 @@ void setup() {
 
   Serial.begin(9600);
 
+  // R Click
+  R_click_1.set_SPI_clock(1700000);
+  R_click_2.set_SPI_clock(1700000);
+  R_click_3.set_SPI_clock(1700000);
+  R_click_4.set_SPI_clock(1700000);
   R_click_1.begin();
   R_click_2.begin();
   R_click_3.begin();
   R_click_4.begin();
 
   // LED matrix
-  // NOTE: It takes roughly 30 us to write to one WS2812 LED. Hence, for the
-  // full 16x16 matrix the theoretical max fps is around 130 Hz. We must cap
-  // the refresh rate to lower values. If we don't we get flickering of the LED
-  // strip. Confirmed and tested: <= 80 Hz.
+  /*
+  NOTE:
+    Don't call `FastLED.setMaxRefreshRate()`, because it will turn
+    `FastLED.show()` into a blocking call.
+
+  NOTE:
+    Type `NEOPIXEL` is internally `WS2812Controller800Khz`, so already running
+    at the max clock frequency of 800 kHz
+  */
   FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, LED_COUNT);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
-  // FastLED.setMaxRefreshRate(80); // FPS
   FastLED.setBrightness(5);
   fill_rainbow(leds, LED_COUNT, 0, 1);
   FastLED.show();
 
   // Centipedes
   /*
+  Supported I2C clock speeds:
+    MCP23017 datasheet: 100 kHz, 400 kHz, 1.7 MHz
+    SAMD51   datasheet: 100 kHz, 400 kHz, 1 MHz, 3.4 MHz
+  Default I2C clock speed is 100 kHz.
+
+  Resulting timings of the following code block:
+    ```
+    for (cp_port = 0; cp_port < 8; cp_port++) {
+      cp.portWrite(cp_port, cp_data);
+    }
+    ```
+    100 kHz: 3177 µs
+    400 kHz:  908 µs
+    1   MHz:  457 µs
+    1.7 MHz: fails, too fast
+  */
   Wire.begin();
+  Wire.setClock(1000000); // 1 MHz
   cp.initialize();
 
   for (cp_port = 0; cp_port < 8; cp_port++) {
     cp.portMode(cp_port, 0);  // Set all channels to output
     cp.portWrite(cp_port, 0); // Set all channels LOW
   }
-  */
 
   /*
   // Set RGB LED to blue: We're setting up
@@ -178,7 +214,6 @@ void loop() {
   static uint32_t tick = now;
   static uint32_t tock = now;
   static uint32_t tack = now;
-  static uint32_t utick = micros();
 
   /*
   // Process incoming serial commands
@@ -203,6 +238,8 @@ void loop() {
     if (EMA_obtained_interval > DAQ_DT * 1.05) {
       Serial.print("WARNING: Large EMA DT ");
       Serial.println(EMA_obtained_interval);
+    } else {
+      // Serial.println("*");
     }
   }
 
@@ -218,11 +255,13 @@ void loop() {
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
     state.pres_4_bar = mA2bar(state.pres_4_mA, OMEGA_4_CALIB);
 
-    // Notes on printing to serial:
-    //   Using `snprintf()` to print a large array of formatted values to a
-    //   buffer followed by a single `Serial.print(buf)` is many times faster
-    //   than multiple dumb `Serial.print(value, 3); Serial.write('\t')`
-    //   statements. The former is ~ 320 us, the latter > 3400 us !!!
+    /*
+    NOTE:
+      Using `snprintf()` to print a large array of formatted values to a buffer
+      followed by a single `Serial.print(buf)` is many times faster than
+      multiple dumb `Serial.print(value, 3); Serial.write('\t')` statements. The
+      former is ~ 320 µs, the latter > 3400 µs !!!
+    */
     // clang-format off
     snprintf(buf, BUFLEN,
              "%.2f\t%.2f\t%.2f\t%.2f\t\t"
@@ -236,9 +275,9 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    Serial.print(buf);
+    Serial.print(buf); // Takes 320 µs per call
 
-    Serial.println(FastLED.getFPS());
+    // Serial.println(FastLED.getFPS());
   }
 
   /*
@@ -250,20 +289,48 @@ void loop() {
   }
   */
 
+  // Centipedes
+  // For-loop takes 457 µs in total @ 1 MHz I2C clock
+  EVERY_N_MILLIS(20) {
+    // utick = micros();
+    for (cp_port = 0; cp_port < 8; cp_port++) {
+      cp.portWrite(cp_port, idx_led << cp_port);
+    }
+    // Serial.println(micros() - utick);
+  }
+
   // Animate LED matrix
-  EVERY_N_MILLIS(10) { fadeToBlackBy(leds, LED_COUNT, 1); }
+  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, LED_COUNT, 1); }
   EVERY_N_MILLIS(100) {
-    leds[idx_led] = ColorFromPalette(RainbowColors_p, idx_led);
+    // leds[idx_led] = ColorFromPalette(RainbowColors_p, idx_led);
+    leds[idx_led] = CRGB::Red;
     idx_led++;
   }
 
-  // Send out LED data to the strip. `delay()` keeps the framerate modest and
-  // allows for brightness dithering. It will invoke FastLED.show() - sending
-  // out the LED data - at least once during the delay.
-  // FastLED.delay(0);
+  // Send out LED data to the strip.
+  /*
+  NOTE:
+    It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16 LED
+    matrix is takes 7680 µs. I actually measure 8000 µs, using
+    '''
+      utick = micros();
+      FastLED.show();
+      Serial.println(micros() - utick);
+    '''
+    Hence, we must limit the framerate to a theoretical max of 125 Hz in order
+    to prevent flickering of the LEDs. Actually measured limit is <= 80 Hz.
+
+  NOTE:
+    Capping the framerate by calling `FastLED.setMaxRefreshRate(80)` is not
+    advised, because this makes `FastLED.show()` blocking while it is waiting
+    for the correct time to pass. Hence, we simply put the call to
+    `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it unblocking,
+    while still capping the framerate.
+  */
   EVERY_N_MILLIS(20) {
     // utick = micros();
-    FastLED.show(); // Takes 8000 us to write to all 256 leds, confirmed
-    // Serial.println(micros() - utick);
+    FastLED.show(); // Takes 8003 µs per call
+    // Serial.println("show");
+    //  Serial.println(micros() - utick);
   }
 }
