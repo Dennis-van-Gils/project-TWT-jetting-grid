@@ -65,18 +65,29 @@ float mA2bar(float mA, const Omega_Calib calib) {
 
 /*------------------------------------------------------------------------------
   Protocol coordinate system (PCS) transformations
+
   The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+  Physical valves are numbered 1 to 112, with 0 indicating 'no valve'
 ------------------------------------------------------------------------------*/
 const uint8_t NO_VALVE_EXISTS_AT_COORDINATE = 0;
 
-// Reverse look-up. To be populated from MATRIX_PCS2VALVE during `setup()`.
-// dim 1: Valve number [1 - 112], valve 0 is special case
-// dim 2: PCS axis [0: x, 1: y]
+// clang-format off
+
+/*
+Translation matrix: Valve number to PCS.
+Reverse look-up. To be populated from `MATRIX_PCS2VALVE` during `setup()`.
+dim 1: Valve number [1 - 112], valve 0 is not used
+dim 2: PCS axis [0: x, 1: y]
+Returns the x or y PCS-value of the valve.
+*/
 int8_t MATRIX_VALVE2PCS[113][2] = {0};
 
-// clang-format off
+/*
+Translation matrix: PCS to valve number.
+A valve value of 0 indicates that there can't be any valve at that location.
+*/
 const uint8_t MATRIX_PCS2VALVE[15][15] = {
-//   -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
+  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
   {   0,   1,   0,   2,   0,   3,   0,   4,   0,   5,   0,   6,   0,   7,   0 }, //  7
   {  63,   0,  70,   0,  77,   0,  84,   0,  91,   0,  98,   0, 105,   0, 112 }, //  6
   {   0,   8,   0,   9,   0,  10,   0,  11,   0,  12,   0,  13,   0,  14,   0 }, //  5
@@ -94,8 +105,12 @@ const uint8_t MATRIX_PCS2VALVE[15][15] = {
   {   0,  50,   0,  51,   0,  52,   0,  53,   0,  54,   0,  55,   0,  56,   0 }  // -7
 };
 
+/*
+Translation matrix: PCS to LED index.
+The LED matrix is wired serpentine like.
+*/
 const uint8_t MATRIX_PCS2LED[16][16] = {
-//   -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7    8
+  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7    8
   {  15,  14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0 }, //  7
   {  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31 }, //  6
   {  47,  46,  45,  44,  43,  42,  41,  40,  39,  38,  37,  36,  35,  34,  33,  32 }, //  5
@@ -114,44 +129,101 @@ const uint8_t MATRIX_PCS2LED[16][16] = {
   { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 }, // -8
 };
 
+/*------------------------------------------------------------------------------
+  Centipede (CP) and 16-channel MOSFET board trnsformations
+
+  The two Centipede boards are both addressed by a single class object, called
+  `cp` in `main.cpp`. The object uses `ports` and `values` to refer to
+  individual channels.
+
+    port 0: controls channels   0 to  15
+    port 1: controls channels  16 to  31
+    port 2: controls channels  32 to  47
+    port 3: controls channels  48 to  63
+    port 4: controls channels  64 to  79
+    port 5: controls channels  80 to  95
+    port 6: controls channels  96 to 111
+    port 7: controls channels 112 to 127
+
+  A channel of a port is set HI by setting the corresponding bit in `value`.
+
+  All 256 Centipede channels are wired to the 8x 16-channel MOSFET boards in
+  a 1-to-1 incremental fashion. E.g.
+
+    Centipede channel   0 - MOSFET board 1, input/output 0
+    Centipede channel   1 - MOSFET board 1, input/output 1
+    Centipede channel   2 - MOSFET board 1, input/output 2
+    ....
+    Centipede channel   8 - MOSFET board 2, input/output 0
+    Centipede channel   9 - MOSFET board 2, input/output 1
+    ....
+    Centipede channel 255 - MOSFET board 8, input/output 15
+
+  Above wiring scheme SHOULD NOT PHYSICALLY CHANGE!
+
+  Next:
+
+  The physical wiring from the output channels of the MOSFET boards to each
+  individual valve happens in groups of 14, where only the first 14 of the 16
+  channels of the MOSFET boards are used. The last two channels are not
+  connected to a valve, and can serve as a backup whenever one of the first 14
+  channels would become faulty. Hence, here is where the physical wiring can
+  divert from a 1-to-1 relationship.
+
+  Centipede             MOSFET board      valve
+  port      bit         board channel
+  0         0           1     0           1
+  0         1           1     1           2
+  0         2           1     2           3
+
+  TODO: make less cryptic
+------------------------------------------------------------------------------*/
+
+/*
+Translation array: Valve number to Centipede port.
+This array must reflect the physical wiring inside the electronics cabinet.
+*/
 const uint8_t ARRAY_VALVE2CP_PORT[112] = {
-//    1    2    3    4    5    6    7    8    9   10   11   12   13   14
+  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-//   15   16   17   18   19   20   21   22   23   24   25   26   27   28
+  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
       1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-//   29   30   31   32   33   34   35   36   37   38   39   40   41   42
+  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
       2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,
-//   43   44   45   46   47   48   49   50   51   52   53   54   55   56
+  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
       3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,
-//   57   58   59   60   61   62   63   64   65   66   67   68   69   70
+  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
       4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,
-//   71   72   73   74   75   76   77   78   79   80   81   82   83   84
+  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
       5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,
-//   85   86   87   88   89   90   91   92   93   94   95   96   97   98
+  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
       6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,
-//   99  100  101  102  103  104  105  106  107  108  109  110  111  112
+  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
       7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7
 };
 
+/*
+Translation array: Valve number to Centipede value.
+This array must reflect the physical wiring inside the electronics cabinet.
+*/
 const uint8_t ARRAY_VALVE2CP_VALUE[112] = {
-//    1    2    3    4    5    6    7    8    9   10   11   12   13   14
+  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   15   16   17   18   19   20   21   22   23   24   25   26   27   28
+  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   29   30   31   32   33   34   35   36   37   38   39   40   41   42
+  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   43   44   45   46   47   48   49   50   51   52   53   54   55   56
+  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   57   58   59   60   61   62   63   64   65   66   67   68   69   70
+  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   71   72   73   74   75   76   77   78   79   80   81   82   83   84
+  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   85   86   87   88   89   90   91   92   93   94   95   96   97   98
+  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-//   99  100  101  102  103  104  105  106  107  108  109  110  111  112
+  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
 };
-
 // clang-format on
 
 // TODO: Add safety by catching OUT OF BOUNDS matrix and array indices

@@ -167,12 +167,14 @@ void setup() {
   FastLED.show();
 
   Serial.begin(9600);
-  //while (!Serial) {}
+  // while (!Serial) {}
 
   // Populate reverse look-up table MATRIX_VALVE2PCS from source
   // MATRIX_PCS2VALVE.
   // dim 1: Valve number [1 - 112], valve 0 is special case
   // dim 2: PCS axis [0: x, 1: y]
+  // Initialize matrix with a value of -128 to be able to check if no valves are
+  // missing from the reverser look-up table.
   std::fill(*MATRIX_VALVE2PCS, *MATRIX_VALVE2PCS + 113 * 2, -128);
   for (int8_t y = 7; y > -8; y--) {
     for (int8_t x = -7; x < 8; x++) {
