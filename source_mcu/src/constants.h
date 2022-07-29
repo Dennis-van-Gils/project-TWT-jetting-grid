@@ -69,6 +69,11 @@ float mA2bar(float mA, const Omega_Calib calib) {
 ------------------------------------------------------------------------------*/
 const uint8_t NO_VALVE_EXISTS_AT_COORDINATE = 0;
 
+// Reverse look-up. To be populated from MATRIX_PCS2VALVE during `setup()`.
+// dim 1: Valve number [1 - 112], valve 0 is special case
+// dim 2: PCS axis [0: x, 1: y]
+int8_t MATRIX_VALVE2PCS[113][2] = {0};
+
 // clang-format off
 const uint8_t MATRIX_PCS2VALVE[15][15] = {
 //   -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
@@ -150,13 +155,12 @@ const uint8_t ARRAY_VALVE2CP_VALUE[112] = {
 // clang-format on
 
 // TODO: Add safety by catching OUT OF BOUNDS matrix and array indices
-uint8_t PCS2valve(int8_t x, int8_t y) {
-  return MATRIX_PCS2VALVE[14 - y - 7][x + 7];
-}
+uint8_t PCS2valve(int8_t x, int8_t y) { return MATRIX_PCS2VALVE[7 - y][x + 7]; }
 
-uint8_t PCS2LED(int8_t x, int8_t y) {
-  return MATRIX_PCS2LED[14 - y - 7][x + 7];
-}
+uint8_t PCS2LED(int8_t x, int8_t y) { return MATRIX_PCS2LED[7 - y][x + 7]; }
+
+int8_t valve2PCS_x(uint8_t valve) { return MATRIX_VALVE2PCS[valve][0]; }
+int8_t valve2PCS_y(uint8_t valve) { return MATRIX_VALVE2PCS[valve][1]; }
 
 uint8_t valve2cp_port(uint8_t valve) {
   return ARRAY_VALVE2CP_PORT[(int16_t)valve - 1];

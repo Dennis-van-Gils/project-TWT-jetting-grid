@@ -23,6 +23,9 @@ https://google.github.io/styleguide/cppguide.html#Variable_Names
 
 #include "constants.h"
 
+#include <algorithm>
+using namespace std;
+
 // Serial command listener
 DvG_SerialCommand sc(Serial);
 
@@ -146,18 +149,6 @@ void setup() {
   // To enable float support in `snprintf()` we must add the following
   asm(".global _printf_float");
 
-  Serial.begin(9600);
-
-  // R Click
-  R_click_1.set_SPI_clock(1700000);
-  R_click_2.set_SPI_clock(1700000);
-  R_click_3.set_SPI_clock(1700000);
-  R_click_4.set_SPI_clock(1700000);
-  R_click_1.begin();
-  R_click_2.begin();
-  R_click_3.begin();
-  R_click_4.begin();
-
   // LED matrix
   /*
   NOTE:
@@ -171,9 +162,67 @@ void setup() {
   FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, LED_COUNT);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
-  FastLED.setBrightness(5);
+  FastLED.setBrightness(150);
   fill_rainbow(leds, LED_COUNT, 0, 1);
   FastLED.show();
+
+  Serial.begin(9600);
+  //while (!Serial) {}
+
+  // Populate reverse look-up table MATRIX_VALVE2PCS from source
+  // MATRIX_PCS2VALVE.
+  // dim 1: Valve number [1 - 112], valve 0 is special case
+  // dim 2: PCS axis [0: x, 1: y]
+  std::fill(*MATRIX_VALVE2PCS, *MATRIX_VALVE2PCS + 113 * 2, -128);
+  for (int8_t y = 7; y > -8; y--) {
+    for (int8_t x = -7; x < 8; x++) {
+      uint8_t valve = MATRIX_PCS2VALVE[7 - y][x + 7];
+      if (valve > 0) {
+        MATRIX_VALVE2PCS[valve][0] = x;
+        MATRIX_VALVE2PCS[valve][1] = y;
+        Serial.print(valve);
+        Serial.write('\t');
+        Serial.print(x);
+        Serial.write('\t');
+        Serial.println(y);
+      }
+    }
+  }
+
+  // Check if all valves are accounted for
+  bool inverse_lookup_okay = true;
+  int8_t x;
+  int8_t y;
+  Serial.println("\nCheckup\n_______");
+  for (uint8_t valve = 1; valve < 113; valve++) {
+    x = MATRIX_VALVE2PCS[valve][0];
+    y = MATRIX_VALVE2PCS[valve][1];
+    Serial.print(valve);
+    Serial.write('\t');
+    if ((x == -128) || (y == -128)) {
+      inverse_lookup_okay = false;
+      Serial.println("ERROR: Missing valve index!");
+    } else {
+      Serial.print(x);
+      Serial.write('\t');
+      Serial.println(y);
+    }
+  }
+
+  if (!inverse_lookup_okay) {
+    Serial.println("ERROR: Invalid lookup table");
+    while (1) {}
+  }
+
+  // R Click
+  R_click_1.set_SPI_clock(1700000);
+  R_click_2.set_SPI_clock(1700000);
+  R_click_3.set_SPI_clock(1700000);
+  R_click_4.set_SPI_clock(1700000);
+  R_click_1.begin();
+  R_click_2.begin();
+  R_click_3.begin();
+  R_click_4.begin();
 
   // Centipedes
   /*
@@ -326,10 +375,14 @@ void loop() {
       }
     }
 
-    idx_led = PCS2LED(pcs_x, pcs_y);
-    leds[idx_led] = CRGB::Red;
-
+    /*
+    // Progress PCS coordinates
     idx_valve = PCS2valve(pcs_x, pcs_y);
+    */
+
+    pcs_x = valve2PCS_x(idx_valve);
+    pcs_y = valve2PCS_y(idx_valve);
+
     cp_port = valve2cp_port(idx_valve);
     cp_value = valve2cp_value(idx_valve);
 
@@ -349,7 +402,7 @@ void loop() {
     cp6_value = 0;
     cp7_value = 0;
 
-    uint16_t foo;
+    uint16_t foo = 0;
     bitSet(foo, cp_value);
 
     switch (cp_port) {
@@ -390,6 +443,8 @@ void loop() {
 
     // Serial.println(micros() - utick);
 
+    /*
+    // Progress PCS coordinates
     pcs_x++;
     if (pcs_x == 8) {
       pcs_x = -7;
@@ -398,6 +453,16 @@ void loop() {
         pcs_y = 7;
       }
     }
+    */
+
+    idx_valve++;
+    if (idx_valve > 112) {
+      idx_valve = 1;
+    }
+
+    // Color leds
+    idx_led = PCS2LED(pcs_x, pcs_y);
+    leds[idx_led] = CRGB::Red;
   }
 
   // Send out LED data to the strip.
