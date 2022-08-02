@@ -2,13 +2,81 @@
 Constants of the TWT jetting grid
 
 Dennis van Gils
-28-07-2022
+01-08-2022
 */
 
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
 #include "MIKROE_4_20mA_RT_Click.h"
+
+/*------------------------------------------------------------------------------
+  HARDWARE WIRING
+--------------------------------------------------------------------------------
+
+  TABLE 1: Wiring scheme
+
+    |-------------------------------------------------------|
+    |               Fixed wiring               |  Flexible  |
+    |------------------------------------------|------------|
+    |      Centipedes      |   MOSFET boards   |   valves   |
+    |----------------------|-------------------|------------|
+    |  port° |   channels° |  #° |   channels° |         #¹ |
+    |--------|-------------|-----|-------------|------------|
+    |     0  |    0 -  15  |  0  |    0 -  15  |   1 -  14  |
+    |     1  |   16 -  31  |  1  |   16 -  31  |  15 -  28  |
+    |     2  |   32 -  47  |  2  |   32 -  47  |  29 -  42  |
+    |     3  |   48 -  63  |  3  |   48 -  63  |  43 -  56  |
+    |     4  |   64 -  79  |  4  |   64 -  79  |  57 -  70  |
+    |     5  |   80 -  95  |  5  |   80 -  95  |  71 -  84  |
+    |     6  |   96 - 111  |  6  |   96 - 111  |  85 -  98  |
+    |     7  |  112 - 127  |  7  |  112 - 127  |  99 - 112  |
+    |-------------------------------------------------------|
+    °: index starts at 0
+    ¹: index starts at 1
+
+  # Centipedes
+
+  Connected to the Arduino (Adafruit Feather M4 Express) are two Centipede
+  boards from Macetech. Each Centipede board consists of 8x MCP23017 16-bit
+  digital I/O port expander chips, adressable over I2C. Hence, each board
+  provides 64 digital channels, here configured as output, for a total of 128
+  channels.
+
+  Both Centipedes are managed by a single instance of the `Centipede` class,
+  called the `cp` object in `main.cpp`. The object uses `ports` and `values` to
+  refer to individual channels. The `value` written to a `port` decodes a 16-bit
+  bitmask, toggling the corresponding channels of that port on or off.
+
+  # MOSFET boards
+
+  The output channels of the Centipedes deliver 3.3 V. To drive the solenoid
+  valves we need a voltage of 24 V. Hence, we use MOSFET boards in order to
+  increase the electrical power of each digital channel. Each MOSFET board
+  (from AliExpress, brand Sanwo?) provides 16-channels, so we have 8 MOSFET
+  boards in total. All 128 Centipede channels are wired in a 1-to-1 incremental
+  fashion to the MOSFET boards. This physical wiring SHOULD NOT CHANGE!
+
+  # Solenoid valves
+
+  The physical wiring from the output channels of the MOSFET boards to each
+  individual valve happens in groups of 14, where only the first 14 of the 16
+  channels of each MOSFET board are used. The last two channels are not
+  connected to a valve, and can serve as a backup when one of the first 14
+  channels becomes faulty somehow. Hence, here is where the physical wiring
+  is user-configurable and diverts from a 1-to-1 incremental relationship with
+  respect to the MOSFET and Centipede boards.
+
+  NOTE: In contrast to the port and channel numbers of the Centipede and MOSFET
+  boards which start at an index of 0, the valves start at an index of 1.
+  A valve with index 0 is a special case denoting that no valve is connected at
+  that location.
+
+  Arrays `ARRAY_VALVE2CP_PORT` and `ARRAY_VALVE2CP_BIT` must reflect this
+  physical wiring. Change these arrays whenever modifications had to be made to
+  the wiring inside the electronics cabinet.
+
+------------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------
   LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
@@ -129,56 +197,6 @@ const uint8_t MATRIX_PCS2LED[16][16] = {
   { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 }, // -8
 };
 
-/*------------------------------------------------------------------------------
-  Centipede (CP) and 16-channel MOSFET board trnsformations
-
-  The two Centipede boards are both addressed by a single class object, called
-  `cp` in `main.cpp`. The object uses `ports` and `values` to refer to
-  individual channels.
-
-    port 0: controls channels   0 to  15
-    port 1: controls channels  16 to  31
-    port 2: controls channels  32 to  47
-    port 3: controls channels  48 to  63
-    port 4: controls channels  64 to  79
-    port 5: controls channels  80 to  95
-    port 6: controls channels  96 to 111
-    port 7: controls channels 112 to 127
-
-  A channel of a port is set HI by setting the corresponding bit in `value`.
-
-  All 256 Centipede channels are wired to the 8x 16-channel MOSFET boards in
-  a 1-to-1 incremental fashion. E.g.
-
-    Centipede channel   0 - MOSFET board 1, input/output 0
-    Centipede channel   1 - MOSFET board 1, input/output 1
-    Centipede channel   2 - MOSFET board 1, input/output 2
-    ....
-    Centipede channel   8 - MOSFET board 2, input/output 0
-    Centipede channel   9 - MOSFET board 2, input/output 1
-    ....
-    Centipede channel 255 - MOSFET board 8, input/output 15
-
-  Above wiring scheme SHOULD NOT PHYSICALLY CHANGE!
-
-  Next:
-
-  The physical wiring from the output channels of the MOSFET boards to each
-  individual valve happens in groups of 14, where only the first 14 of the 16
-  channels of the MOSFET boards are used. The last two channels are not
-  connected to a valve, and can serve as a backup whenever one of the first 14
-  channels would become faulty. Hence, here is where the physical wiring can
-  divert from a 1-to-1 relationship.
-
-  Centipede             MOSFET board      valve
-  port      bit         board channel
-  0         0           1     0           1
-  0         1           1     1           2
-  0         2           1     2           3
-
-  TODO: make less cryptic
-------------------------------------------------------------------------------*/
-
 /*
 Translation array: Valve number to Centipede port.
 This array must reflect the physical wiring inside the electronics cabinet.
@@ -203,10 +221,10 @@ const uint8_t ARRAY_VALVE2CP_PORT[112] = {
 };
 
 /*
-Translation array: Valve number to Centipede value.
+Translation array: Valve number to Centipede bitmask bit.
 This array must reflect the physical wiring inside the electronics cabinet.
 */
-const uint8_t ARRAY_VALVE2CP_VALUE[112] = {
+const uint8_t ARRAY_VALVE2CP_BIT[112] = {
   //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
   // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
@@ -238,11 +256,11 @@ uint8_t valve2cp_port(uint8_t valve) {
   return ARRAY_VALVE2CP_PORT[(int16_t)valve - 1];
 }
 
-uint8_t valve2cp_value(uint8_t valve) {
+uint8_t valve2cp_bit(uint8_t valve) {
   if (valve == 0) {
     return 0;
   } else {
-    return ARRAY_VALVE2CP_VALUE[(int16_t)valve - 1];
+    return ARRAY_VALVE2CP_BIT[(int16_t)valve - 1];
   }
 }
 

@@ -386,7 +386,7 @@ void loop() {
     pcs_y = valve2PCS_y(idx_valve);
 
     cp_port = valve2cp_port(idx_valve);
-    cp_value = valve2cp_value(idx_valve);
+    cp_value = valve2cp_bit(idx_valve);
 
     Serial.print("valve: ");
     Serial.print(idx_valve);
