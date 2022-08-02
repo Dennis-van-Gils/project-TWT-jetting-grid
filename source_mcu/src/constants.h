@@ -11,6 +11,127 @@ Dennis van Gils
 #include "MIKROE_4_20mA_RT_Click.h"
 
 /*------------------------------------------------------------------------------
+  PURPOSE
+--------------------------------------------------------------------------------
+
+  This project involves the control of a jetting grid used in the Twente Water
+  Tunnel (TWT) facility of the University of Twente, Physics of Fluids group.
+
+  Upstream of the TWT measurement section will be the jetting grid consisting of
+  112 individual nozzles laid out in a square grid perpendicular to the mean
+  flow. All nozzles are powered by a single water pump providing the driving
+  pressure for the jets. Each nozzle is controlled by an individual solenoid
+  valve that can be programmatically opened or closed. The nozzles will open
+  and close following predefined 'protocols' tailored to different turbulent
+  statistics inside the measurement section.
+
+  The valves of the grid come in through the 4 side walls of the tunnel section,
+  with 28 valves through each side: 4 x 28 = 112 valves. Each set of these 28
+  valves shares a common pressure distribution vessel of which we will monitor
+  the pressure.
+
+  This code contains the firmware for the Arduino to control the 112 solenoid
+  valves, to read out the 4 pressure sensors and to drive a 16x16 LED matrix to
+  visually indicate the status of each valve.
+
+--------------------------------------------------------------------------------
+  PROTOCOL COORDINATE SYSTEM (PCS)
+--------------------------------------------------------------------------------
+
+  The solenoid valves are ultimately opening and closing jetting nozzles that
+  are laid out in a square grid, aka the protocol coordinate system (PCS).
+
+  ●: Indicates a valve & nozzle
+  -: Indicates no nozzle & valve exists
+
+      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
+     ┌─────────────────────────────────────────────┐
+   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+     └─────────────────────────────────────────────┘
+
+  The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+  Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
+  See `docs\jetting_grid_indices.pdf` for the valve numbering.
+
+------------------------------------------------------------------------------*/
+// clang-format off
+const uint8_t NUMEL_PCS_DIMS = 2;
+const uint8_t NUMEL_PCS_AXIS = 15;
+const uint8_t NUMEL_LED_AXIS = 16;
+const uint8_t NUMEL_VALVES = 112;
+
+// Translation matrix: PCS coordinate to valve number.
+//   [dim 1]: PCS y-coordinate [0: PCS_y =  7, 14: PCS_y = -7]
+//   [dim 2]: PCS x-coordinate [0: PCS_x = -7, 14: PCS_x =  7]
+//   Returns: The valve numbered 1 to 112, with 0 indicating 'no valve'
+const uint8_t ARR_PCS2VALVE[NUMEL_PCS_AXIS][NUMEL_PCS_AXIS] = {
+  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
+  {   0,   1,   0,   2,   0,   3,   0,   4,   0,   5,   0,   6,   0,   7,   0 }, //  7
+  {  63,   0,  70,   0,  77,   0,  84,   0,  91,   0,  98,   0, 105,   0, 112 }, //  6
+  {   0,   8,   0,   9,   0,  10,   0,  11,   0,  12,   0,  13,   0,  14,   0 }, //  5
+  {  62,   0,  69,   0,  76,   0,  83,   0,  90,   0,  97,   0, 104,   0, 111 }, //  4
+  {   0,  15,   0,  16,   0,  17,   0,  18,   0,  19,   0,  20,   0,  21,   0 }, //  3
+  {  61,   0,  68,   0,  75,   0,  82,   0,  89,   0,  96,   0, 103,   0, 110 }, //  2
+  {   0,  22,   0,  23,   0,  24,   0,  25,   0,  26,   0,  27,   0,  28,   0 }, //  1
+  {  60,   0,  67,   0,  74,   0,  81,   0,  88,   0,  95,   0, 102,   0, 109 }, //  0
+  {   0,  29,   0,  30,   0,  31,   0,  32,   0,  33,   0,  34,   0,  35,   0 }, // -1
+  {  59,   0,  66,   0,  73,   0,  80,   0,  87,   0,  94,   0, 101,   0, 108 }, // -2
+  {   0,  36,   0,  37,   0,  38,   0,  39,   0,  40,   0,  41,   0,  42,   0 }, // -3
+  {  58,   0,  65,   0,  72,   0,  79,   0,  86,   0,  93,   0, 100,   0, 107 }, // -4
+  {   0,  43,   0,  44,   0,  45,   0,  46,   0,  47,   0,  48,   0,  49,   0 }, // -5
+  {  57,   0,  64,   0,  71,   0,  78,   0,  85,   0,  92,   0,  99,   0, 106 }, // -6
+  {   0,  50,   0,  51,   0,  52,   0,  53,   0,  54,   0,  55,   0,  56,   0 }  // -7
+};
+
+// Translation matrix: PCS coordinate to LED index.
+// The LED matrix is wired serpentine like.
+//   [dim 1]: PCS y-coordinate [0: PCS_y =  7, 14: PCS_y = -7]
+//   [dim 2]: PCS x-coordinate [0: PCS_x = -7, 14: PCS_x =  7]
+//   Returns: The LED index 0 to 255
+const uint8_t ARR_PCS2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
+  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7    8
+  {  15,  14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0 }, //  7
+  {  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31 }, //  6
+  {  47,  46,  45,  44,  43,  42,  41,  40,  39,  38,  37,  36,  35,  34,  33,  32 }, //  5
+  {  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63 }, //  4
+  {  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  69,  68,  67,  66,  65,  64 }, //  3
+  {  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95 }, //  2
+  { 111, 110, 109, 108, 107, 106, 105, 104, 103, 102, 101, 100,  99,  98,  97,  96 }, //  1
+  { 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127 }, //  0
+  { 143, 142, 141, 140, 139, 138, 137, 136, 135, 134, 133, 132, 131, 130, 129, 128 }, // -1
+  { 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159 }, // -2
+  { 175, 174, 173, 172, 171, 170, 169, 168, 167, 166, 165, 164, 163, 162, 161, 160 }, // -3
+  { 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191 }, // -4
+  { 207, 206, 205, 204, 203, 202, 201, 200, 199, 198, 197, 196, 195, 194, 193, 192 }, // -5
+  { 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223 }, // -6
+  { 239, 238, 237, 236, 235, 234, 233, 232, 231, 230, 229, 228, 227, 226, 225, 224 }, // -7
+  { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 }, // -8
+};
+
+// Translation matrix: Valve number to PCS coordinate.
+// Reverse look-up. To be populated from `ARR_PCS2VALVE` during `setup()`.
+//   [dim 1]: The valve numbered 1 to 112, with 0 indicating 'no valve'
+//   [dim 2]: PCS axis [0: x, 1: y]
+//   Returns: The PCS x or y-coordinate of the valve
+int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][NUMEL_PCS_DIMS] = {0};
+
+// clang-format on
+
+/*------------------------------------------------------------------------------
   HARDWARE WIRING
 --------------------------------------------------------------------------------
 
@@ -33,7 +154,7 @@ Dennis van Gils
     |     7  |  112 - 127  |  7  |  112 - 127  |  99 - 112  |
     |-------------------------------------------------------|
     °: index starts at 0
-    ¹: index starts at 1
+    ¹: numbering starts at 1
 
   # Centipedes
 
@@ -68,15 +189,63 @@ Dennis van Gils
   respect to the MOSFET and Centipede boards.
 
   NOTE: In contrast to the port and channel numbers of the Centipede and MOSFET
-  boards which start at an index of 0, the valves start at an index of 1.
-  A valve with index 0 is a special case denoting that no valve is connected at
+  boards which start at an index of 0, the valves start at a number of 1. A
+  valve with number 0 is a special case denoting that no valve is connected at
   that location.
 
-  Arrays `ARRAY_VALVE2CP_PORT` and `ARRAY_VALVE2CP_BIT` must reflect this
-  physical wiring. Change these arrays whenever modifications had to be made to
-  the wiring inside the electronics cabinet.
+  Arrays `ARR_VALVE2CP_PORT` and `ARR_VALVE2CP_BIT` must reflect this physical
+  wiring. Change these arrays whenever modifications had to be made to the
+  wiring inside the electronics cabinet.
 
 ------------------------------------------------------------------------------*/
+// clang-format off
+
+// Translation array: Valve number to Centipede port.
+// This array must reflect the physical wiring inside the electronics cabinet.
+//   [dim 1]: The valve number - 1, so from 0 to 111
+//   Returns: The Centipede port index
+const uint8_t ARR_VALVE2CP_PORT[NUMEL_VALVES] = {
+  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
+      1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
+      2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,
+  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
+      3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,
+  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
+      4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,
+  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
+      5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,
+  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
+      6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,
+  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
+      7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7
+};
+
+// Translation array: Valve number to Centipede bitmask bit.
+// This array must reflect the physical wiring inside the electronics cabinet.
+//   [dim 1]: The valve number - 1, so from 0 to 111
+//   Returns: The Centipede bitmask bit index
+const uint8_t ARR_VALVE2CP_BIT[NUMEL_VALVES] = {
+  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
+};
+// clang-format on
 
 /*------------------------------------------------------------------------------
   LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
@@ -133,135 +302,76 @@ float mA2bar(float mA, const Omega_Calib calib) {
 
 /*------------------------------------------------------------------------------
   Protocol coordinate system (PCS) transformations
-
-  The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
-  Physical valves are numbered 1 to 112, with 0 indicating 'no valve'
 ------------------------------------------------------------------------------*/
-const uint8_t NO_VALVE_EXISTS_AT_COORDINATE = 0;
 
-// clang-format off
+// TODO: Add safety by catching OUT OF BOUNDS array indices
 
-/*
-Translation matrix: Valve number to PCS.
-Reverse look-up. To be populated from `MATRIX_PCS2VALVE` during `setup()`.
-dim 1: Valve number [1 - 112], valve 0 is not used
-dim 2: PCS axis [0: x, 1: y]
-Returns the x or y PCS-value of the valve.
-*/
-int8_t MATRIX_VALVE2PCS[113][2] = {0};
-
-/*
-Translation matrix: PCS to valve number.
-A valve value of 0 indicates that there can't be any valve at that location.
-*/
-const uint8_t MATRIX_PCS2VALVE[15][15] = {
-  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
-  {   0,   1,   0,   2,   0,   3,   0,   4,   0,   5,   0,   6,   0,   7,   0 }, //  7
-  {  63,   0,  70,   0,  77,   0,  84,   0,  91,   0,  98,   0, 105,   0, 112 }, //  6
-  {   0,   8,   0,   9,   0,  10,   0,  11,   0,  12,   0,  13,   0,  14,   0 }, //  5
-  {  62,   0,  69,   0,  76,   0,  83,   0,  90,   0,  97,   0, 104,   0, 111 }, //  4
-  {   0,  15,   0,  16,   0,  17,   0,  18,   0,  19,   0,  20,   0,  21,   0 }, //  3
-  {  61,   0,  68,   0,  75,   0,  82,   0,  89,   0,  96,   0, 103,   0, 110 }, //  2
-  {   0,  22,   0,  23,   0,  24,   0,  25,   0,  26,   0,  27,   0,  28,   0 }, //  1
-  {  60,   0,  67,   0,  74,   0,  81,   0,  88,   0,  95,   0, 102,   0, 109 }, //  0
-  {   0,  29,   0,  30,   0,  31,   0,  32,   0,  33,   0,  34,   0,  35,   0 }, // -1
-  {  59,   0,  66,   0,  73,   0,  80,   0,  87,   0,  94,   0, 101,   0, 108 }, // -2
-  {   0,  36,   0,  37,   0,  38,   0,  39,   0,  40,   0,  41,   0,  42,   0 }, // -3
-  {  58,   0,  65,   0,  72,   0,  79,   0,  86,   0,  93,   0, 100,   0, 107 }, // -4
-  {   0,  43,   0,  44,   0,  45,   0,  46,   0,  47,   0,  48,   0,  49,   0 }, // -5
-  {  57,   0,  64,   0,  71,   0,  78,   0,  85,   0,  92,   0,  99,   0, 106 }, // -6
-  {   0,  50,   0,  51,   0,  52,   0,  53,   0,  54,   0,  55,   0,  56,   0 }  // -7
-};
-
-/*
-Translation matrix: PCS to LED index.
-The LED matrix is wired serpentine like.
-*/
-const uint8_t MATRIX_PCS2LED[16][16] = {
-  // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7    8
-  {  15,  14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0 }, //  7
-  {  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31 }, //  6
-  {  47,  46,  45,  44,  43,  42,  41,  40,  39,  38,  37,  36,  35,  34,  33,  32 }, //  5
-  {  48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63 }, //  4
-  {  79,  78,  77,  76,  75,  74,  73,  72,  71,  70,  69,  68,  67,  66,  65,  64 }, //  3
-  {  80,  81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95 }, //  2
-  { 111, 110, 109, 108, 107, 106, 105, 104, 103, 102, 101, 100,  99,  98,  97,  96 }, //  1
-  { 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127 }, //  0
-  { 143, 142, 141, 140, 139, 138, 137, 136, 135, 134, 133, 132, 131, 130, 129, 128 }, // -1
-  { 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159 }, // -2
-  { 175, 174, 173, 172, 171, 170, 169, 168, 167, 166, 165, 164, 163, 162, 161, 160 }, // -3
-  { 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191 }, // -4
-  { 207, 206, 205, 204, 203, 202, 201, 200, 199, 198, 197, 196, 195, 194, 193, 192 }, // -5
-  { 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223 }, // -6
-  { 239, 238, 237, 236, 235, 234, 233, 232, 231, 230, 229, 228, 227, 226, 225, 224 }, // -7
-  { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 }, // -8
-};
-
-/*
-Translation array: Valve number to Centipede port.
-This array must reflect the physical wiring inside the electronics cabinet.
-*/
-const uint8_t ARRAY_VALVE2CP_PORT[112] = {
-  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
-      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
-      1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
-  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
-      2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,
-  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
-      3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,   3,
-  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
-      4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4,
-  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
-      5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,   5,
-  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
-      6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,   6,
-  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
-      7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7
-};
-
-/*
-Translation array: Valve number to Centipede bitmask bit.
-This array must reflect the physical wiring inside the electronics cabinet.
-*/
-const uint8_t ARRAY_VALVE2CP_BIT[112] = {
-  //  1    2    3    4    5    6    7    8    9   10   11   12   13   14
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 15   16   17   18   19   20   21   22   23   24   25   26   27   28
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 29   30   31   32   33   34   35   36   37   38   39   40   41   42
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 43   44   45   46   47   48   49   50   51   52   53   54   55   56
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 57   58   59   60   61   62   63   64   65   66   67   68   69   70
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 71   72   73   74   75   76   77   78   79   80   81   82   83   84
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 85   86   87   88   89   90   91   92   93   94   95   96   97   98
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-  // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
-      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
-};
-// clang-format on
-
-// TODO: Add safety by catching OUT OF BOUNDS matrix and array indices
-uint8_t PCS2valve(int8_t x, int8_t y) { return MATRIX_PCS2VALVE[7 - y][x + 7]; }
-
-uint8_t PCS2LED(int8_t x, int8_t y) { return MATRIX_PCS2LED[7 - y][x + 7]; }
-
-int8_t valve2PCS_x(uint8_t valve) { return MATRIX_VALVE2PCS[valve][0]; }
-int8_t valve2PCS_y(uint8_t valve) { return MATRIX_VALVE2PCS[valve][1]; }
-
-uint8_t valve2cp_port(uint8_t valve) {
-  return ARRAY_VALVE2CP_PORT[(int16_t)valve - 1];
+/**
+ * @brief Translate PCS coordinate to valve number.
+ *
+ * @param x PCS x-coordinate
+ * @param y PCS y-coordinate
+ * @return The valve numbered 1 to 112, with 0 indicating 'no valve'
+ */
+uint8_t PCS2valve(int8_t x, int8_t y) {
+  int8_t tmp_x = x + 7;
+  int8_t tmp_y = 7 - y;
+  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS)) {
+    return 0;
+  }
+  if ((tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+    return 0;
+  }
+  return ARR_PCS2VALVE[tmp_y][tmp_x];
 }
 
-uint8_t valve2cp_bit(uint8_t valve) {
-  if (valve == 0) {
-    return 0;
-  } else {
-    return ARRAY_VALVE2CP_BIT[(int16_t)valve - 1];
+/**
+ * @brief Translate PCS coordinate to LED index.
+ *
+ * @param x PCS x-coordinate
+ * @param y PCS y-coordinate
+ * @return The LED index. 255 when the PCS coordinate is out of bounds.
+ */
+uint8_t PCS2LED(int8_t x, int8_t y) {
+  int8_t tmp_x = x + 7;
+  int8_t tmp_y = 7 - y;
+  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS)) {
+    return 255;
   }
+  if ((tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+    return 255;
+  }
+  return ARR_PCS2LED[tmp_y][tmp_x];
+}
+
+int8_t valve2PCS_x(uint8_t valve) { return ARR_VALVE2PCS[valve][0]; }
+int8_t valve2PCS_y(uint8_t valve) { return ARR_VALVE2PCS[valve][1]; }
+
+/**
+ * @brief Translate valve number to Centipede port.
+ *
+ * @param valve The valve numbered 1 to 112
+ * @return The Centipede port index. 255 when the valve number is out of bounds.
+ */
+uint8_t valve2cp_port(uint8_t valve) {
+  if ((valve == 0) || (valve > NUMEL_VALVES)) {
+    return 255;
+  }
+  return ARR_VALVE2CP_PORT[valve - 1];
+}
+
+/**
+ * @brief Translate valve number to Centipede bitmask bit.
+ *
+ * @param valve The valve numbered 1 to 112
+ * @return The Centipede bitmask bit index. 255 when the valve number is out of
+ * bounds.
+ */
+uint8_t valve2cp_bit(uint8_t valve) {
+  if ((valve == 0) || (valve > NUMEL_VALVES)) {
+    return 255;
+  }
+  return ARR_VALVE2CP_BIT[valve - 1];
 }
 
 #endif

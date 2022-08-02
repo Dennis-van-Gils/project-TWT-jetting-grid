@@ -175,13 +175,13 @@ void setup() {
   // dim 2: PCS axis [0: x, 1: y]
   // Initialize matrix with a value of -128 to be able to check if no valves are
   // missing from the reverser look-up table.
-  std::fill(*MATRIX_VALVE2PCS, *MATRIX_VALVE2PCS + 113 * 2, -128);
+  std::fill(*ARR_VALVE2PCS, *ARR_VALVE2PCS + 113 * 2, -128);
   for (int8_t y = 7; y > -8; y--) {
     for (int8_t x = -7; x < 8; x++) {
-      uint8_t valve = MATRIX_PCS2VALVE[7 - y][x + 7];
+      uint8_t valve = ARR_PCS2VALVE[7 - y][x + 7];
       if (valve > 0) {
-        MATRIX_VALVE2PCS[valve][0] = x;
-        MATRIX_VALVE2PCS[valve][1] = y;
+        ARR_VALVE2PCS[valve][0] = x;
+        ARR_VALVE2PCS[valve][1] = y;
         Serial.print(valve);
         Serial.write('\t');
         Serial.print(x);
@@ -197,8 +197,8 @@ void setup() {
   int8_t y;
   Serial.println("\nCheckup\n_______");
   for (uint8_t valve = 1; valve < 113; valve++) {
-    x = MATRIX_VALVE2PCS[valve][0];
-    y = MATRIX_VALVE2PCS[valve][1];
+    x = ARR_VALVE2PCS[valve][0];
+    y = ARR_VALVE2PCS[valve][1];
     Serial.print(valve);
     Serial.write('\t');
     if ((x == -128) || (y == -128)) {
@@ -377,13 +377,13 @@ void loop() {
       }
     }
 
-    /*
+    ///*
     // Progress PCS coordinates
     idx_valve = PCS2valve(pcs_x, pcs_y);
-    */
+    //*/
 
-    pcs_x = valve2PCS_x(idx_valve);
-    pcs_y = valve2PCS_y(idx_valve);
+    // pcs_x = valve2PCS_x(idx_valve);
+    // pcs_y = valve2PCS_y(idx_valve);
 
     cp_port = valve2cp_port(idx_valve);
     cp_value = valve2cp_bit(idx_valve);
@@ -445,7 +445,7 @@ void loop() {
 
     // Serial.println(micros() - utick);
 
-    /*
+    ///*
     // Progress PCS coordinates
     pcs_x++;
     if (pcs_x == 8) {
@@ -455,12 +455,14 @@ void loop() {
         pcs_y = 7;
       }
     }
-    */
+    //*/
 
+    /*
     idx_valve++;
     if (idx_valve > 112) {
       idx_valve = 1;
     }
+    */
 
     // Color leds
     idx_led = PCS2LED(pcs_x, pcs_y);
