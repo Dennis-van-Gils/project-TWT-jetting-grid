@@ -69,11 +69,6 @@ Dennis van Gils
   See `docs\jetting_grid_indices.pdf` for the valve numbering.
 
 ------------------------------------------------------------------------------*/
-// clang-format off
-const uint8_t NUMEL_PCS_DIMS = 2;
-const uint8_t NUMEL_PCS_AXIS = 15;
-const uint8_t NUMEL_LED_AXIS = 16;
-const uint8_t NUMEL_VALVES = 112;
 
 /**
  * @brief Structure to hold a Protocol Coordinate System (PCS) coordinate.
@@ -82,6 +77,13 @@ struct PCS {
   int8_t x;
   int8_t y;
 };
+
+const uint8_t NUMEL_PCS_DIMS = 2;
+const uint8_t NUMEL_PCS_AXIS = 15;
+const uint8_t NUMEL_LED_AXIS = 16;
+const uint8_t NUMEL_VALVES = 112;
+
+// clang-format off
 
 // Translation matrix: PCS coordinate to valve number.
 //   [dim 1]: PCS y-coordinate [0: PCS_y =  7, 14: PCS_y = -7]
@@ -207,6 +209,7 @@ int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][NUMEL_PCS_DIMS] = {0};
   wiring inside the electronics cabinet.
 
 ------------------------------------------------------------------------------*/
+
 // clang-format off
 
 // Translation array: Valve number to Centipede port.
@@ -254,6 +257,7 @@ const uint8_t ARR_VALVE2CP_BIT[NUMEL_VALVES] = {
   // 99  100  101  102  103  104  105  106  107  108  109  110  111  112
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,
 };
+
 // clang-format on
 
 /*------------------------------------------------------------------------------
@@ -316,13 +320,12 @@ float mA2bar(float mA, const Omega_Calib calib) {
 /**
  * @brief Translate PCS coordinate to valve number.
  *
- * @param x PCS x-coordinate
- * @param y PCS y-coordinate
+ * @param pcs The PCS coordinate
  * @return The valve numbered 1 to 112, with 0 indicating 'no valve'
  */
-uint8_t PCS2valve(int8_t x, int8_t y) {
-  int8_t tmp_x = x + 7;
-  int8_t tmp_y = 7 - y;
+uint8_t PCS2valve(PCS pcs) {
+  int8_t tmp_x = pcs.x + 7;
+  int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     return 0;
@@ -333,14 +336,13 @@ uint8_t PCS2valve(int8_t x, int8_t y) {
 /**
  * @brief Translate PCS coordinate to LED index.
  *
- * @param x PCS x-coordinate
- * @param y PCS y-coordinate
+ * @param pcs The PCS coordinate
  * @return The LED index
  * @throw Halts when the PCS coordinate is out-of-bounds
  */
-uint8_t PCS2LED(int8_t x, int8_t y) {
-  int8_t tmp_x = x + 7;
-  int8_t tmp_y = 7 - y;
+uint8_t PCS2LED(PCS pcs) {
+  int8_t tmp_x = pcs.x + 7;
+  int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     halt(1);
@@ -352,28 +354,14 @@ uint8_t PCS2LED(int8_t x, int8_t y) {
  * @brief Translate valve number to PCS coordinate.
  *
  * @param valve The valve numbered 1 to 112
- * @return The PCS x-coordinate
+ * @return The PCS coordinate
  * @throw Halts when the valve number is out-of-bounds
  */
-int8_t valve2PCS_x(uint8_t valve) {
+PCS valve2PCS(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
     halt(2);
   }
-  return ARR_VALVE2PCS[valve][0];
-}
-
-/**
- * @brief Translate valve number to PCS coordinate.
- *
- * @param valve The valve numbered 1 to 112
- * @return The PCS y-coordinate
- * @throw Halts when the valve number is out-of-bounds
- */
-int8_t valve2PCS_y(uint8_t valve) {
-  if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    halt(2);
-  }
-  return ARR_VALVE2PCS[valve][1];
+  return PCS{ARR_VALVE2PCS[valve][0], ARR_VALVE2PCS[valve][1]};
 }
 
 /*------------------------------------------------------------------------------

@@ -269,9 +269,7 @@ void setup() {
 //  loop
 // -----------------------------------------------------------------------------
 
-int8_t pcs_x = -7;
-int8_t pcs_y = 7;
-
+PCS pcs{-7, 7};
 uint16_t idx_valve = 1;
 uint16_t idx_led = 0;
 
@@ -377,13 +375,11 @@ void loop() {
       }
     }
 
-    ///*
+    /*
     // Progress PCS coordinates
-    idx_valve = PCS2valve(pcs_x, pcs_y);
-    //*/
-
-    // pcs_x = valve2PCS_x(idx_valve);
-    // pcs_y = valve2PCS_y(idx_valve);
+    idx_valve = PCS2valve(pcs);
+    */
+    pcs = valve2PCS(idx_valve);
 
     if (idx_valve > 0) {
       cp_port = valve2cp_port(idx_valve);
@@ -447,27 +443,27 @@ void loop() {
 
     // Serial.println(micros() - utick);
 
-    ///*
+    /*
     // Progress PCS coordinates
-    pcs_x++;
-    if (pcs_x == 8) {
-      pcs_x = -7;
-      pcs_y--;
-      if (pcs_y == -8) {
-        pcs_y = 7;
+    pcs.x++;
+    if (pcs.x == 8) {
+      pcs.x = -7;
+      pcs.y--;
+      if (pcs.y == -8) {
+        pcs.y = 7;
       }
     }
-    //*/
+    */
 
-    /*
+    ///*
     idx_valve++;
     if (idx_valve > 112) {
       idx_valve = 1;
     }
-    */
+    //*/
 
     // Color leds
-    idx_led = PCS2LED(pcs_x, pcs_y);
+    idx_led = PCS2LED(pcs);
     leds[idx_led] = CRGB::Red;
   }
 
