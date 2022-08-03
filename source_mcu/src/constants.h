@@ -72,7 +72,8 @@ char halt_msg[HALT_MSG_LEN]{'\0'};
 
   The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
   Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
-  See `docs\jetting_grid_indices.pdf` for the valve numbering.
+  For the valve numbering, see `docs\jetting_grid_indices.pdf` and the array
+  `ARR_PCS2VALVE` as defined farther down in this file.
 
 ------------------------------------------------------------------------------*/
 
