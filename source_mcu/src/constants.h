@@ -275,13 +275,17 @@ const uint8_t ARR_VALVE2CP_BIT[NUMEL_VALVES] = {
  *
  * @param pcs The PCS coordinate
  * @return The valve numbered 1 to 112, with 0 indicating 'no valve'
+ * @throw Halts when the PCS coordinate is out-of-bounds
  */
 uint8_t PCS2valve(PCS pcs) {
   int8_t tmp_x = pcs.x + 7;
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-    return 0;
+    snprintf(halt_msg, HALT_MSG_LEN,
+             "CRITICAL: Out-of-bounds index (%d, %d) in `PCS2valve()`", pcs.x,
+             pcs.y);
+    halt(1, halt_msg);
   }
   return ARR_PCS2VALVE[tmp_y][tmp_x];
 }
@@ -301,7 +305,7 @@ uint8_t PCS2LED(PCS pcs) {
     snprintf(halt_msg, HALT_MSG_LEN,
              "CRITICAL: Out-of-bounds index (%d, %d) in `PCS2LED()`", pcs.x,
              pcs.y);
-    halt(1, halt_msg);
+    halt(2, halt_msg);
   }
   return ARR_PCS2LED[tmp_y][tmp_x];
 }
@@ -317,7 +321,7 @@ PCS valve2PCS(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
     snprintf(halt_msg, HALT_MSG_LEN,
              "CRITICAL: Out-of-bounds valve number %d in `valve2PCS()`", valve);
-    halt(2, halt_msg);
+    halt(3, halt_msg);
   }
   return PCS{ARR_VALVE2PCS[valve][0], ARR_VALVE2PCS[valve][1]};
 }
@@ -358,7 +362,7 @@ void init_valve2PCS() {
     if ((x == -128) || (y == -128)) {
       snprintf(halt_msg, HALT_MSG_LEN,
                "CRITICAL: Valve number %d is not accounted for", valve);
-      halt(5, halt_msg);
+      halt(4, halt_msg);
     }
   }
 }
@@ -379,7 +383,7 @@ uint8_t valve2cp_port(uint8_t valve) {
     snprintf(halt_msg, HALT_MSG_LEN,
              "CRITICAL: Out-of-bounds valve number %d in `valve2cp_port()`",
              valve);
-    halt(3, halt_msg);
+    halt(5, halt_msg);
   }
   return ARR_VALVE2CP_PORT[valve - 1];
 }
@@ -396,7 +400,7 @@ uint8_t valve2cp_bit(uint8_t valve) {
     snprintf(halt_msg, HALT_MSG_LEN,
              "CRITICAL: Out-of-bounds valve number %d in `valve2cp_bit()`",
              valve);
-    halt(4, halt_msg);
+    halt(6, halt_msg);
   }
   return ARR_VALVE2CP_BIT[valve - 1];
 }
