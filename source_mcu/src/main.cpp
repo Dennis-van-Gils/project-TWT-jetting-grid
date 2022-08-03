@@ -3,7 +3,7 @@ TWT jetting grid
 
 https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
 Dennis van Gils
-28-07-2022
+03-08-2022
 */
 
 /*
@@ -162,7 +162,7 @@ void setup() {
   FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, LED_COUNT);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
-  FastLED.setBrightness(150);
+  FastLED.setBrightness(30);
   fill_rainbow(leds, LED_COUNT, 0, 1);
   FastLED.show();
 
@@ -385,63 +385,65 @@ void loop() {
     // pcs_x = valve2PCS_x(idx_valve);
     // pcs_y = valve2PCS_y(idx_valve);
 
-    cp_port = valve2cp_port(idx_valve);
-    cp_value = valve2cp_bit(idx_valve);
+    if (idx_valve > 0) {
+      cp_port = valve2cp_port(idx_valve);
+      cp_value = valve2cp_bit(idx_valve);
 
-    Serial.print("valve: ");
-    Serial.print(idx_valve);
-    Serial.print(" @ cp ");
-    Serial.print(cp_port);
-    Serial.print(", ");
-    Serial.println(cp_value);
+      Serial.print("valve: ");
+      Serial.print(idx_valve);
+      Serial.print(" @ cp ");
+      Serial.print(cp_port);
+      Serial.print(", ");
+      Serial.println(cp_value);
 
-    cp0_value = 0;
-    cp1_value = 0;
-    cp2_value = 0;
-    cp3_value = 0;
-    cp4_value = 0;
-    cp5_value = 0;
-    cp6_value = 0;
-    cp7_value = 0;
+      cp0_value = 0;
+      cp1_value = 0;
+      cp2_value = 0;
+      cp3_value = 0;
+      cp4_value = 0;
+      cp5_value = 0;
+      cp6_value = 0;
+      cp7_value = 0;
 
-    uint16_t foo = 0;
-    bitSet(foo, cp_value);
+      uint16_t foo = 0;
+      bitSet(foo, cp_value);
 
-    switch (cp_port) {
-      case 0:
-        cp0_value |= foo;
-        break;
-      case 1:
-        cp1_value |= foo;
-        break;
-      case 2:
-        cp2_value |= foo;
-        break;
-      case 3:
-        cp3_value |= foo;
-        break;
-      case 4:
-        cp4_value |= foo;
-        break;
-      case 5:
-        cp5_value |= foo;
-        break;
-      case 6:
-        cp6_value |= foo;
-        break;
-      case 7:
-        cp7_value |= foo;
-        break;
+      switch (cp_port) {
+        case 0:
+          cp0_value |= foo;
+          break;
+        case 1:
+          cp1_value |= foo;
+          break;
+        case 2:
+          cp2_value |= foo;
+          break;
+        case 3:
+          cp3_value |= foo;
+          break;
+        case 4:
+          cp4_value |= foo;
+          break;
+        case 5:
+          cp5_value |= foo;
+          break;
+        case 6:
+          cp6_value |= foo;
+          break;
+        case 7:
+          cp7_value |= foo;
+          break;
+      }
+
+      cp.portWrite(0, cp0_value);
+      cp.portWrite(1, cp1_value);
+      cp.portWrite(2, cp2_value);
+      cp.portWrite(3, cp3_value);
+      cp.portWrite(4, cp4_value);
+      cp.portWrite(5, cp5_value);
+      cp.portWrite(6, cp6_value);
+      cp.portWrite(7, cp7_value);
     }
-
-    cp.portWrite(0, cp0_value);
-    cp.portWrite(1, cp1_value);
-    cp.portWrite(2, cp2_value);
-    cp.portWrite(3, cp3_value);
-    cp.portWrite(4, cp4_value);
-    cp.portWrite(5, cp5_value);
-    cp.portWrite(6, cp6_value);
-    cp.portWrite(7, cp7_value);
 
     // Serial.println(micros() - utick);
 

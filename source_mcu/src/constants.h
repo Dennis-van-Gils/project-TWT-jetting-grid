@@ -2,13 +2,14 @@
 Constants of the TWT jetting grid
 
 Dennis van Gils
-01-08-2022
+03-08-2022
 */
 
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
 #include "MIKROE_4_20mA_RT_Click.h"
+#include "halt.h"
 
 /*------------------------------------------------------------------------------
   PURPOSE
@@ -73,6 +74,14 @@ const uint8_t NUMEL_PCS_DIMS = 2;
 const uint8_t NUMEL_PCS_AXIS = 15;
 const uint8_t NUMEL_LED_AXIS = 16;
 const uint8_t NUMEL_VALVES = 112;
+
+/**
+ * @brief Structure to hold a Protocol Coordinate System (PCS) coordinate.
+ */
+struct PCS {
+  int8_t x;
+  int8_t y;
+};
 
 // Translation matrix: PCS coordinate to valve number.
 //   [dim 1]: PCS y-coordinate [0: PCS_y =  7, 14: PCS_y = -7]
@@ -304,8 +313,6 @@ float mA2bar(float mA, const Omega_Calib calib) {
   Protocol coordinate system (PCS) transformations
 ------------------------------------------------------------------------------*/
 
-// TODO: Add safety by catching OUT OF BOUNDS array indices
-
 /**
  * @brief Translate PCS coordinate to valve number.
  *
@@ -316,10 +323,8 @@ float mA2bar(float mA, const Omega_Calib calib) {
 uint8_t PCS2valve(int8_t x, int8_t y) {
   int8_t tmp_x = x + 7;
   int8_t tmp_y = 7 - y;
-  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS)) {
-    return 0;
-  }
-  if ((tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
+      (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     return 0;
   }
   return ARR_PCS2VALVE[tmp_y][tmp_x];
@@ -330,32 +335,61 @@ uint8_t PCS2valve(int8_t x, int8_t y) {
  *
  * @param x PCS x-coordinate
  * @param y PCS y-coordinate
- * @return The LED index. 255 when the PCS coordinate is out of bounds.
+ * @return The LED index
+ * @throw Halts when the PCS coordinate is out-of-bounds
  */
 uint8_t PCS2LED(int8_t x, int8_t y) {
   int8_t tmp_x = x + 7;
   int8_t tmp_y = 7 - y;
-  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS)) {
-    return 255;
-  }
-  if ((tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-    return 255;
+  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
+      (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+    halt(1);
   }
   return ARR_PCS2LED[tmp_y][tmp_x];
 }
 
-int8_t valve2PCS_x(uint8_t valve) { return ARR_VALVE2PCS[valve][0]; }
-int8_t valve2PCS_y(uint8_t valve) { return ARR_VALVE2PCS[valve][1]; }
+/**
+ * @brief Translate valve number to PCS coordinate.
+ *
+ * @param valve The valve numbered 1 to 112
+ * @return The PCS x-coordinate
+ * @throw Halts when the valve number is out-of-bounds
+ */
+int8_t valve2PCS_x(uint8_t valve) {
+  if ((valve == 0) || (valve > NUMEL_VALVES)) {
+    halt(2);
+  }
+  return ARR_VALVE2PCS[valve][0];
+}
+
+/**
+ * @brief Translate valve number to PCS coordinate.
+ *
+ * @param valve The valve numbered 1 to 112
+ * @return The PCS y-coordinate
+ * @throw Halts when the valve number is out-of-bounds
+ */
+int8_t valve2PCS_y(uint8_t valve) {
+  if ((valve == 0) || (valve > NUMEL_VALVES)) {
+    halt(2);
+  }
+  return ARR_VALVE2PCS[valve][1];
+}
+
+/*------------------------------------------------------------------------------
+  Valve to Centipede transformations
+------------------------------------------------------------------------------*/
 
 /**
  * @brief Translate valve number to Centipede port.
  *
  * @param valve The valve numbered 1 to 112
- * @return The Centipede port index. 255 when the valve number is out of bounds.
+ * @return The Centipede port index
+ * @throw Halts when the valve number is out-of-bounds
  */
 uint8_t valve2cp_port(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    return 255;
+    halt(3);
   }
   return ARR_VALVE2CP_PORT[valve - 1];
 }
@@ -364,12 +398,12 @@ uint8_t valve2cp_port(uint8_t valve) {
  * @brief Translate valve number to Centipede bitmask bit.
  *
  * @param valve The valve numbered 1 to 112
- * @return The Centipede bitmask bit index. 255 when the valve number is out of
- * bounds.
+ * @return The Centipede bitmask bit index
+ * @throw Halts when the valve number is out-of-bounds
  */
 uint8_t valve2cp_bit(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    return 255;
+    halt(4);
   }
   return ARR_VALVE2CP_BIT[valve - 1];
 }
