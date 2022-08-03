@@ -1,3 +1,8 @@
+/*
+Dennis van Gils
+03-08-2022
+*/
+
 #ifndef HALT_H_
 #define HALT_H_
 
@@ -6,7 +11,7 @@
 extern CRGB leds[256];
 
 /**
- * @brief Halt all operations and flash the text 'HALT' on the LED matrix in an
+ * @brief Halt execution and flash the text 'HALT' on the LED matrix in an
  * infinite loop.
  *
  * Can be used to gracefully catch an illegal operation, like trying to address
@@ -17,8 +22,9 @@ extern CRGB leds[256];
  * @param halt_ID Optional ID to identify where in the source code the `halt`
  * function got called. The ID number will show up as extra lit LEDs underneath
  * the 'HALT' text.
+ * @param msg Optional text to display over the serial output.
  */
-void halt(uint8_t halt_ID = 0) {
+void halt(uint8_t halt_ID = 0, const char *msg = NULL) {
   const uint8_t arr_halt[] = {81,  83,  85,  86,  87,  89,  92,  93,  94,  98,
                               102, 104, 106, 108, 110, 113, 114, 115, 117, 118,
                               119, 121, 125, 130, 134, 136, 138, 140, 142, 145,
@@ -35,6 +41,9 @@ void halt(uint8_t halt_ID = 0) {
   while (1) {
     Serial.print("EXECUTION HALTED, ID: ");
     Serial.println(halt_ID);
+    if (msg != NULL) {
+      Serial.println(msg);
+    }
 
     FastLED.setBrightness(30);
     FastLED.show();

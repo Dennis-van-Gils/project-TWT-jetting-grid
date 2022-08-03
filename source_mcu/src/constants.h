@@ -1,5 +1,5 @@
 /*
-Constants of the TWT jetting grid
+Constants and transformations of the TWT jetting grid
 
 Dennis van Gils
 03-08-2022
@@ -8,8 +8,14 @@ Dennis van Gils
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
 
+#include <algorithm>
+using namespace std;
+
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "halt.h"
+
+const uint8_t HALT_MSG_LEN = 80;
+char halt_msg[HALT_MSG_LEN]{'\0'};
 
 /*------------------------------------------------------------------------------
   PURPOSE
@@ -78,10 +84,9 @@ struct PCS {
   int8_t y;
 };
 
-const uint8_t NUMEL_PCS_DIMS = 2;
-const uint8_t NUMEL_PCS_AXIS = 15;
-const uint8_t NUMEL_LED_AXIS = 16;
-const uint8_t NUMEL_VALVES = 112;
+const uint8_t NUMEL_PCS_AXIS = 15; // Spanning [-7, 7]
+const uint8_t NUMEL_LED_AXIS = 16; // 16x16 matrix
+const uint8_t NUMEL_VALVES = 112;  // From 1 to 112, not counting 0
 
 // clang-format off
 
@@ -133,14 +138,15 @@ const uint8_t ARR_PCS2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
   { 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 }, // -8
 };
 
+// clang-format on
+
 // Translation matrix: Valve number to PCS coordinate.
-// Reverse look-up. To be populated from `ARR_PCS2VALVE` during `setup()`.
+// Reverse look-up. Must be build from the source array `ARR_PCS2VALVE` by
+// calling `init_valve2PCS()` during `setup()`.
 //   [dim 1]: The valve numbered 1 to 112, with 0 indicating 'no valve'
 //   [dim 2]: PCS axis [0: x, 1: y]
 //   Returns: The PCS x or y-coordinate of the valve
-int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][NUMEL_PCS_DIMS] = {0};
-
-// clang-format on
+int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][2] = {0};
 
 /*------------------------------------------------------------------------------
   HARDWARE WIRING
@@ -261,59 +267,6 @@ const uint8_t ARR_VALVE2CP_BIT[NUMEL_VALVES] = {
 // clang-format on
 
 /*------------------------------------------------------------------------------
-  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
-------------------------------------------------------------------------------*/
-
-const uint8_t PIN_LED_MATRIX = 11;
-const uint16_t LED_COUNT = 256;
-
-/*------------------------------------------------------------------------------
-  MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
-------------------------------------------------------------------------------*/
-
-// Cable select pins
-const uint8_t PIN_R_CLICK_1 = 10;
-const uint8_t PIN_R_CLICK_2 = 9;
-const uint8_t PIN_R_CLICK_3 = 5;
-const uint8_t PIN_R_CLICK_4 = 6;
-
-// Calibrated against a multimeter @ 14-07-2022 by DPM van Gils
-const RT_Click_Calibration R_CLICK_1_CALIB{3.99, 20.00, 791, 3971};
-const RT_Click_Calibration R_CLICK_2_CALIB{3.98, 19.57, 784, 3881};
-const RT_Click_Calibration R_CLICK_3_CALIB{3.96, 19.68, 774, 3908};
-const RT_Click_Calibration R_CLICK_4_CALIB{3.98, 19.83, 828, 3981};
-
-// Single R click readings fluctuate a lot and so will be oversampled and
-// subsequently low-pass filtered as data-acquisition (DAQ) routine.
-const uint32_t DAQ_DT = 10000; // Desired oversampling interval [µs]
-const float DAQ_LP = 10.;      // Low-pass filter cut-off frequency [Hz]
-
-/*------------------------------------------------------------------------------
-  OMEGA pressure sensors, type PXM309-007GI
-------------------------------------------------------------------------------*/
-
-// Structure to hold the Omega pressure sensor calibration parameters
-struct Omega_Calib {
-  float balance_mA;
-  float sensitivity_mA;
-  float full_range_bar;
-};
-
-// Omega calibration parameters supplied with the pressure transducers
-//   sensor #1 - Serial BG042821D030, Job WHS0059544, Date 30-03-22022
-//   sensor #2 - Serial BG042821D032, Job WHS0059544, Date 30-03-22022
-//   sensor #3 - Serial BG042821D034, Job WHS0059544, Date 30-03-22022
-//   sensor #4 - Serial BG042821D041, Job WHS0059544, Date 30-03-22022
-const Omega_Calib OMEGA_1_CALIB{4.035, 16.015, 7.0};
-const Omega_Calib OMEGA_2_CALIB{4.024, 16.002, 7.0};
-const Omega_Calib OMEGA_3_CALIB{4.004, 16.057, 7.0};
-const Omega_Calib OMEGA_4_CALIB{3.995, 16.001, 7.0};
-
-float mA2bar(float mA, const Omega_Calib calib) {
-  return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
-}
-
-/*------------------------------------------------------------------------------
   Protocol coordinate system (PCS) transformations
 ------------------------------------------------------------------------------*/
 
@@ -345,7 +298,10 @@ uint8_t PCS2LED(PCS pcs) {
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-    halt(1);
+    snprintf(halt_msg, HALT_MSG_LEN,
+             "CRITICAL: Out-of-bounds index (%d, %d) in `PCS2LED()`", pcs.x,
+             pcs.y);
+    halt(1, halt_msg);
   }
   return ARR_PCS2LED[tmp_y][tmp_x];
 }
@@ -359,9 +315,52 @@ uint8_t PCS2LED(PCS pcs) {
  */
 PCS valve2PCS(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    halt(2);
+    snprintf(halt_msg, HALT_MSG_LEN,
+             "CRITICAL: Out-of-bounds valve number %d in `valve2PCS()`", valve);
+    halt(2, halt_msg);
   }
   return PCS{ARR_VALVE2PCS[valve][0], ARR_VALVE2PCS[valve][1]};
+}
+
+/**
+ * @brief Build the reverse look-up table in order for `valve2PCS()` to work.
+ *
+ * The reverse look-up table will get build from the source array
+ * `ARR_PCS2VALVE`. A check will be performed to see if all valves from 1 to 112
+ * are accounted for.
+ *
+ * @throw Halts when not all valve numbers from 1 to 112 are accounted for
+ */
+void init_valve2PCS() {
+  uint8_t valve;
+  int8_t x;
+  int8_t y;
+
+  // Initialize array with a value of -128 to be able to check if valves are
+  // missing from the reverse look-up table.
+  std::fill(*ARR_VALVE2PCS, *ARR_VALVE2PCS + (NUMEL_VALVES + 1) * 2, -128);
+
+  // Build the reverse look-up table
+  for (y = 7; y > -8; y--) {
+    for (x = -7; x < 8; x++) {
+      valve = ARR_PCS2VALVE[7 - y][x + 7];
+      if (valve > 0) {
+        ARR_VALVE2PCS[valve][0] = x;
+        ARR_VALVE2PCS[valve][1] = y;
+      }
+    }
+  }
+
+  // Check if all valves from 1 to 112 are accounted for
+  for (valve = 1; valve < 113; valve++) {
+    x = ARR_VALVE2PCS[valve][0];
+    y = ARR_VALVE2PCS[valve][1];
+    if ((x == -128) || (y == -128)) {
+      snprintf(halt_msg, HALT_MSG_LEN,
+               "CRITICAL: Valve number %d is not accounted for", valve);
+      halt(5, halt_msg);
+    }
+  }
 }
 
 /*------------------------------------------------------------------------------
@@ -377,7 +376,10 @@ PCS valve2PCS(uint8_t valve) {
  */
 uint8_t valve2cp_port(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    halt(3);
+    snprintf(halt_msg, HALT_MSG_LEN,
+             "CRITICAL: Out-of-bounds valve number %d in `valve2cp_port()`",
+             valve);
+    halt(3, halt_msg);
   }
   return ARR_VALVE2CP_PORT[valve - 1];
 }
@@ -391,9 +393,70 @@ uint8_t valve2cp_port(uint8_t valve) {
  */
 uint8_t valve2cp_bit(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    halt(4);
+    snprintf(halt_msg, HALT_MSG_LEN,
+             "CRITICAL: Out-of-bounds valve number %d in `valve2cp_bit()`",
+             valve);
+    halt(4, halt_msg);
   }
   return ARR_VALVE2CP_BIT[valve - 1];
+}
+
+/*------------------------------------------------------------------------------
+  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+------------------------------------------------------------------------------*/
+
+const uint16_t N_LEDS = NUMEL_LED_AXIS * NUMEL_LED_AXIS;
+const uint8_t PIN_LED_MATRIX = 11;
+
+/*------------------------------------------------------------------------------
+  MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
+------------------------------------------------------------------------------*/
+
+// Cable select pins
+const uint8_t PIN_R_CLICK_1 = 10;
+const uint8_t PIN_R_CLICK_2 = 9;
+const uint8_t PIN_R_CLICK_3 = 5;
+const uint8_t PIN_R_CLICK_4 = 6;
+
+// Calibrated against a multimeter @ 14-07-2022 by DPM van Gils
+const RT_Click_Calibration R_CLICK_1_CALIB{3.99, 20.00, 791, 3971};
+const RT_Click_Calibration R_CLICK_2_CALIB{3.98, 19.57, 784, 3881};
+const RT_Click_Calibration R_CLICK_3_CALIB{3.96, 19.68, 774, 3908};
+const RT_Click_Calibration R_CLICK_4_CALIB{3.98, 19.83, 828, 3981};
+
+// Single R click readings fluctuate a lot and so will be oversampled and
+// subsequently low-pass filtered as data-acquisition (DAQ) routine.
+const uint32_t DAQ_DT = 10000; // Desired oversampling interval [µs]
+const float DAQ_LP = 10.;      // Low-pass filter cut-off frequency [Hz]
+
+/*------------------------------------------------------------------------------
+  OMEGA pressure sensors, type PXM309-007GI
+------------------------------------------------------------------------------*/
+
+/**
+ * @brief Structure to hold the Omega pressure sensor calibration parameters.
+ *
+ * The parameters can be found on the calibration sheet supplied with the
+ * sensor.
+ */
+struct Omega_Calib {
+  float balance_mA;
+  float sensitivity_mA;
+  float full_range_bar;
+};
+
+// Omega calibration parameters supplied with the pressure sensors
+//   sensor #1 - Serial BG042821D030, Job WHS0059544, Date 30-03-22022
+//   sensor #2 - Serial BG042821D032, Job WHS0059544, Date 30-03-22022
+//   sensor #3 - Serial BG042821D034, Job WHS0059544, Date 30-03-22022
+//   sensor #4 - Serial BG042821D041, Job WHS0059544, Date 30-03-22022
+const Omega_Calib OMEGA_1_CALIB{4.035, 16.015, 7.0};
+const Omega_Calib OMEGA_2_CALIB{4.024, 16.002, 7.0};
+const Omega_Calib OMEGA_3_CALIB{4.004, 16.057, 7.0};
+const Omega_Calib OMEGA_4_CALIB{3.995, 16.001, 7.0};
+
+float mA2bar(float mA, const Omega_Calib calib) {
+  return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
 }
 
 #endif

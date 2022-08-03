@@ -20,28 +20,34 @@ https://google.github.io/styleguide/cppguide.html#Variable_Names
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
-
 #include "constants.h"
-
-#include <algorithm>
-using namespace std;
 
 // Serial command listener
 DvG_SerialCommand sc(Serial);
 
 // Common character buffer
-#define BUFLEN 128
-char buf[BUFLEN]{'\0'};
+const uint8_t BUF_LEN = 128;
+char buf[BUF_LEN]{'\0'};
 
 // DEBUG: timer
 uint32_t utick = micros();
 
 /*------------------------------------------------------------------------------
-  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
-  WS2812 or SK6812 type
+  Holds actuator states and sensor readings
 ------------------------------------------------------------------------------*/
 
-CRGB leds[LED_COUNT];
+struct State {
+  // OMEGA pressure sensors
+  float pres_1_mA = NAN;  // [mA]
+  float pres_2_mA = NAN;  // [mA]
+  float pres_3_mA = NAN;  // [mA]
+  float pres_4_mA = NAN;  // [mA]
+  float pres_1_bar = NAN; // [bar]
+  float pres_2_bar = NAN; // [bar]
+  float pres_3_bar = NAN; // [bar]
+  float pres_4_bar = NAN; // [bar]
+};
+State state;
 
 /*------------------------------------------------------------------------------
   Macetech Centipede boards
@@ -63,21 +69,11 @@ uint16_t cp7_value = 0;
 Centipede cp;
 
 /*------------------------------------------------------------------------------
-  Holds actuator states and sensor readings
+  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+  WS2812 or SK6812 type
 ------------------------------------------------------------------------------*/
 
-struct State {
-  // OMEGA pressure sensors
-  float pres_1_mA = NAN;  // [mA]
-  float pres_2_mA = NAN;  // [mA]
-  float pres_3_mA = NAN;  // [mA]
-  float pres_4_mA = NAN;  // [mA]
-  float pres_1_bar = NAN; // [bar]
-  float pres_2_bar = NAN; // [bar]
-  float pres_3_bar = NAN; // [bar]
-  float pres_4_bar = NAN; // [bar]
-};
-State state;
+CRGB leds[N_LEDS];
 
 /*
 // On-board NeoPixel RGB LED
@@ -159,62 +155,17 @@ void setup() {
     Type `NEOPIXEL` is internally `WS2812Controller800Khz`, so already running
     at the max clock frequency of 800 kHz
   */
-  FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, LED_COUNT);
+  FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, N_LEDS);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
   FastLED.setBrightness(30);
-  fill_rainbow(leds, LED_COUNT, 0, 1);
+  fill_rainbow(leds, N_LEDS, 0, 1);
   FastLED.show();
 
   Serial.begin(9600);
   // while (!Serial) {}
 
-  // Populate reverse look-up table MATRIX_VALVE2PCS from source
-  // MATRIX_PCS2VALVE.
-  // dim 1: Valve number [1 - 112], valve 0 is special case
-  // dim 2: PCS axis [0: x, 1: y]
-  // Initialize matrix with a value of -128 to be able to check if no valves are
-  // missing from the reverser look-up table.
-  std::fill(*ARR_VALVE2PCS, *ARR_VALVE2PCS + 113 * 2, -128);
-  for (int8_t y = 7; y > -8; y--) {
-    for (int8_t x = -7; x < 8; x++) {
-      uint8_t valve = ARR_PCS2VALVE[7 - y][x + 7];
-      if (valve > 0) {
-        ARR_VALVE2PCS[valve][0] = x;
-        ARR_VALVE2PCS[valve][1] = y;
-        Serial.print(valve);
-        Serial.write('\t');
-        Serial.print(x);
-        Serial.write('\t');
-        Serial.println(y);
-      }
-    }
-  }
-
-  // Check if all valves are accounted for
-  bool inverse_lookup_okay = true;
-  int8_t x;
-  int8_t y;
-  Serial.println("\nCheckup\n_______");
-  for (uint8_t valve = 1; valve < 113; valve++) {
-    x = ARR_VALVE2PCS[valve][0];
-    y = ARR_VALVE2PCS[valve][1];
-    Serial.print(valve);
-    Serial.write('\t');
-    if ((x == -128) || (y == -128)) {
-      inverse_lookup_okay = false;
-      Serial.println("ERROR: Missing valve index!");
-    } else {
-      Serial.print(x);
-      Serial.write('\t');
-      Serial.println(y);
-    }
-  }
-
-  if (!inverse_lookup_okay) {
-    Serial.println("ERROR: Invalid lookup table");
-    while (1) {}
-  }
+  init_valve2PCS();
 
   // R Click
   R_click_1.set_SPI_clock(1700000);
@@ -301,8 +252,8 @@ void loop() {
   if (R_click_poll_EMA_collectively()) {
     // DEBUG: Alarm when obtained DT interval is too large
     if (EMA_obtained_interval > DAQ_DT * 1.05) {
-      // Serial.print("WARNING: Large EMA DT ");
-      // Serial.println(EMA_obtained_interval);
+      Serial.print("WARNING: Large EMA DT ");
+      Serial.println(EMA_obtained_interval);
     } else {
       // Serial.println("*");
     }
@@ -328,7 +279,7 @@ void loop() {
       former is ~ 320 µs, the latter > 3400 µs !!!
     */
     // clang-format off
-    snprintf(buf, BUFLEN,
+    snprintf(buf, BUF_LEN,
              "%.2f\t%.2f\t%.2f\t%.2f\t\t"
              "%.3f\t%.3f\t%.3f\t%.3f\n",
              state.pres_1_mA,
@@ -340,7 +291,7 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    // Serial.print(buf); // Takes 320 µs per call
+    Serial.print(buf); // Takes 320 µs per call
 
     // Serial.println(FastLED.getFPS());
   }
@@ -355,13 +306,7 @@ void loop() {
   */
 
   // Animate LED matrix
-  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, LED_COUNT, 5); }
-  /*
-  EVERY_N_MILLIS(100) {
-    leds[idx_led] = CRGB::Red;
-    idx_led++;
-  }
-  */
+  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, N_LEDS, 5); }
 
   // Centipedes
   // For-loop takes 457 µs in total @ 1 MHz I2C clock
@@ -369,7 +314,7 @@ void loop() {
     // utick = micros();
 
     // Fade any previous red pixels as blue
-    for (idx_led = 0; idx_led < LED_COUNT; idx_led++) {
+    for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
       if (leds[idx_led].r > 0) {
         leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
       }
@@ -385,12 +330,14 @@ void loop() {
       cp_port = valve2cp_port(idx_valve);
       cp_value = valve2cp_bit(idx_valve);
 
+      /*
       Serial.print("valve: ");
       Serial.print(idx_valve);
       Serial.print(" @ cp ");
       Serial.print(cp_port);
       Serial.print(", ");
       Serial.println(cp_value);
+      */
 
       cp0_value = 0;
       cp1_value = 0;
