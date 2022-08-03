@@ -6,12 +6,6 @@ Dennis van Gils
 03-08-2022
 */
 
-/*
-- Google CPP style guide:
-https://google.github.io/styleguide/cppguide.html#Variable_Names
-- FastLED API           : http://fastled.io/docs/3.1/index.html
-*/
-
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
@@ -146,15 +140,13 @@ void setup() {
   asm(".global _printf_float");
 
   // LED matrix
-  /*
-  NOTE:
-    Don't call `FastLED.setMaxRefreshRate()`, because it will turn
-    `FastLED.show()` into a blocking call.
-
-  NOTE:
-    Type `NEOPIXEL` is internally `WS2812Controller800Khz`, so already running
-    at the max clock frequency of 800 kHz
-  */
+  //
+  // NOTE:
+  //   Don't call `FastLED.setMaxRefreshRate()`, because it will turn
+  //   `FastLED.show()` into a blocking call.
+  // NOTE:
+  //   Type `NEOPIXEL` is internally `WS2812Controller800Khz`, so already
+  //   running at the max clock frequency of 800 kHz.
   FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, N_LEDS);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
@@ -165,6 +157,7 @@ void setup() {
   Serial.begin(9600);
   // while (!Serial) {}
 
+  // Build reverse look-up table
   init_valve2PCS();
 
   // R Click
@@ -178,23 +171,22 @@ void setup() {
   R_click_4.begin();
 
   // Centipedes
-  /*
-  Supported I2C clock speeds:
-    MCP23017 datasheet: 100 kHz, 400 kHz, 1.7 MHz
-    SAMD51   datasheet: 100 kHz, 400 kHz, 1 MHz, 3.4 MHz
-  Default I2C clock speed is 100 kHz.
-
-  Resulting timings of the following code block:
-    ```
-    for (cp_port = 0; cp_port < 8; cp_port++) {
-      cp.portWrite(cp_port, cp_data);
-    }
-    ```
-    100 kHz: 3177 µs
-    400 kHz:  908 µs
-    1   MHz:  457 µs
-    1.7 MHz: fails, too fast
-  */
+  //
+  // Supported I2C clock speeds:
+  //   MCP23017 datasheet: 100 kHz, 400 kHz, 1.7 MHz
+  //   SAMD51   datasheet: 100 kHz, 400 kHz, 1 MHz, 3.4 MHz
+  // Arduino's default I2C clock speed is 100 kHz.
+  //
+  // Resulting timings of the following code block:
+  //   ```
+  //   for (cp_port = 0; cp_port < 8; cp_port++) {
+  //     cp.portWrite(cp_port, cp_data);
+  //   }
+  //   ```
+  //   100 kHz: 3177 µs
+  //   400 kHz:  908 µs
+  //   1   MHz:  457 µs  <------- Chosen
+  //   1.7 MHz: fails, too fast
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
   cp.initialize();
@@ -271,13 +263,11 @@ void loop() {
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
     state.pres_4_bar = mA2bar(state.pres_4_mA, OMEGA_4_CALIB);
 
-    /*
-    NOTE:
-      Using `snprintf()` to print a large array of formatted values to a buffer
-      followed by a single `Serial.print(buf)` is many times faster than
-      multiple dumb `Serial.print(value, 3); Serial.write('\t')` statements. The
-      former is ~ 320 µs, the latter > 3400 µs !!!
-    */
+    // NOTE:
+    //   Using `snprintf()` to print a large array of formatted values to a
+    //   buffer followed by a single `Serial.print(buf)` is many times faster
+    //   than multiple dumb `Serial.print(value, 3); Serial.write('\t')`
+    //   statements. The latter is > 3400 µs, the former just ~ 320 µs !!!
     // clang-format off
     snprintf(buf, BUF_LEN,
              "%.2f\t%.2f\t%.2f\t%.2f\t\t"
@@ -415,25 +405,26 @@ void loop() {
   }
 
   // Send out LED data to the strip.
-  /*
-  NOTE:
-    It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16 LED
-    matrix is takes 7680 µs. I actually measure 8000 µs, using
-    '''
-      utick = micros();
-      FastLED.show();
-      Serial.println(micros() - utick);
-    '''
-    Hence, we must limit the framerate to a theoretical max of 125 Hz in order
-    to prevent flickering of the LEDs. Actually measured limit is <= 80 Hz.
+  //
+  // NOTE:
+  //   It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16 LED
+  //   matrix is takes 7680 µs. I actually measure 8000 µs, using
+  //   '''
+  //     utick = micros();
+  //     FastLED.show();
+  //     Serial.println(micros() - utick);
+  //   '''
+  //   Hence, we must limit the framerate to a theoretical max of 125 Hz in
+  //   order to prevent flickering of the LEDs. Actually measured limit is
+  //   <= 80 Hz.
+  //
+  // NOTE:
+  //   Capping the framerate by calling `FastLED.setMaxRefreshRate(80)` is not
+  //   advised, because this makes `FastLED.show()` blocking while it is waiting
+  //   for the correct time to pass. Hence, we simply put the call to
+  //   `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it
+  //   unblocking, while still capping the framerate.
 
-  NOTE:
-    Capping the framerate by calling `FastLED.setMaxRefreshRate(80)` is not
-    advised, because this makes `FastLED.show()` blocking while it is waiting
-    for the correct time to pass. Hence, we simply put the call to
-    `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it unblocking,
-    while still capping the framerate.
-  */
   EVERY_N_MILLIS(20) {
     // utick = micros();
     FastLED.show(); // Takes 8003 µs per call
