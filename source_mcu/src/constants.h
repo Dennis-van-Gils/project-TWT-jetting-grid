@@ -143,7 +143,7 @@ const uint8_t ARR_PCS2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
 
 // Translation matrix: Valve number to PCS coordinate.
 // Reverse look-up. Must be build from the source array `ARR_PCS2VALVE` by
-// calling `init_valve2PCS()` during `setup()`.
+// calling `init_valve2pcs()` during `setup()`.
 //   [dim 1]: The valve numbered 1 to 112, with 0 indicating 'no valve'
 //   [dim 2]: PCS axis [0: x, 1: y]
 //   Returns: The PCS x or y-coordinate of the valve
@@ -217,6 +217,14 @@ int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][2] = {0};
 
 ------------------------------------------------------------------------------*/
 
+/**
+ * @brief Structure to hold a Centipede port and bit address.
+ */
+struct CP_Addr {
+  uint8_t port;
+  uint8_t bit;
+};
+
 // clang-format off
 
 // Translation array: Valve number to Centipede port.
@@ -278,13 +286,13 @@ const uint8_t ARR_VALVE2CP_BIT[NUMEL_VALVES] = {
  * @return The valve numbered 1 to 112, with 0 indicating 'no valve'
  * @throw Halts when the PCS coordinate is out-of-bounds
  */
-uint8_t PCS2valve(PCS pcs) {
+uint8_t pcs2valve(PCS pcs) {
   int8_t tmp_x = pcs.x + 7;
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     snprintf(halt_msg, HALT_MSG_LEN,
-             "CRITICAL: Out-of-bounds index (%d, %d) in `PCS2valve()`", pcs.x,
+             "CRITICAL: Out-of-bounds index (%d, %d) in `pcs2valve()`", pcs.x,
              pcs.y);
     halt(1, halt_msg);
   }
@@ -298,13 +306,13 @@ uint8_t PCS2valve(PCS pcs) {
  * @return The LED index
  * @throw Halts when the PCS coordinate is out-of-bounds
  */
-uint8_t PCS2LED(PCS pcs) {
+uint8_t pcs2led(PCS pcs) {
   int8_t tmp_x = pcs.x + 7;
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     snprintf(halt_msg, HALT_MSG_LEN,
-             "CRITICAL: Out-of-bounds index (%d, %d) in `PCS2LED()`", pcs.x,
+             "CRITICAL: Out-of-bounds index (%d, %d) in `pcs2led()`", pcs.x,
              pcs.y);
     halt(2, halt_msg);
   }
@@ -318,17 +326,17 @@ uint8_t PCS2LED(PCS pcs) {
  * @return The PCS coordinate
  * @throw Halts when the valve number is out-of-bounds
  */
-PCS valve2PCS(uint8_t valve) {
+PCS valve2pcs(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
     snprintf(halt_msg, HALT_MSG_LEN,
-             "CRITICAL: Out-of-bounds valve number %d in `valve2PCS()`", valve);
+             "CRITICAL: Out-of-bounds valve number %d in `valve2pcs()`", valve);
     halt(3, halt_msg);
   }
   return PCS{ARR_VALVE2PCS[valve][0], ARR_VALVE2PCS[valve][1]};
 }
 
 /**
- * @brief Build the reverse look-up table in order for `valve2PCS()` to work.
+ * @brief Build the reverse look-up table in order for `valve2pcs()` to work.
  *
  * The reverse look-up table will get build from the source array
  * `ARR_PCS2VALVE`. A check will be performed to see if all valves from 1 to 112
@@ -336,7 +344,7 @@ PCS valve2PCS(uint8_t valve) {
  *
  * @throw Halts when not all valve numbers from 1 to 112 are accounted for
  */
-void init_valve2PCS() {
+void init_valve2pcs() {
   uint8_t valve;
   int8_t x;
   int8_t y;
@@ -373,42 +381,23 @@ void init_valve2PCS() {
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Translate valve number to Centipede port.
+ * @brief Translate valve number to Centipede port and bit address.
  *
  * @param valve The valve numbered 1 to 112
- * @return The Centipede port index
+ * @return The Centipede port and bit address
  * @throw Halts when the valve number is out-of-bounds
  */
-uint8_t valve2cp_port(uint8_t valve) {
+CP_Addr valve2cp(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
     snprintf(halt_msg, HALT_MSG_LEN,
-             "CRITICAL: Out-of-bounds valve number %d in `valve2cp_port()`",
-             valve);
-    halt(5, halt_msg);
-  }
-  return ARR_VALVE2CP_PORT[valve - 1];
-}
-
-/**
- * @brief Translate valve number to Centipede bitmask bit.
- *
- * @param valve The valve numbered 1 to 112
- * @return The Centipede bitmask bit index
- * @throw Halts when the valve number is out-of-bounds
- */
-uint8_t valve2cp_bit(uint8_t valve) {
-  if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    snprintf(halt_msg, HALT_MSG_LEN,
-             "CRITICAL: Out-of-bounds valve number %d in `valve2cp_bit()`",
-             valve);
+             "CRITICAL: Out-of-bounds valve number %d in `valve2cp()`", valve);
     halt(6, halt_msg);
   }
-  return ARR_VALVE2CP_BIT[valve - 1];
+  return CP_Addr{ARR_VALVE2CP_PORT[valve - 1], ARR_VALVE2CP_BIT[valve - 1]};
 }
 
 /*------------------------------------------------------------------------------
-  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
-  WS2812 or SK6812 type
+  LED matrix, 16x16 WS2812 RGB NeoPixel (Adafruit #2547)
 ------------------------------------------------------------------------------*/
 
 const uint16_t N_LEDS = NUMEL_LED_AXIS * NUMEL_LED_AXIS;
