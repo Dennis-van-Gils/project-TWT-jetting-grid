@@ -2,7 +2,7 @@
 Constants and transformations of the TWT jetting grid
 
 Dennis van Gils
-03-08-2022
+04-08-2022
 */
 
 #ifndef CONSTANTS_H_
@@ -408,6 +408,7 @@ uint8_t valve2cp_bit(uint8_t valve) {
 
 /*------------------------------------------------------------------------------
   LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+  WS2812 or SK6812 type
 ------------------------------------------------------------------------------*/
 
 const uint16_t N_LEDS = NUMEL_LED_AXIS * NUMEL_LED_AXIS;
@@ -429,8 +430,9 @@ const RT_Click_Calibration R_CLICK_2_CALIB{3.98, 19.57, 784, 3881};
 const RT_Click_Calibration R_CLICK_3_CALIB{3.96, 19.68, 774, 3908};
 const RT_Click_Calibration R_CLICK_4_CALIB{3.98, 19.83, 828, 3981};
 
-// Single R click readings fluctuate a lot and so will be oversampled and
-// subsequently low-pass filtered as data-acquisition (DAQ) routine.
+// Single R click readings fluctuate a lot and so we will employ an exponential
+// moving average by using oversampling and subsequent low-pass filtering as
+// data-acquisition (DAQ) routine.
 const uint32_t DAQ_DT = 10000; // Desired oversampling interval [µs]
 const float DAQ_LP = 10.;      // Low-pass filter cut-off frequency [Hz]
 
