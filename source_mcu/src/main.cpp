@@ -10,6 +10,9 @@ Dennis van Gils
 #include <SPI.h>
 #include <Wire.h>
 
+#include <array>
+using namespace std;
+
 #include "Centipede.h"
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
@@ -63,38 +66,31 @@ const uint8_t NUMEL_CP_PORTS = 8;
 class Centipede_mgr {
 private:
   Centipede *cp_;
-  uint16_t bitmasks_[NUMEL_CP_PORTS] = {
-      0}; // Bitmask values for each of the 8 ports
+  std::array<uint16_t, NUMEL_CP_PORTS>
+      bitmasks_; // Bitmask values for each of the 8 ports
 
 public:
-  Centipede_mgr(Centipede *cp) { cp_ = cp; }
-
-  /**
-   * @brief
-   *
-   */
-  void clear() { memset(bitmasks_, 0, sizeof(bitmasks_[0]) * NUMEL_CP_PORTS); }
-
-  /**
-   * @brief
-   *
-   * @param cp_addr
-   * @return
-   */
-  bool add(CP_Addr cp_addr) {
-    if (cp_addr.port >= NUMEL_CP_PORTS) {
-      return false;
-      // TODO: Simply halt here. Remove boolean return value.
-    }
-    bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
-    return true;
+  Centipede_mgr(Centipede *cp) {
+    cp_ = cp;
+    clear_masks();
   }
 
-  /**
-   * @brief
-   *
-   */
-  void send() {
+  void clear_masks() {
+    std::fill(std::begin(bitmasks_), std::end(bitmasks_), 0);
+  }
+
+  void add_to_masks(CP_Addr cp_addr) {
+    if (cp_addr.port >= NUMEL_CP_PORTS) {
+      // TODO: Simply halt here.
+    }
+    bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
+  }
+
+  void set_masks(std::array<uint16_t, NUMEL_CP_PORTS> in) { bitmasks_ = in; }
+
+  std::array<uint16_t, NUMEL_CP_PORTS> get_masks() { return bitmasks_; }
+
+  void send_masks() {
     for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
       cp.portWrite(port, bitmasks_[port]);
     }
@@ -331,7 +327,7 @@ void loop() {
   EVERY_N_MILLIS(100) {
     // Recolor any previous red leds to blue
     for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
-      if (leds[idx_led].r > 0) {
+      if (leds[idx_led].r) {
         leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
       }
     }
@@ -354,9 +350,9 @@ void loop() {
       Serial.print(buf);
       */
 
-      cp_mgr.clear();
-      cp_mgr.add(cp_addr);
-      cp_mgr.send();
+      cp_mgr.clear_masks();
+      cp_mgr.add_to_masks(cp_addr);
+      cp_mgr.send_masks();
 
       // Serial.println(micros() - utick);
     }
