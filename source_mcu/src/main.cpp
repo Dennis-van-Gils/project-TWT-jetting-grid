@@ -55,19 +55,38 @@ State state; // Structure holding the sensor readings and actuator states
 ------------------------------------------------------------------------------*/
 
 // One object controls both Centipede boards over ports 0 to 7
-uint8_t cp_port;
-uint8_t cp_value;
-
-uint16_t cp0_value = 0;
-uint16_t cp1_value = 0;
-uint16_t cp2_value = 0;
-uint16_t cp3_value = 0;
-uint16_t cp4_value = 0;
-uint16_t cp5_value = 0;
-uint16_t cp6_value = 0;
-uint16_t cp7_value = 0;
-
 Centipede cp;
+
+// TODO: Move `Centipede_mgr` class to another header file and document
+const uint8_t NUMEL_CP_PORTS = 8;
+
+class Centipede_mgr {
+private:
+  Centipede *cp_;
+  uint16_t bitmasks_[NUMEL_CP_PORTS] = {
+      0}; // Bitmask values for each of the 8 ports
+
+public:
+  Centipede_mgr(Centipede *cp) { cp_ = cp; }
+
+  void clear() { memset(bitmasks_, 0, sizeof(bitmasks_[0]) * NUMEL_CP_PORTS); }
+
+  bool add(CP_Addr cp_addr) {
+    if (cp_addr.port >= NUMEL_CP_PORTS) {
+      return false;
+    }
+    bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
+    return true;
+  }
+
+  void send() {
+    for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
+      cp.portWrite(port, bitmasks_[port]);
+    }
+  }
+};
+
+Centipede_mgr cp_mgr(&cp);
 
 /*------------------------------------------------------------------------------
   LEDs
@@ -164,7 +183,7 @@ void setup() {
   // while (!Serial) {}
 
   // Build reverse look-up table
-  init_valve2PCS();
+  init_valve2pcs();
 
   // R Click
   R_click_1.begin();
@@ -194,9 +213,9 @@ void setup() {
   Wire.setClock(1000000); // 1 MHz
   cp.initialize();
 
-  for (cp_port = 0; cp_port < 8; cp_port++) {
-    cp.portMode(cp_port, 0);  // Set all channels to output
-    cp.portWrite(cp_port, 0); // Set all channels LOW
+  for (uint8_t port = 0; port < 8; port++) {
+    cp.portMode(port, 0);  // Set all channels to output
+    cp.portWrite(port, 0); // Set all channels LOW
   }
 
   // Finished setup, so clear all LEDs
@@ -209,6 +228,7 @@ void setup() {
 // -----------------------------------------------------------------------------
 
 PCS pcs{-7, 7};
+CP_Addr cp_addr;
 uint16_t idx_valve = 1;
 uint16_t idx_led = 0;
 
@@ -283,18 +303,17 @@ void loop() {
              state.pres_4_bar);
     // clang-format on
     Serial.print(buf); // Takes 320 µs per call
-
     // Serial.println(FastLED.getFPS());
   }
 
   // Fade LED matrix. Keep in front of any other LED color assignments.
-  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, N_LEDS, 5); }
+  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, N_LEDS, 10); }
 
-  // Centipedes
-  // For-loop takes 457 µs in total @ 1 MHz I2C clock
+  // ---------------------------------------------------------------------------
+  //   Centipedes
+  // ---------------------------------------------------------------------------
+
   EVERY_N_MILLIS(100) {
-    // utick = micros();
-
     // Fade any previous red pixels as blue
     for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
       if (leds[idx_led].r > 0) {
@@ -304,73 +323,28 @@ void loop() {
 
     /*
     // Progress PCS coordinates
-    idx_valve = PCS2valve(pcs);
+    idx_valve = pcs2valve(pcs);
     */
-    pcs = valve2PCS(idx_valve);
+    pcs = valve2pcs(idx_valve);
 
     if (idx_valve > 0) {
-      cp_port = valve2cp_port(idx_valve);
-      cp_value = valve2cp_bit(idx_valve);
+      // Block takes 460 µs @ 1 MHz I2C clock
+      // utick = micros();
+
+      cp_addr = valve2cp(idx_valve);
 
       /*
-      Serial.print("valve: ");
-      Serial.print(idx_valve);
-      Serial.print(" @ cp ");
-      Serial.print(cp_port);
-      Serial.print(", ");
-      Serial.println(cp_value);
+      snprintf(buf, BUF_LEN, "valve %3d @ cp %d, %2d\n", //
+               idx_valve, cp_addr.port, cp_addr.bit);
+      Serial.print(buf);
       */
 
-      cp0_value = 0;
-      cp1_value = 0;
-      cp2_value = 0;
-      cp3_value = 0;
-      cp4_value = 0;
-      cp5_value = 0;
-      cp6_value = 0;
-      cp7_value = 0;
+      cp_mgr.clear();
+      cp_mgr.add(cp_addr);
+      cp_mgr.send();
 
-      uint16_t foo = 0;
-      bitSet(foo, cp_value);
-
-      switch (cp_port) {
-        case 0:
-          cp0_value |= foo;
-          break;
-        case 1:
-          cp1_value |= foo;
-          break;
-        case 2:
-          cp2_value |= foo;
-          break;
-        case 3:
-          cp3_value |= foo;
-          break;
-        case 4:
-          cp4_value |= foo;
-          break;
-        case 5:
-          cp5_value |= foo;
-          break;
-        case 6:
-          cp6_value |= foo;
-          break;
-        case 7:
-          cp7_value |= foo;
-          break;
-      }
-
-      cp.portWrite(0, cp0_value);
-      cp.portWrite(1, cp1_value);
-      cp.portWrite(2, cp2_value);
-      cp.portWrite(3, cp3_value);
-      cp.portWrite(4, cp4_value);
-      cp.portWrite(5, cp5_value);
-      cp.portWrite(6, cp6_value);
-      cp.portWrite(7, cp7_value);
+      // Serial.println(micros() - utick);
     }
-
-    // Serial.println(micros() - utick);
 
     /*
     // Progress PCS coordinates
@@ -392,11 +366,13 @@ void loop() {
     //*/
 
     // Color leds
-    idx_led = PCS2LED(pcs);
+    idx_led = pcs2led(pcs);
     leds[idx_led] = CRGB::Red;
   }
 
-  // Send out LED data to the strip.
+  // ---------------------------------------------------------------------------
+  //   Send out LED data to the matrix
+  // ---------------------------------------------------------------------------
   //
   // NOTE:
   //   It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16 LED
