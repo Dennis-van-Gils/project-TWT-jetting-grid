@@ -69,16 +69,31 @@ private:
 public:
   Centipede_mgr(Centipede *cp) { cp_ = cp; }
 
+  /**
+   * @brief
+   *
+   */
   void clear() { memset(bitmasks_, 0, sizeof(bitmasks_[0]) * NUMEL_CP_PORTS); }
 
+  /**
+   * @brief
+   *
+   * @param cp_addr
+   * @return
+   */
   bool add(CP_Addr cp_addr) {
     if (cp_addr.port >= NUMEL_CP_PORTS) {
       return false;
+      // TODO: Simply halt here. Remove boolean return value.
     }
     bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
     return true;
   }
 
+  /**
+   * @brief
+   *
+   */
   void send() {
     for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
       cp.portWrite(port, bitmasks_[port]);
@@ -314,7 +329,7 @@ void loop() {
   // ---------------------------------------------------------------------------
 
   EVERY_N_MILLIS(100) {
-    // Fade any previous red pixels as blue
+    // Recolor any previous red leds to blue
     for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
       if (leds[idx_led].r > 0) {
         leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
@@ -365,7 +380,7 @@ void loop() {
     }
     //*/
 
-    // Color leds
+    // Color all active valve leds in red
     idx_led = pcs2led(pcs);
     leds[idx_led] = CRGB::Red;
   }
