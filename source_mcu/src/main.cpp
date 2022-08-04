@@ -3,7 +3,7 @@ TWT jetting grid
 
 https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
 Dennis van Gils
-03-08-2022
+04-08-2022
 */
 
 #include <Arduino.h>
@@ -27,21 +27,28 @@ char buf[BUF_LEN]{'\0'};
 uint32_t utick = micros();
 
 /*------------------------------------------------------------------------------
-  Holds actuator states and sensor readings
+  State
 ------------------------------------------------------------------------------*/
 
 struct State {
+  // Exponential moving averages (EMA) of the R Click boards
+  uint32_t DAQ_obtained_DT; // Obtained oversampling interval [µs]
+  float EMA_1;              // Exponential moving average of R Click 1 [bitval]
+  float EMA_2;              // Exponential moving average of R Click 2 [bitval]
+  float EMA_3;              // Exponential moving average of R Click 3 [bitval]
+  float EMA_4;              // Exponential moving average of R Click 4 [bitval]
+
   // OMEGA pressure sensors
-  float pres_1_mA = NAN;  // [mA]
-  float pres_2_mA = NAN;  // [mA]
-  float pres_3_mA = NAN;  // [mA]
-  float pres_4_mA = NAN;  // [mA]
-  float pres_1_bar = NAN; // [bar]
-  float pres_2_bar = NAN; // [bar]
-  float pres_3_bar = NAN; // [bar]
-  float pres_4_bar = NAN; // [bar]
+  float pres_1_mA = NAN;  // OMEGA pressure sensor 1 [mA]
+  float pres_2_mA = NAN;  // OMEGA pressure sensor 2 [mA]
+  float pres_3_mA = NAN;  // OMEGA pressure sensor 3 [mA]
+  float pres_4_mA = NAN;  // OMEGA pressure sensor 4 [mA]
+  float pres_1_bar = NAN; // OMEGA pressure sensor 1 [bar]
+  float pres_2_bar = NAN; // OMEGA pressure sensor 2 [bar]
+  float pres_3_bar = NAN; // OMEGA pressure sensor 3 [bar]
+  float pres_4_bar = NAN; // OMEGA pressure sensor 4 [bar]
 };
-State state;
+State state; // Structure holding the sensor readings and actuator states
 
 /*------------------------------------------------------------------------------
   Macetech Centipede boards
@@ -63,24 +70,15 @@ uint16_t cp7_value = 0;
 Centipede cp;
 
 /*------------------------------------------------------------------------------
-  LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
-  WS2812 or SK6812 type
+  LEDs
 ------------------------------------------------------------------------------*/
 
-CRGB leds[N_LEDS];
-
-/*
-// On-board NeoPixel RGB LED
-#define NEO_DIM 3    // Brightness level for dim intensity [0 -255]
-#define NEO_BRIGHT 6 // Brightness level for bright intensity [0 - 255]
-#define NEO_FLASH_DURATION 100 // [ms]
-bool neo_flash = false;
-uint32_t t_neo_flash = 0;
-Adafruit_NeoPixel neo(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
-*/
+bool alive_blinker = true; // Blinker for the 'alive' status LED
+CRGB onboard_led[1];       // Onboard NeoPixel of the Adafruit Feather M4 board
+CRGB leds[N_LEDS];         // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
 
 /*------------------------------------------------------------------------------
-  MIKROE 4-20 mA R click boards for reading out the OMEGA pressure sensors
+  MIKROE 4-20 mA R Click boards for reading out the OMEGA pressure sensors
 ------------------------------------------------------------------------------*/
 
 R_Click R_click_1(PIN_R_CLICK_1, R_CLICK_1_CALIB);
@@ -88,42 +86,47 @@ R_Click R_click_2(PIN_R_CLICK_2, R_CLICK_2_CALIB);
 R_Click R_click_3(PIN_R_CLICK_3, R_CLICK_3_CALIB);
 R_Click R_click_4(PIN_R_CLICK_4, R_CLICK_4_CALIB);
 
-uint32_t EMA_tick = micros();
-uint32_t EMA_obtained_interval;
-bool EMA_at_startup = true;
-float EMA_1_bitval;
-float EMA_2_bitval;
-float EMA_3_bitval;
-float EMA_4_bitval;
-
+/**
+ * @brief Perform an exponential moving average (EMA) on each R Click reading by
+ * using oversampling and subsequent low-pass filtering.
+ *
+ * This function should be repeatedly called in the main loop, ideally at a
+ * faster pace than the given oversampling interval `DAQ_DT` as set in
+ * `constants.h`.
+ *
+ * @return True when a new sample has been read and added to the moving
+ * average. False otherwise, because it was not yet time to read out a new
+ * sample.
+ */
 bool R_click_poll_EMA_collectively() {
+  static bool at_startup = true;
+  static uint32_t tick = micros();
   uint32_t now = micros();
   float alpha; // Derived smoothing factor of the exponential moving average
 
-  if ((now - EMA_tick) >= DAQ_DT) {
+  if ((now - tick) >= DAQ_DT) {
     // Enough time has passed -> Acquire a new reading.
-    // Calculate the smoothing factor every time because an exact interval time
+    // Calculate the smoothing factor every time because an exact time interval
     // is not garantueed.
-    EMA_obtained_interval = now - EMA_tick;
-    alpha = 1.f - exp(-float(EMA_obtained_interval) * DAQ_LP * 1e-6);
+    state.DAQ_obtained_DT = now - tick;
+    alpha = 1.f - exp(-float(state.DAQ_obtained_DT) * DAQ_LP * 1e-6);
 
-    if (EMA_at_startup) {
-      EMA_at_startup = false;
-      EMA_1_bitval = R_click_1.read_bitval();
-      EMA_2_bitval = R_click_2.read_bitval();
-      EMA_3_bitval = R_click_3.read_bitval();
-      EMA_4_bitval = R_click_4.read_bitval();
+    if (at_startup) {
+      at_startup = false;
+      state.EMA_1 = R_click_1.read_bitval();
+      state.EMA_2 = R_click_2.read_bitval();
+      state.EMA_3 = R_click_3.read_bitval();
+      state.EMA_4 = R_click_4.read_bitval();
     } else {
-      // Block takes 94 µs @ 1   MHz SPI clock
-      // Block takes 67 µs @ 1.7 MHz SPI clock
+      // Block takes 94 µs @ 1 MHz SPI clock
       // utick = micros();
-      EMA_1_bitval += alpha * (R_click_1.read_bitval() - EMA_1_bitval);
-      EMA_2_bitval += alpha * (R_click_2.read_bitval() - EMA_2_bitval);
-      EMA_3_bitval += alpha * (R_click_3.read_bitval() - EMA_3_bitval);
-      EMA_4_bitval += alpha * (R_click_4.read_bitval() - EMA_4_bitval);
+      state.EMA_1 += alpha * (R_click_1.read_bitval() - state.EMA_1);
+      state.EMA_2 += alpha * (R_click_2.read_bitval() - state.EMA_2);
+      state.EMA_3 += alpha * (R_click_3.read_bitval() - state.EMA_3);
+      state.EMA_4 += alpha * (R_click_4.read_bitval() - state.EMA_4);
       // Serial.println(micros() - utick);
     }
-    EMA_tick = now;
+    tick = now;
     return true;
 
   } else {
@@ -139,7 +142,7 @@ void setup() {
   // To enable float support in `snprintf()` we must add the following
   asm(".global _printf_float");
 
-  // LED matrix
+  // Onboard LED & LED matrix
   //
   // NOTE:
   //   Don't call `FastLED.setMaxRefreshRate()`, because it will turn
@@ -147,10 +150,13 @@ void setup() {
   // NOTE:
   //   Type `NEOPIXEL` is internally `WS2812Controller800Khz`, so already
   //   running at the max clock frequency of 800 kHz.
+
+  FastLED.addLeds<NEOPIXEL, PIN_NEOPIXEL>(onboard_led, 1);
   FastLED.addLeds<NEOPIXEL, PIN_LED_MATRIX>(leds, N_LEDS);
   FastLED.setCorrection(UncorrectedColor);
   // FastLED.setCorrection(TypicalSMD5050);
   FastLED.setBrightness(30);
+  fill_solid(onboard_led, 1, CRGB::Blue);
   fill_rainbow(leds, N_LEDS, 0, 1);
   FastLED.show();
 
@@ -161,10 +167,6 @@ void setup() {
   init_valve2PCS();
 
   // R Click
-  R_click_1.set_SPI_clock(1700000);
-  R_click_2.set_SPI_clock(1700000);
-  R_click_3.set_SPI_clock(1700000);
-  R_click_4.set_SPI_clock(1700000);
   R_click_1.begin();
   R_click_2.begin();
   R_click_3.begin();
@@ -187,6 +189,7 @@ void setup() {
   //   400 kHz:  908 µs
   //   1   MHz:  457 µs  <------- Chosen
   //   1.7 MHz: fails, too fast
+
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
   cp.initialize();
@@ -196,16 +199,9 @@ void setup() {
     cp.portWrite(cp_port, 0); // Set all channels LOW
   }
 
-  /*
-  // Set RGB LED to blue: We're setting up
-  neo.begin();
-  neo.setPixelColor(0, neo.Color(0, 0, NEO_BRIGHT));
-  neo.show();
-
-  // Set RGB LED to dim green: We're all ready to go and idle
-  neo.setPixelColor(0, neo.Color(0, NEO_DIM, 0));
-  neo.show();
-  */
+  // Finished setup, so clear all LEDs
+  FastLED.clearData();
+  FastLED.show();
 }
 
 // -----------------------------------------------------------------------------
@@ -219,14 +215,12 @@ uint16_t idx_led = 0;
 void loop() {
   char *str_cmd; // Incoming serial command string
   uint32_t now = millis();
-  static uint32_t tick = now;
-  static uint32_t tock = now;
-  static uint32_t tack = now;
 
-  /*
-  // Process incoming serial commands
-  if (now - tack > 50) {
-    tack = now;
+  // ---------------------------------------------------------------------------
+  //   Process incoming serial commands
+  // ---------------------------------------------------------------------------
+
+  EVERY_N_MILLISECONDS(50) {
     if (sc.available()) {
       str_cmd = sc.getCmd();
 
@@ -235,29 +229,36 @@ void loop() {
       }
     }
   }
-  */
 
   // ---------------------------------------------------------------------------
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
   if (R_click_poll_EMA_collectively()) {
-    // DEBUG: Alarm when obtained DT interval is too large
-    if (EMA_obtained_interval > DAQ_DT * 1.05) {
-      Serial.print("WARNING: Large EMA DT ");
-      Serial.println(EMA_obtained_interval);
-    } else {
-      // Serial.println("*");
+    // DEBUG info: Show warning when obtained interval is too large
+    if (state.DAQ_obtained_DT > DAQ_DT * 1.05) {
+      Serial.print("WARNING: Large DAQ DT ");
+      Serial.println(state.DAQ_obtained_DT);
     }
   }
 
-  if (now - tick > 1000) {
-    tick = now;
+  // ---------------------------------------------------------------------------
+  //   Report readings over serial
+  // ---------------------------------------------------------------------------
 
-    state.pres_1_mA = R_click_1.bitval2mA(EMA_1_bitval);
-    state.pres_2_mA = R_click_2.bitval2mA(EMA_2_bitval);
-    state.pres_3_mA = R_click_3.bitval2mA(EMA_3_bitval);
-    state.pres_4_mA = R_click_4.bitval2mA(EMA_4_bitval);
+  EVERY_N_MILLIS(1000) {
+    /*
+    static uint32_t t_start = 0;
+    if (!t_start) {
+      t_start = millis();
+    }
+    Serial.println(millis() - t_start);
+    */
+
+    state.pres_1_mA = R_click_1.bitval2mA(state.EMA_1);
+    state.pres_2_mA = R_click_2.bitval2mA(state.EMA_2);
+    state.pres_3_mA = R_click_3.bitval2mA(state.EMA_3);
+    state.pres_4_mA = R_click_4.bitval2mA(state.EMA_4);
     state.pres_1_bar = mA2bar(state.pres_1_mA, OMEGA_1_CALIB);
     state.pres_2_bar = mA2bar(state.pres_2_mA, OMEGA_2_CALIB);
     state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
@@ -286,16 +287,7 @@ void loop() {
     // Serial.println(FastLED.getFPS());
   }
 
-  /*
-  // Set RGB LED back to dim green: Measurement is done
-  if (neo_flash && (now - t_neo_flash >= NEO_FLASH_DURATION)) {
-    neo_flash = false;
-    neo.setPixelColor(0, neo.Color(0, NEO_DIM, 0));
-    neo.show();
-  }
-  */
-
-  // Animate LED matrix
+  // Fade LED matrix. Keep in front of any other LED color assignments.
   EVERY_N_MILLIS(20) { fadeToBlackBy(leds, N_LEDS, 5); }
 
   // Centipedes
@@ -425,10 +417,17 @@ void loop() {
   //   `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it
   //   unblocking, while still capping the framerate.
 
+  EVERY_N_MILLIS(500) {
+    // Blink the 'alive' status LED
+    leds[255] = alive_blinker ? CRGB::Green : CRGB::Black;
+    onboard_led[0] = alive_blinker ? CRGB::Green : CRGB::Black;
+    alive_blinker = !alive_blinker;
+  }
+
   EVERY_N_MILLIS(20) {
     // utick = micros();
     FastLED.show(); // Takes 8003 µs per call
     // Serial.println("show");
-    //  Serial.println(micros() - utick);
+    // Serial.println(micros() - utick);
   }
 }
