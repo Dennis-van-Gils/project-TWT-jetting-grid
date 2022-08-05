@@ -29,6 +29,10 @@ char buf[BUF_LEN]{'\0'};
 // DEBUG: timer
 uint32_t utick = micros();
 
+// DEBUG: Allows developing code on a bare Arduino without sensors & actuators
+// attached
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+
 /*------------------------------------------------------------------------------
   State
 ------------------------------------------------------------------------------*/
@@ -222,12 +226,14 @@ void setup() {
 
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
   cp.initialize();
 
   for (uint8_t port = 0; port < 8; port++) {
     cp.portMode(port, 0);  // Set all channels to output
     cp.portWrite(port, 0); // Set all channels LOW
   }
+#endif
 
   // Finished setup, so clear all LEDs
   FastLED.clearData();
@@ -265,6 +271,7 @@ void loop() {
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
   if (R_click_poll_EMA_collectively()) {
     // DEBUG info: Show warning when obtained interval is too large
     if (state.DAQ_obtained_DT > DAQ_DT * 1.05) {
@@ -272,6 +279,7 @@ void loop() {
       Serial.println(state.DAQ_obtained_DT);
     }
   }
+#endif
 
   // ---------------------------------------------------------------------------
   //   Report readings over serial
@@ -352,7 +360,9 @@ void loop() {
 
       cp_mgr.clear_masks();
       cp_mgr.add_to_masks(cp_addr);
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
       cp_mgr.send_masks();
+#endif
 
       // Serial.println(micros() - utick);
     }
