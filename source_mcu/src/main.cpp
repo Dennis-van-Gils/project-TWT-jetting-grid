@@ -31,7 +31,7 @@ uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
   State
@@ -79,9 +79,7 @@ public:
     clear_masks();
   }
 
-  void clear_masks() {
-    std::fill(std::begin(bitmasks_), std::end(bitmasks_), 0);
-  }
+  void clear_masks() { bitmasks_.fill(0); }
 
   void add_to_masks(CP_Addr cp_addr) {
     if (cp_addr.port >= NUMEL_CP_PORTS) {
@@ -93,6 +91,13 @@ public:
   void set_masks(std::array<uint16_t, NUMEL_CP_PORTS> in) { bitmasks_ = in; }
 
   std::array<uint16_t, NUMEL_CP_PORTS> get_masks() { return bitmasks_; }
+
+  void report_masks(Stream &mySerial) {
+    snprintf(buf, BUF_LEN, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", //
+             bitmasks_[0], bitmasks_[1], bitmasks_[2], bitmasks_[3],
+             bitmasks_[4], bitmasks_[5], bitmasks_[6], bitmasks_[7]);
+    mySerial.print(buf);
+  }
 
   void send_masks() {
     for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
@@ -246,6 +251,7 @@ void setup() {
 
 PCS pcs{-7, 7};
 CP_Addr cp_addr;
+std::array<uint16_t, NUMEL_CP_PORTS> bitmasks;
 uint16_t idx_valve = 1;
 uint16_t idx_led = 0;
 
@@ -321,7 +327,9 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    Serial.print(buf); // Takes 320 µs per call
+    if (0) {
+      Serial.print(buf); // Takes 320 µs per call
+    }
     // Serial.println(FastLED.getFPS());
   }
 
@@ -352,14 +360,18 @@ void loop() {
 
       cp_addr = valve2cp(idx_valve);
 
-      /*
+      ///*
       snprintf(buf, BUF_LEN, "valve %3d @ cp %d, %2d\n", //
                idx_valve, cp_addr.port, cp_addr.bit);
       Serial.print(buf);
-      */
+      //*/
 
       cp_mgr.clear_masks();
       cp_mgr.add_to_masks(cp_addr);
+      bitmasks = cp_mgr.get_masks();
+      cp_mgr.report_masks(Serial);
+      // for (const auto bitmask : bitmasks) {}
+
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
       cp_mgr.send_masks();
 #endif
