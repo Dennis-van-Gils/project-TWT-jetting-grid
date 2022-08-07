@@ -13,7 +13,7 @@ Dennis van Gils
 #include <array>
 using namespace std;
 
-#include "Centipede.h"
+#include "CentipedeManager.h"
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
@@ -22,16 +22,16 @@ using namespace std;
 // Serial command listener
 DvG_SerialCommand sc(Serial);
 
-// Common character buffer
-const uint8_t BUF_LEN = 128;
-char buf[BUF_LEN]{'\0'};
+// Will be used externally
+const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
+char buf[BUF_LEN]{'\0'};     // Common character buffer for string formatting
 
 // DEBUG: timer
 uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
 
 /*------------------------------------------------------------------------------
   State
@@ -62,51 +62,7 @@ State state; // Structure holding the sensor readings and actuator states
 ------------------------------------------------------------------------------*/
 
 // One object controls both Centipede boards over ports 0 to 7
-Centipede cp;
-
-// TODO: Move `Centipede_mgr` class to another header file and document
-const uint8_t NUMEL_CP_PORTS = 8;
-
-class Centipede_mgr {
-private:
-  Centipede *cp_;
-  std::array<uint16_t, NUMEL_CP_PORTS>
-      bitmasks_; // Bitmask values for each of the 8 ports
-
-public:
-  Centipede_mgr(Centipede *cp) {
-    cp_ = cp;
-    clear_masks();
-  }
-
-  void clear_masks() { bitmasks_.fill(0); }
-
-  void add_to_masks(CP_Addr cp_addr) {
-    if (cp_addr.port >= NUMEL_CP_PORTS) {
-      // TODO: Simply halt here.
-    }
-    bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
-  }
-
-  void set_masks(std::array<uint16_t, NUMEL_CP_PORTS> in) { bitmasks_ = in; }
-
-  std::array<uint16_t, NUMEL_CP_PORTS> get_masks() { return bitmasks_; }
-
-  void report_masks(Stream &mySerial) {
-    snprintf(buf, BUF_LEN, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", //
-             bitmasks_[0], bitmasks_[1], bitmasks_[2], bitmasks_[3],
-             bitmasks_[4], bitmasks_[5], bitmasks_[6], bitmasks_[7]);
-    mySerial.print(buf);
-  }
-
-  void send_masks() {
-    for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
-      cp.portWrite(port, bitmasks_[port]);
-    }
-  }
-};
-
-Centipede_mgr cp_mgr(&cp);
+CentipedeManager cp_mgr;
 
 /*------------------------------------------------------------------------------
   LEDs
@@ -232,12 +188,7 @@ void setup() {
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
-  cp.initialize();
-
-  for (uint8_t port = 0; port < 8; port++) {
-    cp.portMode(port, 0);  // Set all channels to output
-    cp.portWrite(port, 0); // Set all channels LOW
-  }
+  cp_mgr.begin();
 #endif
 
   // Finished setup, so clear all LEDs
@@ -250,7 +201,7 @@ void setup() {
 // -----------------------------------------------------------------------------
 
 PCS pcs{-7, 7};
-CP_Addr cp_addr;
+CP_Address cp_addr;
 std::array<uint16_t, NUMEL_CP_PORTS> bitmasks;
 uint16_t idx_valve = 1;
 uint16_t idx_led = 0;
@@ -327,9 +278,7 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    if (0) {
-      Serial.print(buf); // Takes 320 µs per call
-    }
+    Serial.print(buf); // Takes 320 µs per call
     // Serial.println(FastLED.getFPS());
   }
 

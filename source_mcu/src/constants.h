@@ -2,7 +2,7 @@
 Constants and transformations of the TWT jetting grid
 
 Dennis van Gils
-04-08-2022
+07-08-2022
 */
 
 #ifndef CONSTANTS_H_
@@ -11,11 +11,13 @@ Dennis van Gils
 #include <algorithm>
 using namespace std;
 
+#include "CentipedeManager.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "halt.h"
 
-const uint8_t HALT_MSG_LEN = 80;
-char halt_msg[HALT_MSG_LEN]{'\0'};
+// Common character buffer for string formatting
+extern const uint8_t BUF_LEN;
+extern char buf[];
 
 /*------------------------------------------------------------------------------
   PURPOSE
@@ -217,14 +219,6 @@ int8_t ARR_VALVE2PCS[NUMEL_VALVES + 1][2] = {0};
 
 ------------------------------------------------------------------------------*/
 
-/**
- * @brief Structure to hold a Centipede port and bit address.
- */
-struct CP_Addr {
-  uint8_t port;
-  uint8_t bit;
-};
-
 // clang-format off
 
 // Translation array: Valve number to Centipede port.
@@ -291,10 +285,10 @@ uint8_t pcs2valve(PCS pcs) {
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-    snprintf(halt_msg, HALT_MSG_LEN,
+    snprintf(buf, BUF_LEN,
              "CRITICAL: Out-of-bounds index (%d, %d) in `pcs2valve()`", pcs.x,
              pcs.y);
-    halt(1, halt_msg);
+    halt(1, buf);
   }
   return ARR_PCS2VALVE[tmp_y][tmp_x];
 }
@@ -311,10 +305,10 @@ uint8_t pcs2led(PCS pcs) {
   int8_t tmp_y = 7 - pcs.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-    snprintf(halt_msg, HALT_MSG_LEN,
+    snprintf(buf, BUF_LEN,
              "CRITICAL: Out-of-bounds index (%d, %d) in `pcs2led()`", pcs.x,
              pcs.y);
-    halt(2, halt_msg);
+    halt(2, buf);
   }
   return ARR_PCS2LED[tmp_y][tmp_x];
 }
@@ -328,9 +322,9 @@ uint8_t pcs2led(PCS pcs) {
  */
 PCS valve2pcs(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    snprintf(halt_msg, HALT_MSG_LEN,
+    snprintf(buf, BUF_LEN,
              "CRITICAL: Out-of-bounds valve number %d in `valve2pcs()`", valve);
-    halt(3, halt_msg);
+    halt(3, buf);
   }
   return PCS{ARR_VALVE2PCS[valve][0], ARR_VALVE2PCS[valve][1]};
 }
@@ -369,9 +363,9 @@ void init_valve2pcs() {
     x = ARR_VALVE2PCS[valve][0];
     y = ARR_VALVE2PCS[valve][1];
     if ((x == -128) || (y == -128)) {
-      snprintf(halt_msg, HALT_MSG_LEN,
-               "CRITICAL: Valve number %d is not accounted for", valve);
-      halt(4, halt_msg);
+      snprintf(buf, BUF_LEN, "CRITICAL: Valve number %d is not accounted for",
+               valve);
+      halt(4, buf);
     }
   }
 }
@@ -387,13 +381,13 @@ void init_valve2pcs() {
  * @return The Centipede port and bit address
  * @throw Halts when the valve number is out-of-bounds
  */
-CP_Addr valve2cp(uint8_t valve) {
+CP_Address valve2cp(uint8_t valve) {
   if ((valve == 0) || (valve > NUMEL_VALVES)) {
-    snprintf(halt_msg, HALT_MSG_LEN,
+    snprintf(buf, BUF_LEN,
              "CRITICAL: Out-of-bounds valve number %d in `valve2cp()`", valve);
-    halt(6, halt_msg);
+    halt(6, buf);
   }
-  return CP_Addr{ARR_VALVE2CP_PORT[valve - 1], ARR_VALVE2CP_BIT[valve - 1]};
+  return CP_Address{ARR_VALVE2CP_PORT[valve - 1], ARR_VALVE2CP_BIT[valve - 1]};
 }
 
 /*------------------------------------------------------------------------------
