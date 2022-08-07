@@ -21,6 +21,10 @@ extern char buf[];
 
 /**
  * @brief Total number of Centipede ports in use.
+ *
+ * A single Centipede board has 4 ports for controlling a total of 64 channels.
+ * A second Centipede board on another I2C address will add 4 more additional
+ * ports, allowing a total of 128 channels to be controlled.
  */
 const uint8_t NUMEL_CP_PORTS = 8;
 
@@ -109,9 +113,11 @@ public:
    * @param mySerial The serial stream to report over.
    */
   void report_masks(Stream &mySerial) {
-    snprintf(buf, BUF_LEN, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", //
-             bitmasks_[0], bitmasks_[1], bitmasks_[2], bitmasks_[3],
-             bitmasks_[4], bitmasks_[5], bitmasks_[6], bitmasks_[7]);
+    buf[0] = '\0';
+    for (uint8_t port = 0; port < NUMEL_CP_PORTS - 1; port++) {
+      snprintf(buf, BUF_LEN, "%s%d\t", buf, bitmasks_[port]);
+    }
+    snprintf(buf, BUF_LEN, "%s%d\n", buf, bitmasks_[NUMEL_CP_PORTS - 1]);
     mySerial.print(buf);
   }
 
@@ -126,9 +132,9 @@ public:
   }
 
 private:
-  Centipede cp_; // The Centipede object that manages all 128 channels
+  Centipede cp_; // The Centipede object controlling up to two Centipede boards
   std::array<uint16_t, NUMEL_CP_PORTS>
-      bitmasks_; // Bitmask values for each of the 8 ports
+      bitmasks_; // Bitmask values for each of the ports in use
 };
 
 #endif
