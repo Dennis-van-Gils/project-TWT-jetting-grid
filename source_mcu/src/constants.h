@@ -1,9 +1,13 @@
-/*
-Constants and transformations of the TWT jetting grid
-
-Dennis van Gils
-07-08-2022
-*/
+/**
+ * @file    constants.h
+ * @author  Dennis van Gils (vangils.dennis@gmail.com)
+ * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
+ * @date    08-08-2022
+ *
+ * @brief   Constants and transformations of the TWT jetting grid.
+ *
+ * @copyright MIT License. See the LICENSE file for details.
+ */
 
 #ifndef CONSTANTS_H_
 #define CONSTANTS_H_
@@ -15,7 +19,7 @@ using namespace std;
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "halt.h"
 
-// Common character buffer for string formatting
+// Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;
 extern char buf[];
 
@@ -86,6 +90,22 @@ struct PCS {
   int8_t x;
   int8_t y;
 };
+
+/*
+uint8_t pack_PCS(PCS pcs) {
+  uint8_t c;
+  c = (pcs.x + 7) << 4;
+  c |= ((pcs.y + 7) & 0xF);
+  return c;
+}
+
+PCS unpack_PCS(uint8_t c) {
+  PCS pcs;
+  pcs.x = (c >> 4) - 7;
+  pcs.y = (c & 0xF) - 7;
+  return pcs;
+}
+*/
 
 const uint8_t NUMEL_PCS_AXIS = 15; // Spanning [-7, 7]
 const uint8_t NUMEL_LED_AXIS = 16; // 16x16 matrix
