@@ -1,8 +1,12 @@
 /**
  * @file    CentipedeManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
+ * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
+ * @date    08-08-2022
+ *
  * @brief   Manage the output channels of a Centipede object by storing and
  * keeping track of the bitmasks per port.
+ *
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -15,7 +19,7 @@ using namespace std;
 #include "Centipede.h"
 #include "halt.h"
 
-// Common character buffer for string formatting
+// Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;
 extern char buf[];
 
@@ -94,7 +98,7 @@ public:
   }
 
   /**
-   * @brief Set all the stored bitmasks.
+   * @brief Set all the stored bitmasks to new values.
    *
    * @param in The new bitmask values
    */
@@ -113,6 +117,7 @@ public:
    * @param mySerial The serial stream to report over.
    */
   void report_masks(Stream &mySerial) {
+    #pragma GCC diagnostic ignored "-Wformat-truncation"
     buf[0] = '\0';
     for (uint8_t port = 0; port < NUMEL_CP_PORTS - 1; port++) {
       snprintf(buf, BUF_LEN, "%s%d\t", buf, bitmasks_[port]);
