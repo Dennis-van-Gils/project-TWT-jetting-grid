@@ -1,14 +1,19 @@
-/*
-TWT jetting grid
-
-https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
-Dennis van Gils
-04-08-2022
-*/
+/**
+ * @file    Main.cpp
+ * @author  Dennis van Gils (vangils.dennis@gmail.com)
+ * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
+ * @date    08-08-2022
+ *
+ * @brief   Main control of the TWT jetting grid. See `constants.h` for a
+ * detailed description.
+ *
+ * @copyright MIT License. See the LICENSE file for details.
+ */
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <bitset>
 
 #include <array>
 using namespace std;
@@ -156,7 +161,9 @@ void setup() {
   FastLED.show();
 
   Serial.begin(9600);
-  // while (!Serial) {}
+  while (!Serial) {}
+
+  Serial.println("GO!");
 
   // Build reverse look-up table
   init_valve2pcs();
@@ -194,6 +201,83 @@ void setup() {
   // Finished setup, so clear all LEDs
   FastLED.clearData();
   FastLED.show();
+
+  // Protocol line test
+  std::array<PCS, 255> p_line;
+  p_line.fill(-128);
+  p_line = {PCS{-6, 7},  PCS{6, 7},  PCS{0, 1},
+            PCS{-6, -7}, PCS{7, -6}, PCS{4, 3}};
+
+  // Packed protocol line
+  std::array<uint16_t, NUMEL_PCS_AXIS> p_packed;
+  p_packed.fill(0);
+
+  // Pack into boolean matrix
+  for (auto c = p_line.begin(); c != p_line.end(); ++c) {
+    if (c->x == -128 || c->y == -128) {
+      break;
+    }
+    c->print(Serial);
+
+    int8_t tmp_x = c->x + 7;
+    int8_t tmp_y = 7 - c->y;
+    if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
+        (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+      snprintf(buf, BUF_LEN, "CRITICAL: Out-of-bounds index (%d, %d)", c->x,
+               c->y);
+      halt(2, buf);
+    }
+    p_packed[tmp_y] |= (1U << tmp_x);
+  }
+
+  Serial.println("\nDone packing");
+
+  // Unpack boolean matrix
+  // for (auto row = p_packed.begin(); row != p_packed.end(); ++row) {
+  PCS p2;
+  for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+    if (p_packed[row]) {
+      p2.y = 7 - row;
+      for (uint8_t bit = 0; bit < 16; ++bit) {
+        if ((p_packed[row] >> (bit)) & 0x01) {
+          p2.x = bit - 7;
+          p2.print(Serial);
+        }
+      }
+    }
+  }
+
+  Serial.println("\nDONE");
+
+  /*
+  // PCS p1{8, 8};
+  // PCS p1{-7, -7};
+  for (int8_t x = -8; x < 10; x++) {
+    for (int8_t y = -7; y < 8; y++) {
+      PCS p1{x, y};
+
+      // Packing coordinates into one byte
+      // uint8_t c = pack_PCS(p1);
+
+      // Unpacking coordinates
+      // PCS p2 = unpack_PCS(c);
+
+      Serial.print(p1.x);
+      Serial.write('\t');
+      Serial.print(p1.y);
+      Serial.write('\t');
+
+      Serial.println(c, BIN);
+
+      Serial.print(p2.x);
+      Serial.write('\t');
+      Serial.print(p2.y);
+      Serial.write('\n');
+    }
+  }
+  */
+
+  // while (1) {}
 }
 
 // -----------------------------------------------------------------------------
@@ -230,11 +314,13 @@ void loop() {
 
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
   if (R_click_poll_EMA_collectively()) {
+    /*
     // DEBUG info: Show warning when obtained interval is too large
     if (state.DAQ_obtained_DT > DAQ_DT * 1.05) {
       Serial.print("WARNING: Large DAQ DT ");
       Serial.println(state.DAQ_obtained_DT);
     }
+    */
   }
 #endif
 
@@ -278,7 +364,7 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    Serial.print(buf); // Takes 320 µs per call
+    // Serial.print(buf); // Takes 320 µs per call
     // Serial.println(FastLED.getFPS());
   }
 

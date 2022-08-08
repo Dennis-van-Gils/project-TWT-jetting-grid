@@ -86,7 +86,38 @@ extern char buf[];
 /**
  * @brief Structure to hold a Protocol Coordinate System (PCS) coordinate.
  */
+/*
 struct PCS {
+  int8_t x;
+  int8_t y;
+};
+*/
+
+// TODO: Capture magic number -128 into const
+class PCS {
+public:
+  PCS(int8_t x_in = -128, int8_t y_in = -128) {
+    x = x_in;
+    y = y_in;
+  };
+
+  void print(Stream &mySerial) {
+    snprintf(buf, BUF_LEN, "(%d, %d)", x, y);
+    mySerial.print(buf);
+  }
+
+  // std::ostream &operator<<(std::ostream &s, const PCS &pcs) {
+  //   return s << "(" << pcs.x << ", " << pcs.y << ")";
+  // }
+
+  /*
+  // Needs #include <iostream>
+  inline Print &operator<<(Print &obj, const PCS &pcs) {
+    obj.print(pcs.x);
+    return obj;
+  }
+  */
+
   int8_t x;
   int8_t y;
 };

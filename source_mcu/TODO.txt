@@ -1,7 +1,3 @@
-Research LED matrix control
-- https://github.com/FastLED/FastLED/blob/master/examples/XYMatrix/XYMatrix.ino
-- https://www.youtube.com/watch?v=zYZkbfmCuEY
-
 Protocol:
 	[HEADER]
 	Name: Protocol nr 1
@@ -14,3 +10,26 @@ Protocol:
 	
   - Plain ASCII, tab delimited, rows ending with '\n' , not '\n\r'
   - Assume each row all valves are turned off, unless listed 
+
+Memory allocation @ Arduino:
+
+	Protocol:
+
+	Send to Arduino via ASCII
+	-------------------------
+	[timestamp in ms] \t [coord 1 as x, y] \t [coord 2 as xy] \t .... \n
+	0   \t 7,6 \t -3,2 \t -7,-5 \t ... \n
+	100 \t 5,2 \t -1,2 \t  2,-4 \t ... \n
+	Sends a single line each time
+
+	When received at Arduino side
+	-----------------------------
+	Each line should be transformed into a 16x16 boolean matrix where all
+	send PCS coordinates are 1's, the rest 0.
+	Next, we pack each row of the matrix in a 16 bit structure, i.e. uint16_t.
+	We have 15 rows of each 16 bits --> 30 bytes for the full boolean matrix
+	+4 bytes for the timestamp in ms as uint32_t
+	----> 30 + 4 = 34 bytes per protocol line, fixed number of bytes, regardless
+	of how many valves should be open or close
+	This allows us to define a fixed-size array within C++, yeay!
+	Say we have 180.000 bytes of RAM left over to play with --> 180000/34 = 5294 protocol lines
