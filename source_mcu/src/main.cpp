@@ -209,7 +209,7 @@ void setup() {
 
   ProtoLine line;
   line.fill(PC_NULL);
-  line = {PC{-6, 7}, PC{6, 7}, PC{0, 1}, PC{-6, -7}, PC{7, -6}, PC{4, 3}};
+  line = {PC{-7, 7}, PC{7, 7}, PC{0, 1}, PC{-7, -7}, PC{7, -7}, PC{4, 3}};
 
   PackedProtoLine packed_line;
   packed_line = proto_mgr.pack_and_add(line);
@@ -217,8 +217,8 @@ void setup() {
   Serial.println("\nDone packing");
 
   // Unpack boolean matrix
-  PC pc2;
   /*
+  PC pc2;
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
     if (packed_line[row]) {
       pc2.y = 7 - row;
@@ -233,12 +233,48 @@ void setup() {
   Serial.println("");
   */
 
-  while (1) {
-    pc2 = proto_mgr.unpack(packed_line);
-    if (pc2.isNull()) {
-      break;
+  for (uint8_t i = 0; i < 100; ++i) {
+
+    PC pc2;
+    //----------------------------
+    utick = micros();
+    while (1) {
+      pc2 = proto_mgr.unpack(packed_line);
+      if (pc2.isNull()) {
+        break;
+      }
+      // pc2.print(Serial);
     }
-    pc2.print(Serial);
+    //----------------------------
+    Serial.print(micros() - utick);
+    Serial.print("\t");
+
+    ProtoLine line2;
+    //----------------------------
+    utick = micros();
+    line2 = proto_mgr.unpack2(packed_line);
+    for (auto &pc : line2) {
+      if (pc.isNull()) {
+        break;
+      }
+      // pc.print(Serial);
+    }
+    //----------------------------
+    Serial.print(micros() - utick);
+    Serial.print("\t");
+
+    ProtoLine *line3;
+    //----------------------------
+    utick = micros();
+    line3 = proto_mgr.unpack3(packed_line);
+    for (auto &pc : line3[0]) {
+      if (pc.isNull()) {
+        break;
+      }
+      // pc.print(Serial);
+    }
+    //----------------------------
+    Serial.println(micros() - utick);
   }
 
   Serial.println("\nDONE");

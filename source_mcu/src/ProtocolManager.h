@@ -247,18 +247,14 @@ public:
     PC pc;
 
     while (row < NUMEL_PCS_AXIS) {
-      // Serial.println("");
-      // Serial.print(row);
-      // Serial.write('\t');
-      // Serial.println(bit);
-      // Serial.println("");
       if (packed_line[row]) {
+        // There is a mask > 0, so there must be at least one coordinate
         pc.y = 7 - row;
         while (bit < 16) {
           if ((packed_line[row] >> (bit)) & 0x01) {
             pc.x = bit - 7;
             bit++;
-            return pc;
+            return pc; // Return the coordinate
           }
           bit++;
         }
@@ -272,10 +268,58 @@ public:
     return pc;
   }
 
+  ProtoLine unpack2(const PackedProtoLine &packed_line) {
+    ProtoLine line;
+    uint16_t idx_coord = 0;
+    PC pc;
+
+    for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+      if (packed_line[row]) {
+        // There is a mask > 0, so there must be at least one coordinate
+        pc.y = 7 - row;
+        for (uint8_t bit = 0; bit < 16; ++bit) {
+          if ((packed_line[row] >> (bit)) & 0x01) {
+            pc.x = bit - 7;
+            line_[idx_coord] = pc;
+            idx_coord++;
+          }
+        }
+      }
+    }
+
+    return line_;
+  }
+
+  ProtoLine *unpack3(const PackedProtoLine &packed_line) {
+    // ProtoLine line;
+    uint16_t idx_coord = 0;
+    PC pc;
+
+    for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+      if (packed_line[row]) {
+        // There is a mask > 0, so there must be at least one coordinate
+        pc.y = 7 - row;
+        for (uint8_t bit = 0; bit < 16; ++bit) {
+          if ((packed_line[row] >> (bit)) & 0x01) {
+            pc.x = bit - 7;
+            line_[idx_coord] = pc;
+            idx_coord++;
+          }
+        }
+      }
+    }
+
+    // TODO: Add extra spot for end sentinel `PC_NULL`
+    line_[idx_coord] = PC{PC_NULL, PC_NULL};
+
+    return &line_;
+  }
+
 private:
   ProtoProgram program_;
   uint16_t N_program_lines_;
   uint16_t current_pos_;
+  ProtoLine line_;
 };
 
 #endif
