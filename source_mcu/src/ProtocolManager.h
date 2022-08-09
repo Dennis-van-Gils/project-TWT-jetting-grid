@@ -310,7 +310,6 @@ public:
    * @return ProtoLine*
    */
   ProtoLine *unpack3(const PackedProtoLine &packed_line) {
-    // ProtoLine line;
     uint16_t idx_coord = 0;
     PC pc;
 
@@ -332,6 +331,43 @@ public:
     line_[idx_coord] = PC{PC_NULL, PC_NULL};
 
     return &line_;
+  }
+
+  /**
+   * @brief
+   *
+   * Refer directly to class member
+   *
+   * Danger: The member `line_buffer` is valid as long as no other call to
+   * `unpack4()` is made.
+   *
+   * @param packed_line
+   * @return ProtoLine*
+   */
+  std::array<PC, MAX_COORDS_PER_PROTO_LINE + 1>
+      line_buffer; // For use with `unpack4`, Extra spot added for end sentinel
+                   // `PC_NULL`
+
+  void unpack4(const PackedProtoLine &packed_line) {
+    uint16_t idx_coord = 0;
+    PC pc;
+
+    for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+      if (packed_line[row]) {
+        // There is a mask > 0, so there must be at least one coordinate
+        pc.y = 7 - row;
+        for (uint8_t bit = 0; bit < 16; ++bit) {
+          if ((packed_line[row] >> (bit)) & 0x01) {
+            pc.x = bit - 7;
+            line_buffer[idx_coord] = pc;
+            idx_coord++;
+          }
+        }
+      }
+    }
+
+    // Extra spot added for end sentinel `PC_NULL`
+    line_buffer[idx_coord] = PC{PC_NULL, PC_NULL};
   }
 
 private:

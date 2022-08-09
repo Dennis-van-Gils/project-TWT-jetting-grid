@@ -274,6 +274,19 @@ void setup() {
       // pc.print(Serial);
     }
     //----------------------------
+    Serial.print(micros() - utick);
+    Serial.print("\t");
+
+    //----------------------------
+    utick = micros();
+    proto_mgr.unpack4(packed_line);
+    for (auto &pc : proto_mgr.line_buffer) {
+      if (pc.isNull()) {
+        break;
+      }
+      // pc.print(Serial);
+    }
+    //----------------------------
     Serial.println(micros() - utick);
   }
 
