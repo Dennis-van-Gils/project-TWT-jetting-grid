@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    08-08-2022
+ * @date    09-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -13,7 +13,6 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <bitset>
 
 #include <array>
 using namespace std;
@@ -22,6 +21,7 @@ using namespace std;
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
+#include "ProtocolManager.h"
 #include "constants.h"
 
 // Serial command listener
@@ -36,7 +36,7 @@ uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
   State
@@ -166,7 +166,7 @@ void setup() {
   Serial.println("GO!");
 
   // Build reverse look-up table
-  init_valve2pcs();
+  init_valve2pc();
 
   // R Click
   R_click_1.begin();
@@ -202,91 +202,57 @@ void setup() {
   FastLED.clearData();
   FastLED.show();
 
-  // Protocol line test
-  std::array<PCS, 255> p_line;
-  p_line.fill(-128);
-  p_line = {PCS{-6, 7},  PCS{6, 7},  PCS{0, 1},
-            PCS{-6, -7}, PCS{7, -6}, PCS{4, 3}};
+  // ---------------------
+  // Protocol manager test
+  // ---------------------
+  ProtocolManager proto_mgr;
 
-  // Packed protocol line
-  std::array<uint16_t, NUMEL_PCS_AXIS> p_packed;
-  p_packed.fill(0);
+  ProtoLine line;
+  line.fill(PC_NULL);
+  line = {PC{-6, 7}, PC{6, 7}, PC{0, 1}, PC{-6, -7}, PC{7, -6}, PC{4, 3}};
 
-  // Pack into boolean matrix
-  for (auto c = p_line.begin(); c != p_line.end(); ++c) {
-    if (c->x == -128 || c->y == -128) {
-      break;
-    }
-    c->print(Serial);
-
-    int8_t tmp_x = c->x + 7;
-    int8_t tmp_y = 7 - c->y;
-    if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
-        (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-      snprintf(buf, BUF_LEN, "CRITICAL: Out-of-bounds index (%d, %d)", c->x,
-               c->y);
-      halt(2, buf);
-    }
-    p_packed[tmp_y] |= (1U << tmp_x);
-  }
+  PackedProtoLine packed_line;
+  packed_line = proto_mgr.pack_and_add(line);
 
   Serial.println("\nDone packing");
 
   // Unpack boolean matrix
-  // for (auto row = p_packed.begin(); row != p_packed.end(); ++row) {
-  PCS p2;
+  PC pc2;
+  /*
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (p_packed[row]) {
-      p2.y = 7 - row;
+    if (packed_line[row]) {
+      pc2.y = 7 - row;
       for (uint8_t bit = 0; bit < 16; ++bit) {
-        if ((p_packed[row] >> (bit)) & 0x01) {
-          p2.x = bit - 7;
-          p2.print(Serial);
+        if ((packed_line[row] >> (bit)) & 0x01) {
+          pc2.x = bit - 7;
+          pc2.print(Serial);
         }
       }
     }
   }
+  Serial.println("");
+  */
+
+  while (1) {
+    pc2 = proto_mgr.unpack(packed_line);
+    if (pc2.isNull()) {
+      break;
+    }
+    pc2.print(Serial);
+  }
 
   Serial.println("\nDONE");
 
-  /*
-  // PCS p1{8, 8};
-  // PCS p1{-7, -7};
-  for (int8_t x = -8; x < 10; x++) {
-    for (int8_t y = -7; y < 8; y++) {
-      PCS p1{x, y};
-
-      // Packing coordinates into one byte
-      // uint8_t c = pack_PCS(p1);
-
-      // Unpacking coordinates
-      // PCS p2 = unpack_PCS(c);
-
-      Serial.print(p1.x);
-      Serial.write('\t');
-      Serial.print(p1.y);
-      Serial.write('\t');
-
-      Serial.println(c, BIN);
-
-      Serial.print(p2.x);
-      Serial.write('\t');
-      Serial.print(p2.y);
-      Serial.write('\n');
-    }
-  }
-  */
-
-  // while (1) {}
+  while (1) {}
 }
 
 // -----------------------------------------------------------------------------
 //  loop
 // -----------------------------------------------------------------------------
 
-PCS pcs{-7, 7};
+PC pc{-7, 7};
 CP_Address cp_addr;
-std::array<uint16_t, NUMEL_CP_PORTS> bitmasks;
+CP_Masks cp_masks;
 uint16_t idx_valve = 1;
 uint16_t idx_led = 0;
 
@@ -385,9 +351,9 @@ void loop() {
 
     /*
     // Progress PCS coordinates
-    idx_valve = pcs2valve(pcs);
+    idx_valve = pc2valve(pc);
     */
-    pcs = valve2pcs(idx_valve);
+    pc = valve2pc(idx_valve);
 
     if (idx_valve > 0) {
       // Block takes 460 µs @ 1 MHz I2C clock
@@ -403,9 +369,9 @@ void loop() {
 
       cp_mgr.clear_masks();
       cp_mgr.add_to_masks(cp_addr);
-      bitmasks = cp_mgr.get_masks();
+      cp_masks = cp_mgr.get_masks();
       cp_mgr.report_masks(Serial);
-      // for (const auto bitmask : bitmasks) {}
+      // for (const auto bitmask : cp_masks) {}
 
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
       cp_mgr.send_masks();
@@ -416,12 +382,12 @@ void loop() {
 
     /*
     // Progress PCS coordinates
-    pcs.x++;
-    if (pcs.x == 8) {
-      pcs.x = -7;
-      pcs.y--;
-      if (pcs.y == -8) {
-        pcs.y = 7;
+    pc.x++;
+    if (pc.x == 8) {
+      pc.x = -7;
+      pc.y--;
+      if (pc.y == -8) {
+        pc.y = 7;
       }
     }
     */
@@ -434,7 +400,7 @@ void loop() {
     //*/
 
     // Color all active valve leds in red
-    idx_led = pcs2led(pcs);
+    idx_led = pc2led(pc);
     leds[idx_led] = CRGB::Red;
   }
 

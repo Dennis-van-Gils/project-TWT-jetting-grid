@@ -1,7 +1,11 @@
 /**
  * @file    halt.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
- * @brief   Halt execution specific to the TWT jetting grid
+ * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
+ * @date    09-08-2022
+ *
+ * @brief   Halt execution specific to the TWT jetting grid.
+ *
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -10,6 +14,7 @@
 
 #include "FastLED.h"
 
+// See `main.cpp`
 extern CRGB leds[256];
 
 /**

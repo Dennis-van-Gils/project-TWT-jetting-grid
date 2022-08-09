@@ -2,7 +2,7 @@
  * @file    CentipedeManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    08-08-2022
+ * @date    09-08-2022
  *
  * @brief   Manage the output channels of a Centipede object by storing and
  * keeping track of the bitmasks per port.
@@ -30,7 +30,10 @@ extern char buf[];
  * A second Centipede board on another I2C address will add 4 more additional
  * ports, allowing a total of 128 channels to be controlled.
  */
-const uint8_t NUMEL_CP_PORTS = 8;
+const uint8_t N_CP_PORTS = 8;
+
+// TODO: descr
+using CP_Masks = std::array<uint16_t, N_CP_PORTS>;
 
 /*******************************************************************************
   CP_Address
@@ -69,7 +72,7 @@ public:
   void begin() {
     cp_.initialize();
 
-    for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
+    for (uint8_t port = 0; port < N_CP_PORTS; port++) {
       cp_.portMode(port, 0);  // Set all channels to output
       cp_.portWrite(port, 0); // Set all channels LOW
     }
@@ -78,7 +81,7 @@ public:
   /**
    * @brief Set all the stored bitmasks to 0, i.e. set all outputs LOW.
    */
-  void clear_masks() { bitmasks_.fill(0); }
+  void clear_masks() { masks_.fill(0); }
 
   /**
    * @brief Add a single Centipede address to the stored bitmasks, turning that
@@ -87,14 +90,14 @@ public:
    * @param cp_addr The Centipede address to set HIGH
    */
   void add_to_masks(CP_Address cp_addr) {
-    if (cp_addr.port >= NUMEL_CP_PORTS) {
+    if (cp_addr.port >= N_CP_PORTS) {
       snprintf(buf, BUF_LEN,
                "CRITICAL: Out-of-bounds port number %d in "
                "`CentipedeManager::add_to_masks()`",
                cp_addr.port);
       halt(7, buf);
     }
-    bitmasks_[cp_addr.port] |= (1U << cp_addr.bit);
+    masks_[cp_addr.port] |= (1U << cp_addr.bit);
   }
 
   /**
@@ -102,14 +105,14 @@ public:
    *
    * @param in The new bitmask values
    */
-  void set_masks(std::array<uint16_t, NUMEL_CP_PORTS> in) { bitmasks_ = in; }
+  void set_masks(CP_Masks in) { masks_ = in; }
 
   /**
    * @brief Get all the stored bitmasks.
    *
    * @return The stored bitmask values
    */
-  std::array<uint16_t, NUMEL_CP_PORTS> get_masks() { return bitmasks_; }
+  CP_Masks get_masks() { return masks_; }
 
   /**
    * @brief Print the stored bitmasks to the serial stream.
@@ -117,12 +120,12 @@ public:
    * @param mySerial The serial stream to report over.
    */
   void report_masks(Stream &mySerial) {
-    #pragma GCC diagnostic ignored "-Wformat-truncation"
+#pragma GCC diagnostic ignored "-Wformat-truncation"
     buf[0] = '\0';
-    for (uint8_t port = 0; port < NUMEL_CP_PORTS - 1; port++) {
-      snprintf(buf, BUF_LEN, "%s%d\t", buf, bitmasks_[port]);
+    for (uint8_t port = 0; port < N_CP_PORTS - 1; port++) {
+      snprintf(buf, BUF_LEN, "%s%d\t", buf, masks_[port]);
     }
-    snprintf(buf, BUF_LEN, "%s%d\n", buf, bitmasks_[NUMEL_CP_PORTS - 1]);
+    snprintf(buf, BUF_LEN, "%s%d\n", buf, masks_[N_CP_PORTS - 1]);
     mySerial.print(buf);
   }
 
@@ -131,15 +134,14 @@ public:
    * channel HIGH or LOW as per the bitmasks.
    */
   void send_masks() {
-    for (uint8_t port = 0; port < NUMEL_CP_PORTS; port++) {
-      cp_.portWrite(port, bitmasks_[port]);
+    for (uint8_t port = 0; port < N_CP_PORTS; port++) {
+      cp_.portWrite(port, masks_[port]);
     }
   }
 
 private:
   Centipede cp_; // The Centipede object controlling up to two Centipede boards
-  std::array<uint16_t, NUMEL_CP_PORTS>
-      bitmasks_; // Bitmask values for each of the ports in use
+  CP_Masks masks_; // Bitmask values for each of the ports in use
 };
 
 #endif
