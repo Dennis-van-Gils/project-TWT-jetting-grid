@@ -13,6 +13,10 @@
 #ifndef CENTIPEDE_MANAGER_H_
 #define CENTIPEDE_MANAGER_H_
 
+// Ignore warning on `snprintf(buf, BUF_LEN, "%s%d\t", buf, masks_[port]);`
+// It's safe here.
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+
 #include <array>
 using namespace std;
 
@@ -120,7 +124,6 @@ public:
    * @param mySerial The serial stream to report over.
    */
   void report_masks(Stream &mySerial) {
-#pragma GCC diagnostic ignored "-Wformat-truncation"
     buf[0] = '\0';
     for (uint8_t port = 0; port < N_CP_PORTS - 1; port++) {
       snprintf(buf, BUF_LEN, "%s%d\t", buf, masks_[port]);
