@@ -268,6 +268,14 @@ public:
     return pc;
   }
 
+  /**
+   * @brief
+   *
+   * Copy by value. Slow.
+   *
+   * @param packed_line
+   * @return ProtoLine
+   */
   ProtoLine unpack2(const PackedProtoLine &packed_line) {
     ProtoLine line;
     uint16_t idx_coord = 0;
@@ -290,6 +298,17 @@ public:
     return line_;
   }
 
+  /**
+   * @brief
+   *
+   * Copy by reference. Fast.
+   *
+   * Danger: The return `ProtoLine*` is valid as long as no other call to
+   * `unpack3()` is made.
+   *
+   * @param packed_line
+   * @return ProtoLine*
+   */
   ProtoLine *unpack3(const PackedProtoLine &packed_line) {
     // ProtoLine line;
     uint16_t idx_coord = 0;
@@ -319,7 +338,7 @@ private:
   ProtoProgram program_;
   uint16_t N_program_lines_;
   uint16_t current_pos_;
-  ProtoLine line_;
+  ProtoLine line_; // For use with `unpack3()`
 };
 
 #endif
