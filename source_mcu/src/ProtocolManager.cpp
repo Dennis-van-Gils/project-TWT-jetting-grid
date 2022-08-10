@@ -30,9 +30,8 @@ void P::print(Stream &mySerial) {
 ProtocolManager::ProtocolManager() {}
 
 void ProtocolManager::clear() {
-  // We clear the program by setting the first entry of the program to contain
-  // only PCS points with the special value of `P_NULL_VAL`.
-  // program_[0].fill(P_NULL_VAL);
+  // TODO: Fill with special value denoting end-of-program
+  program_[0].line.fill(0); // TODO: fill(0) is incorrect, leave for now
 
   // Reset the current position
   current_pos_ = 0;
