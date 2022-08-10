@@ -65,7 +65,13 @@ public:
   Structures and typedefs
 ------------------------------------------------------------------------------*/
 
+/**
+ * @brief TODO descr
+ *
+ * Default initialization is with special value `P_NULL_VAL`
+ */
 using Line = std::array<P, MAX_POINTS_PER_LINE>;
+
 using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
 
 struct TimeLine {
@@ -96,53 +102,23 @@ public:
 
   PackedLine pack_and_add(const Line &line);
 
-  P unpack(const PackedLine &packed);
-
   /**
    * @brief
-   *
-   * Copy by value. Slow.
-   *
-   * @param packed
-   * @return ProtoLine
-   */
-  Line unpack2(const PackedLine &packed);
-
-  /**
-   * @brief
-   *
-   * Copy by reference. Fast.
-   *
-   * Danger: The return `ProtoLine*` is valid as long as no other call to
-   * `unpack3()` is made.
-   *
-   * @param packed
-   * @return ProtoLine*
-   */
-  Line *unpack3(const PackedLine &packed);
-
-  /**
-   * @brief
-   *
-   * Refer directly to class member
    *
    * Danger: The member `line_buffer` is valid as long as no other call to
    * `unpack4()` is made.
    *
    * @param packed
-   * @return ProtoLine*
    */
-  std::array<P, MAX_POINTS_PER_LINE + 1>
-      line_buffer; // For use with `unpack4`, Extra spot added for end sentinel
-                   // `P_NULL`
+  void unpack(const PackedLine &packed);
 
-  void unpack4(const PackedLine &packed);
+  // For use with `unpack`, Extra spot added for end sentinel `P_NULL_VAL`
+  std::array<P, MAX_POINTS_PER_LINE + 1> line_buffer;
 
 private:
   Program program_;
   uint16_t N_program_lines_;
   uint16_t current_pos_;
-  Line line_; // For use with `unpack3()`
 };
 
 #endif

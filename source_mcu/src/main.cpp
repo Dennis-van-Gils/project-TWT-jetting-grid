@@ -39,6 +39,28 @@ uint32_t utick = micros();
 #define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
+  freeMemory
+------------------------------------------------------------------------------*/
+
+#ifdef __arm__
+// should use uinstd.h to define sbrk but Due causes a conflict
+extern "C" char* sbrk(int incr);
+#else  // __ARM__
+extern char *__brkval;
+#endif  // __arm__
+
+int freeMemory() {
+  char top;
+#ifdef __arm__
+  return &top - reinterpret_cast<char*>(sbrk(0));
+#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
+  return &top - __brkval;
+#else  // __arm__
+  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
+#endif  // __arm__
+}
+
+/*------------------------------------------------------------------------------
   State
 ------------------------------------------------------------------------------*/
 
@@ -205,92 +227,32 @@ void setup() {
   // ---------------------
   // Protocol manager test
   // ---------------------
+  Serial.print("freemem: ");
+  Serial.println(freeMemory());
+
   ProtocolManager proto_mgr;
 
-  Line line;
-  line.fill(P_NULL_VAL);
-  line = {P{-7, 7}, P{7, 7}, P{0, 1}, P{-7, -7}, P{7, -7}, P{4, 3}};
+  Line line{P{-7, 7}, P{7, 7}, P{0, 1}, P{-7, -7}, P{7, -7}, P{4, 3}};
 
   PackedLine packed;
   packed = proto_mgr.pack_and_add(line);
 
   Serial.println("\nDone packing");
 
-  // Unpack boolean matrix
-  /*
-  P p2;
-  for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (packed[row]) {
-      p2.y = 7 - row;
-      for (uint8_t bit = 0; bit < 16; ++bit) {
-        if ((packed[row] >> (bit)) & 0x01) {
-          p2.x = bit - 7;
-          p2.print(Serial);
-        }
-      }
+  utick = micros();
+  proto_mgr.unpack(packed);
+  for (auto &p : proto_mgr.line_buffer) {
+    if (p.isNull()) {
+      break;
     }
+    p.print(Serial);
   }
   Serial.println("");
-  */
-
-  for (uint8_t i = 0; i < 100; ++i) {
-
-    P p2;
-    //----------------------------
-    utick = micros();
-    while (1) {
-      p2 = proto_mgr.unpack(packed);
-      if (p2.isNull()) {
-        break;
-      }
-      // p2.print(Serial);
-    }
-    //----------------------------
-    Serial.print(micros() - utick);
-    Serial.print("\t");
-
-    Line line2;
-    //----------------------------
-    utick = micros();
-    line2 = proto_mgr.unpack2(packed);
-    for (auto &p : line2) {
-      if (p.isNull()) {
-        break;
-      }
-      // p.print(Serial);
-    }
-    //----------------------------
-    Serial.print(micros() - utick);
-    Serial.print("\t");
-
-    Line *line3;
-    //----------------------------
-    utick = micros();
-    line3 = proto_mgr.unpack3(packed);
-    for (auto &p : line3[0]) {
-      if (p.isNull()) {
-        break;
-      }
-      // p.print(Serial);
-    }
-    //----------------------------
-    Serial.print(micros() - utick);
-    Serial.print("\t");
-
-    //----------------------------
-    utick = micros();
-    proto_mgr.unpack4(packed);
-    for (auto &p : proto_mgr.line_buffer) {
-      if (p.isNull()) {
-        break;
-      }
-      // p.print(Serial);
-    }
-    //----------------------------
-    Serial.println(micros() - utick);
-  }
-
+  Serial.println(micros() - utick);
   Serial.println("\nDONE");
+
+  Serial.print("freemem: ");
+  Serial.println(freeMemory());
 
   while (1) {}
 }
