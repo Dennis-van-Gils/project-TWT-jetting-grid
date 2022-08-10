@@ -17,12 +17,14 @@
 #include <array>
 using namespace std;
 
-#include "CentipedeManager.h"
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
+
+#include "CentipedeManager.h"
 #include "ProtocolManager.h"
 #include "constants.h"
+#include "translations.h"
 
 // Serial command listener
 DvG_SerialCommand sc(Serial);
@@ -166,7 +168,7 @@ void setup() {
   Serial.println("GO!");
 
   // Build reverse look-up table
-  init_valve2pc();
+  init_valve2p();
 
   // R Click
   R_click_1.begin();
@@ -207,25 +209,25 @@ void setup() {
   // ---------------------
   ProtocolManager proto_mgr;
 
-  ProtoLine line;
-  line.fill(PC_NULL);
-  line = {PC{-7, 7}, PC{7, 7}, PC{0, 1}, PC{-7, -7}, PC{7, -7}, PC{4, 3}};
+  Line line;
+  line.fill(P_NULL_VAL);
+  line = {P{-7, 7}, P{7, 7}, P{0, 1}, P{-7, -7}, P{7, -7}, P{4, 3}};
 
-  PackedProtoLine packed_line;
-  packed_line = proto_mgr.pack_and_add(line);
+  PackedLine packed;
+  packed = proto_mgr.pack_and_add(line);
 
   Serial.println("\nDone packing");
 
   // Unpack boolean matrix
   /*
-  PC pc2;
+  P p2;
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (packed_line[row]) {
-      pc2.y = 7 - row;
+    if (packed[row]) {
+      p2.y = 7 - row;
       for (uint8_t bit = 0; bit < 16; ++bit) {
-        if ((packed_line[row] >> (bit)) & 0x01) {
-          pc2.x = bit - 7;
-          pc2.print(Serial);
+        if ((packed[row] >> (bit)) & 0x01) {
+          p2.x = bit - 7;
+          p2.print(Serial);
         }
       }
     }
@@ -235,43 +237,43 @@ void setup() {
 
   for (uint8_t i = 0; i < 100; ++i) {
 
-    PC pc2;
+    P p2;
     //----------------------------
     utick = micros();
     while (1) {
-      pc2 = proto_mgr.unpack(packed_line);
-      if (pc2.isNull()) {
+      p2 = proto_mgr.unpack(packed);
+      if (p2.isNull()) {
         break;
       }
-      // pc2.print(Serial);
+      // p2.print(Serial);
     }
     //----------------------------
     Serial.print(micros() - utick);
     Serial.print("\t");
 
-    ProtoLine line2;
+    Line line2;
     //----------------------------
     utick = micros();
-    line2 = proto_mgr.unpack2(packed_line);
-    for (auto &pc : line2) {
-      if (pc.isNull()) {
+    line2 = proto_mgr.unpack2(packed);
+    for (auto &p : line2) {
+      if (p.isNull()) {
         break;
       }
-      // pc.print(Serial);
+      // p.print(Serial);
     }
     //----------------------------
     Serial.print(micros() - utick);
     Serial.print("\t");
 
-    ProtoLine *line3;
+    Line *line3;
     //----------------------------
     utick = micros();
-    line3 = proto_mgr.unpack3(packed_line);
-    for (auto &pc : line3[0]) {
-      if (pc.isNull()) {
+    line3 = proto_mgr.unpack3(packed);
+    for (auto &p : line3[0]) {
+      if (p.isNull()) {
         break;
       }
-      // pc.print(Serial);
+      // p.print(Serial);
     }
     //----------------------------
     Serial.print(micros() - utick);
@@ -279,12 +281,12 @@ void setup() {
 
     //----------------------------
     utick = micros();
-    proto_mgr.unpack4(packed_line);
-    for (auto &pc : proto_mgr.line_buffer) {
-      if (pc.isNull()) {
+    proto_mgr.unpack4(packed);
+    for (auto &p : proto_mgr.line_buffer) {
+      if (p.isNull()) {
         break;
       }
-      // pc.print(Serial);
+      // p.print(Serial);
     }
     //----------------------------
     Serial.println(micros() - utick);
@@ -299,7 +301,7 @@ void setup() {
 //  loop
 // -----------------------------------------------------------------------------
 
-PC pc{-7, 7};
+P p{-7, 7};
 CP_Address cp_addr;
 CP_Masks cp_masks;
 uint16_t idx_valve = 1;
@@ -400,9 +402,9 @@ void loop() {
 
     /*
     // Progress PCS coordinates
-    idx_valve = pc2valve(pc);
+    idx_valve = p2valve(p);
     */
-    pc = valve2pc(idx_valve);
+    p = valve2p(idx_valve);
 
     if (idx_valve > 0) {
       // Block takes 460 µs @ 1 MHz I2C clock
@@ -430,13 +432,13 @@ void loop() {
     }
 
     /*
-    // Progress PCS coordinates
-    pc.x++;
-    if (pc.x == 8) {
-      pc.x = -7;
-      pc.y--;
-      if (pc.y == -8) {
-        pc.y = 7;
+    // Progress PCS point
+    p.x++;
+    if (p.x == 8) {
+      p.x = -7;
+      p.y--;
+      if (p.y == -8) {
+        p.y = 7;
       }
     }
     */
@@ -449,7 +451,7 @@ void loop() {
     //*/
 
     // Color all active valve leds in red
-    idx_led = pc2led(pc);
+    idx_led = p2led(p);
     leds[idx_led] = CRGB::Red;
   }
 

@@ -44,6 +44,7 @@
 
   The solenoid valves are ultimately opening and closing jetting nozzles that
   are laid out in a square grid, aka the protocol coordinate system (PCS).
+  Individual points in the PCS are named P for point.
 
   ●: Indicates a valve & nozzle
   -: Indicates no nozzle & valve exists
@@ -70,7 +71,7 @@
   The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
   Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
   For the valve numbering, see `docs\jetting_grid_indices.pdf` and the array
-  `PC2VALVE` as defined farther down in this file.
+  `P2VALVE` as defined farther down in this file.
 
 ------------------------------------------------------------------------------*/
 
@@ -80,11 +81,11 @@ const uint8_t N_VALVES = 112;      // From 1 to 112, not counting 0
 
 // clang-format off
 
-// Translation matrix: Protocol coordinate to valve number.
+// Translation matrix: PCS point to valve number.
 //   [dim 1]: y-coordinate [0: y =  7, 14: y = -7]
 //   [dim 2]: x-coordinate [0: x = -7, 14: x =  7]
 //   Returns: The valve numbered 1 to 112, with 0 indicating 'no valve'
-const uint8_t PC2VALVE[NUMEL_PCS_AXIS][NUMEL_PCS_AXIS] = {
+const uint8_t P2VALVE[NUMEL_PCS_AXIS][NUMEL_PCS_AXIS] = {
   // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7
   {   0,   1,   0,   2,   0,   3,   0,   4,   0,   5,   0,   6,   0,   7,   0 }, //  7
   {  63,   0,  70,   0,  77,   0,  84,   0,  91,   0,  98,   0, 105,   0, 112 }, //  6
@@ -103,12 +104,12 @@ const uint8_t PC2VALVE[NUMEL_PCS_AXIS][NUMEL_PCS_AXIS] = {
   {   0,  50,   0,  51,   0,  52,   0,  53,   0,  54,   0,  55,   0,  56,   0 }  // -7
 };
 
-// Translation matrix: Protocol coordinate to LED index.
+// Translation matrix: PCS point to LED index.
 // The LED matrix is wired serpentine like.
 //   [dim 1]: y-coordinate [0: y =  7, 14: y = -7]
 //   [dim 2]: x-coordinate [0: x = -7, 14: x =  7]
 //   Returns: The LED index 0 to 255
-const uint8_t PC2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
+const uint8_t P2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
   // -7   -6   -5   -4   -3   -2   -1    0    1    2    3    4    5    6    7    8
   {  15,  14,  13,  12,  11,  10,   9,   8,   7,   6,   5,   4,   3,   2,   1,   0 }, //  7
   {  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31 }, //  6
@@ -130,13 +131,13 @@ const uint8_t PC2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
 
 // clang-format on
 
-// Translation matrix: Valve number to protocol coordinate.
-// Reverse look-up. Must be build from the source array `PC2VALVE` by calling
-// `init_valve2pc()` during `setup()`.
+// Translation matrix: Valve number to PCS point.
+// Reverse look-up. Must be build from the source array `P2VALVE` by calling
+// `init_valve2p()` during `setup()`.
 //   [dim 1]: The valve numbered 1 to 112, with 0 indicating 'no valve'
 //   [dim 2]: PCS axis [0: x, 1: y]
 //   Returns: The x or y-coordinate of the valve
-int8_t VALVE2PC[N_VALVES + 1][2] = {0};
+int8_t VALVE2P[N_VALVES + 1][2] = {0};
 
 /*------------------------------------------------------------------------------
   HARDWARE WIRING
@@ -311,7 +312,7 @@ const Omega_Calib OMEGA_2_CALIB{4.024, 16.002, 7.0};
 const Omega_Calib OMEGA_3_CALIB{4.004, 16.057, 7.0};
 const Omega_Calib OMEGA_4_CALIB{3.995, 16.001, 7.0};
 
-float mA2bar(float mA, const Omega_Calib calib) {
+inline float mA2bar(float mA, const Omega_Calib calib) {
   return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
 }
 

@@ -2,7 +2,7 @@
  * @file    CentipedeManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-08-2022
+ * @date    10-08-2022
  *
  * @brief   Manage the output channels of a Centipede object by storing and
  * keeping track of the bitmasks per port.
@@ -13,15 +13,11 @@
 #ifndef CENTIPEDE_MANAGER_H_
 #define CENTIPEDE_MANAGER_H_
 
-// Ignore warning on `snprintf(buf, BUF_LEN, "%s%d\t", buf, masks_[port]);`
-// It's safe here.
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-
+#include <Arduino.h>
 #include <array>
 using namespace std;
 
 #include "Centipede.h"
-#include "halt.h"
 
 // Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;
@@ -67,25 +63,18 @@ public:
   /**
    * @brief Construct a new Centipede Manager object.
    */
-  CentipedeManager() { clear_masks(); }
+  CentipedeManager();
 
   /**
    * @brief Initialize the Centipede, set all channels to output and turn the
    * outputs LOW.
    */
-  void begin() {
-    cp_.initialize();
-
-    for (uint8_t port = 0; port < N_CP_PORTS; port++) {
-      cp_.portMode(port, 0);  // Set all channels to output
-      cp_.portWrite(port, 0); // Set all channels LOW
-    }
-  }
+  void begin();
 
   /**
    * @brief Set all the stored bitmasks to 0, i.e. set all outputs LOW.
    */
-  void clear_masks() { masks_.fill(0); }
+  inline void clear_masks() { masks_.fill(0); }
 
   /**
    * @brief Add a single Centipede address to the stored bitmasks, turning that
@@ -93,54 +82,34 @@ public:
    *
    * @param cp_addr The Centipede address to set HIGH
    */
-  void add_to_masks(CP_Address cp_addr) {
-    if (cp_addr.port >= N_CP_PORTS) {
-      snprintf(buf, BUF_LEN,
-               "CRITICAL: Out-of-bounds port number %d in "
-               "`CentipedeManager::add_to_masks()`",
-               cp_addr.port);
-      halt(7, buf);
-    }
-    masks_[cp_addr.port] |= (1U << cp_addr.bit);
-  }
+  void add_to_masks(CP_Address cp_addr);
 
   /**
    * @brief Set all the stored bitmasks to new values.
    *
    * @param in The new bitmask values
    */
-  void set_masks(CP_Masks in) { masks_ = in; }
+  inline void set_masks(CP_Masks in) { masks_ = in; }
 
   /**
    * @brief Get all the stored bitmasks.
    *
    * @return The stored bitmask values
    */
-  CP_Masks get_masks() { return masks_; }
+  inline CP_Masks get_masks() { return masks_; }
 
   /**
    * @brief Print the stored bitmasks to the serial stream.
    *
    * @param mySerial The serial stream to report over.
    */
-  void report_masks(Stream &mySerial) {
-    buf[0] = '\0';
-    for (uint8_t port = 0; port < N_CP_PORTS - 1; port++) {
-      snprintf(buf, BUF_LEN, "%s%d\t", buf, masks_[port]);
-    }
-    snprintf(buf, BUF_LEN, "%s%d\n", buf, masks_[N_CP_PORTS - 1]);
-    mySerial.print(buf);
-  }
+  void report_masks(Stream &mySerial);
 
   /**
    * @brief Send out the stored bitmasks to the Centipede, setting each output
    * channel HIGH or LOW as per the bitmasks.
    */
-  void send_masks() {
-    for (uint8_t port = 0; port < N_CP_PORTS; port++) {
-      cp_.portWrite(port, masks_[port]);
-    }
-  }
+  void send_masks();
 
 private:
   Centipede cp_; // The Centipede object controlling up to two Centipede boards
