@@ -16,19 +16,19 @@
 #ifndef PROTOCOL_MANAGER_H_
 #define PROTOCOL_MANAGER_H_
 
+#include "constants.h"
 #include <Arduino.h>
 #include <array>
-using namespace std;
-
-#include "constants.h"
 
 // Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;
 extern char buf[];
 
-const uint16_t MAX_LINES = 5000; // TODO: descr
-const uint16_t MAX_POINTS_PER_LINE =
-    NUMEL_PCS_AXIS * NUMEL_PCS_AXIS; // TODO: descr
+// TODO: descr
+const uint16_t MAX_LINES = 5000;
+
+// TODO: descr
+const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
 
 /*------------------------------------------------------------------------------
   P "Point in the Protocol Coordinate System (PCS)"
@@ -46,9 +46,14 @@ class P {
 public:
   P(int8_t x_ = P_NULL_VAL, int8_t y_ = P_NULL_VAL);
 
-  bool isNull() const;
+  inline bool isNull() const {
+    return ((x == P_NULL_VAL) || (y == P_NULL_VAL));
+  }
 
-  void setNull();
+  inline void setNull() {
+    x = P_NULL_VAL;
+    y = P_NULL_VAL;
+  }
 
   void print(Stream &mySerial);
 

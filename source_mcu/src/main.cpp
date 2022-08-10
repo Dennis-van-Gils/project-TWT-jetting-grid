@@ -10,21 +10,19 @@
  * @copyright MIT License. See the LICENSE file for details.
  */
 
-#include <Arduino.h>
-#include <SPI.h>
-#include <Wire.h>
-
-#include <array>
-using namespace std;
+#include "CentipedeManager.h"
+#include "ProtocolManager.h"
+#include "constants.h"
+#include "translations.h"
 
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 
-#include "CentipedeManager.h"
-#include "ProtocolManager.h"
-#include "constants.h"
-#include "translations.h"
+#include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <array>
 
 // Serial command listener
 DvG_SerialCommand sc(Serial);
@@ -294,7 +292,7 @@ void setup() {
 
   Serial.println("\nDONE");
 
-  while (1) {}
+  // while (1) {}
 }
 
 // -----------------------------------------------------------------------------

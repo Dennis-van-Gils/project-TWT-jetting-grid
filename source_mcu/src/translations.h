@@ -16,10 +16,9 @@
 #ifndef TRANSLATIONS_H_
 #define TRANSLATIONS_H_
 
-#include <Arduino.h>
-
 #include "CentipedeManager.h"
 #include "ProtocolManager.h"
+#include <Arduino.h>
 
 // Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;

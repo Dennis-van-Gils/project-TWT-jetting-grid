@@ -7,11 +7,6 @@
  */
 
 #include "ProtocolManager.h"
-
-#include <algorithm>
-#include <array>
-using namespace std;
-
 #include "halt.h"
 
 /*------------------------------------------------------------------------------
@@ -21,13 +16,6 @@ using namespace std;
 P::P(int8_t x_, int8_t y_) {
   x = x_;
   y = y_;
-}
-
-bool P::isNull() const { return ((x == P_NULL_VAL) || (y == P_NULL_VAL)); }
-
-void P::setNull() {
-  x = P_NULL_VAL;
-  y = P_NULL_VAL;
 }
 
 void P::print(Stream &mySerial) {

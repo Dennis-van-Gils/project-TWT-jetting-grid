@@ -12,9 +12,8 @@
 #ifndef HALT_H_
 #define HALT_H_
 
-#include <Arduino.h>
-
 #include "FastLED.h"
+#include <Arduino.h>
 
 // See `main.cpp`
 extern CRGB leds[256];

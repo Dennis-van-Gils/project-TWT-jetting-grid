@@ -13,11 +13,9 @@
 #ifndef CENTIPEDE_MANAGER_H_
 #define CENTIPEDE_MANAGER_H_
 
+#include "Centipede.h"
 #include <Arduino.h>
 #include <array>
-using namespace std;
-
-#include "Centipede.h"
 
 // Common character buffer for string formatting, see `main.cpp`
 extern const uint8_t BUF_LEN;
@@ -32,7 +30,9 @@ extern char buf[];
  */
 const uint8_t N_CP_PORTS = 8;
 
-// TODO: descr
+/**
+ * @brief Container for the Centipede port bitmasks.
+ */
 using CP_Masks = std::array<uint16_t, N_CP_PORTS>;
 
 /*******************************************************************************

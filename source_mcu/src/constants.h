@@ -131,14 +131,6 @@ const uint8_t P2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
 
 // clang-format on
 
-// Translation matrix: Valve number to PCS point.
-// Reverse look-up. Must be build from the source array `P2VALVE` by calling
-// `init_valve2p()` during `setup()`.
-//   [dim 1]: The valve numbered 1 to 112, with 0 indicating 'no valve'
-//   [dim 2]: PCS axis [0: x, 1: y]
-//   Returns: The x or y-coordinate of the valve
-int8_t VALVE2P[N_VALVES + 1][2] = {0};
-
 /*------------------------------------------------------------------------------
   HARDWARE WIRING
 --------------------------------------------------------------------------------
