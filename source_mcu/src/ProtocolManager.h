@@ -25,38 +25,37 @@ extern const uint8_t BUF_LEN;
 extern char buf[];
 
 /**
- * @brief The maximum number of protocol lines that a full protocol program can
- * be made of.
+ * @brief The maximum number of protocol lines that a protocol program can
+ * contain.
  *
  * Make it as large as free RAM allows.
  */
 const uint16_t MAX_LINES = 5000;
 
 /**
- * @brief The maximum number of PCS points that a single protocol line can hold.
+ * @brief The maximum number of PCS points that a single protocol line can
+ * contain.
  *
  * Technically, the maximum number should equal the total number of valid valve
  * locations, so equal to `N_VALVES`. However, we deliberately make it able to
  * hold the full PCS space for array-indexing safety.
- *
- * Also, we add one extra spot at the end to allow for a sentinel to signal the
- * end point of the protocol line, i.e. the value `P{P_NULL_VAL, P_NULL_VAL}`.
  */
-const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS + 1;
+const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
 
 /*------------------------------------------------------------------------------
   P "Point in the Protocol Coordinate System (PCS)"
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Special value denoting an uninitialized point in the PCS.
+ * @brief Special value denoting an uninitialized point in the Protocol
+ * Coordinate System (PCS).
  *
- * Also used as a sentinel to signal the end point of a protocol line.
+ * Also used as a sentinel to signal the end of a @p Line.
  */
 const int8_t P_NULL_VAL = -128;
 
 /**
- * @brief Class to hold and manage a single PCS point.
+ * @brief Class to hold a single point in the Protocol Coordinate System (PCS).
  *
  * Default initialization value is `{P_NULL_VAL, P_NULL_VAL}`.
  */
@@ -85,49 +84,83 @@ public:
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief TODO descr
+ * @brief Array of PCS points (objects of class `P`) making up a protocol line.
  *
+ * The coordinates of each point `P` should correspond to a valve that needs to
+ * be turned open. All unmentioned valves will remain/be set closed. The maximum
+ * number of points must not exceed `MAX_POINTS_PER_LINE`.
+ *
+ * After the last point a sentinel must be placed to indicate the end of the
+ * list. This end sentinel takes the form of a special value for `P`, namely
+ * `P{P_NULL_VAL, P_NULL_VAL}`. You can also call the method `setNull()` on the
+ * `P` object.
+ *
+ * https://cplusplus.com/reference/array/array/array:
  * An `std::array` for elements of a class type calls their default constructor.
+ *
  * Hence, the default initialization here is an array full with special valued
- * `P` objects: `P{P_NULL_VAL, P_NULL_VAL`}.
- * See, https://cplusplus.com/reference/array/array/array/.
+ * `P` objects: `P{P_NULL_VAL, P_NULL_VAL}`.
  */
-using Line = std::array<P, MAX_POINTS_PER_LINE>;
+using Line = std::array<P, MAX_POINTS_PER_LINE + 1>; // +1 for the end sentinel
 
 /**
- * @brief TODO descr
+ * @brief Packed version of a `Line`.
  *
- * Is a bitmask, in essence, decoding all the active points of the PCS.
+ * Meaning that the full list of PCS points that have to have their valves
+ * turned open, is now encoded into 16-bit bitmasks, one for each PCS row.
+ *
  * Benefit to packing is the constant array dimension and less memory footprint
- * than using `Line` when using a large number of points `P`.
+ * than using `Line` when using a large number of points `P`. This allows for
+ * more lines that make up a protocol program to be stored into memory.
  *
+ * https://cplusplus.com/reference/array/array/array:
  * An `std::array` for elements of fundamental types are left uninitialized,
  * unless the array object has static storage, in which case they are zero-
- * initialized. Hence, the default initialization here is zero-initialized
- * only when declared non-local.
- * See, https://cplusplus.com/reference/array/array/array/.
+ * initialized.
+ *
+ * Hence, the default initialization here is zero-initialized only when declared
+ * non-local.
  */
 using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
 
-struct TimeLine {
-  uint32_t time;
+/**
+ * @brief Structure to associate a timestamp to a `Line` object.
+ *
+ * See @p `Line` for more details.
+ */
+struct TimedLine {
+  uint32_t time; // Time in [ms]
   Line line;
 };
 
-struct PackedTimeLine {
-  uint32_t time;
+/**
+ * @brief Structure to associate a timestamp to a `PackedLine` object.
+ *
+ * See @p `PackedLine` for more details.
+ */
+struct TimedPackedLine {
+  uint32_t time; // Time in [ms]
   PackedLine packed;
 };
 
-using Program = std::array<PackedTimeLine, MAX_LINES>;
+/**
+ * @brief The protocol program fully stored in memory.
+ *
+ * It is an array containing timestamped protocol lines, in turn containing the
+ * valves to be opened at that timestamp. Each protocol line is actually packed
+ * into a bitmask to save on memory. Method `unpack()` must be called on the
+ * `PackedLine` object to get the list of PCS points (which we then loop over
+ * to 1: finally open the referred valves and close the others and 2: to light
+ * up the appropiate LEDs of the 16x16 LED matrix).
+ */
+using Program = std::array<TimedPackedLine, MAX_LINES>;
 
 /*------------------------------------------------------------------------------
   ProtocolManager
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief
- *
+ * @brief Manager in control of the protocol. Work in progress...
  */
 class ProtocolManager {
 public:
@@ -139,25 +172,25 @@ public:
   void pack_and_add2(const Line &line);
 
   /**
-   * @brief
+   * @brief TODO descr
    *
-   * Danger: The member `line_buffer` is valid as long as no other call to
-   * `unpack()` is made.
+   * Warning: The member `line_buffer` will be overwritten with new data when a
+   * new call to `unpack()` is made.
    *
    * @param packed
    */
   void unpack(const PackedLine &packed);
 
   /**
-   * @brief
+   * @brief TODO descr
    *
-   * Danger: The member `line_buffer` is valid as long as no other call to
-   * `unpack()` is made.
+   * Warning: The member `line_buffer` will be overwritten with new data when a
+   * new call to `unpack()` is made.
    */
-  void unpack2();
+  void unpack();
 
   // Public members
-  Line line_buffer; // For use with `unpack()`
+  Line line_buffer; // For use with `unpack()`.
 
 private:
   Program program_;

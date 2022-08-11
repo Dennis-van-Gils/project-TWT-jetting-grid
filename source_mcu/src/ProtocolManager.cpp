@@ -98,11 +98,11 @@ void ProtocolManager::unpack(const PackedLine &packed) {
     }
   }
 
-  // Extra spot added for end sentinel `P{P_NULL_VAL, P_NULL_VAL}`
+  // Add end sentinel
   line_buffer[idx_P].setNull();
 }
 
-void ProtocolManager::unpack2() {
+void ProtocolManager::unpack() {
   uint16_t idx_P = 0;
   P p;
 
@@ -120,6 +120,6 @@ void ProtocolManager::unpack2() {
     }
   }
 
-  // Extra spot added for end sentinel `P{P_NULL_VAL, P_NULL_VAL}`
+  // Add end sentinel
   line_buffer[idx_P].setNull();
 }
