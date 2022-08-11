@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    10-08-2022
+ * @date    11-08-2022
  *
  * @brief   ...
  *
@@ -24,11 +24,25 @@
 extern const uint8_t BUF_LEN;
 extern char buf[];
 
-// TODO: descr
+/**
+ * @brief The maximum number of protocol lines that a full protocol program can
+ * be made of.
+ *
+ * Make it as large as free RAM allows.
+ */
 const uint16_t MAX_LINES = 5000;
 
-// TODO: descr
-const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
+/**
+ * @brief The maximum number of PCS points that a single protocol line can hold.
+ *
+ * Technically, the maximum number should equal the total number of valid valve
+ * locations, so equal to `N_VALVES`. However, we deliberately make it able to
+ * hold the full PCS space for array-indexing safety.
+ *
+ * Also, we add one extra spot at the end to allow for a sentinel to signal the
+ * end point of the protocol line, i.e. the value `P{P_NULL_VAL, P_NULL_VAL}`.
+ */
+const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS + 1;
 
 /*------------------------------------------------------------------------------
   P "Point in the Protocol Coordinate System (PCS)"
@@ -36,11 +50,15 @@ const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
 
 /**
  * @brief Special value denoting an uninitialized point in the PCS.
+ *
+ * Also used as a sentinel to signal the end point of a protocol line.
  */
 const int8_t P_NULL_VAL = -128;
 
 /**
  * @brief Class to hold and manage a single PCS point.
+ *
+ * Default initialization value is `{P_NULL_VAL, P_NULL_VAL}`.
  */
 class P {
 public:
@@ -57,8 +75,9 @@ public:
 
   void print(Stream &mySerial);
 
-  int8_t x;
-  int8_t y;
+  // Public members
+  int8_t x; // x-coordinate
+  int8_t y; // y-coordinate
 };
 
 /*------------------------------------------------------------------------------
@@ -123,7 +142,7 @@ public:
    * @brief
    *
    * Danger: The member `line_buffer` is valid as long as no other call to
-   * `unpack4()` is made.
+   * `unpack()` is made.
    *
    * @param packed
    */
@@ -133,12 +152,12 @@ public:
    * @brief
    *
    * Danger: The member `line_buffer` is valid as long as no other call to
-   * `unpack4()` is made.
+   * `unpack()` is made.
    */
   void unpack2();
 
-  // For use with `unpack`, Extra spot added for end sentinel `P_NULL_VAL`
-  std::array<P, MAX_POINTS_PER_LINE + 1> line_buffer;
+  // Public members
+  Line line_buffer; // For use with `unpack()`
 
 private:
   Program program_;
