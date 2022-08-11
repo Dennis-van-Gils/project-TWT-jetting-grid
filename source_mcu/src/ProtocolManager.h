@@ -68,10 +68,26 @@ public:
 /**
  * @brief TODO descr
  *
- * Default initialization is with special value `P_NULL_VAL`
+ * An `std::array` for elements of a class type calls their default constructor.
+ * Hence, the default initialization here is an array full with special valued
+ * `P` objects: `P{P_NULL_VAL, P_NULL_VAL`}.
+ * See, https://cplusplus.com/reference/array/array/array/.
  */
 using Line = std::array<P, MAX_POINTS_PER_LINE>;
 
+/**
+ * @brief TODO descr
+ *
+ * Is a bitmask, in essence, decoding all the active points of the PCS.
+ * Benefit to packing is the constant array dimension and less memory footprint
+ * than using `Line` when using a large number of points `P`.
+ *
+ * An `std::array` for elements of fundamental types are left uninitialized,
+ * unless the array object has static storage, in which case they are zero-
+ * initialized. Hence, the default initialization here is zero-initialized
+ * only when declared non-local.
+ * See, https://cplusplus.com/reference/array/array/array/.
+ */
 using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
 
 struct TimeLine {
@@ -81,7 +97,7 @@ struct TimeLine {
 
 struct PackedTimeLine {
   uint32_t time;
-  PackedLine line;
+  PackedLine packed;
 };
 
 using Program = std::array<PackedTimeLine, MAX_LINES>;
@@ -101,6 +117,7 @@ public:
   void clear();
 
   PackedLine pack_and_add(const Line &line);
+  void pack_and_add2(const Line &line);
 
   /**
    * @brief
@@ -111,6 +128,14 @@ public:
    * @param packed
    */
   void unpack(const PackedLine &packed);
+
+  /**
+   * @brief
+   *
+   * Danger: The member `line_buffer` is valid as long as no other call to
+   * `unpack4()` is made.
+   */
+  void unpack2();
 
   // For use with `unpack`, Extra spot added for end sentinel `P_NULL_VAL`
   std::array<P, MAX_POINTS_PER_LINE + 1> line_buffer;
