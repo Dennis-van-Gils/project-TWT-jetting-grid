@@ -27,23 +27,36 @@ void P::print(Stream &mySerial) {
   ProtocolManager
 ------------------------------------------------------------------------------*/
 
-ProtocolManager::ProtocolManager() {}
+ProtocolManager::ProtocolManager() { clear(); }
+
+/*------------------------------------------------------------------------------
+  ProtocolManager::clear
+------------------------------------------------------------------------------*/
 
 void ProtocolManager::clear() {
-  // TODO: Fill with special value denoting end-of-program
-  program_[0].packed.fill(0); // TODO: fill(0) is incorrect, leave for now
-
-  // Reset the current position
-  current_pos_ = 0;
-  N_program_lines_ = 0;
+  for (auto t_packed = program_.begin(); t_packed != program_.end();
+       ++t_packed) {
+    t_packed->duration = 0;
+    t_packed->packed.fill(0);
+  }
+  N_lines_ = 0;
+  pos_ = -1; // -1 indicates we're at start-up of program
 }
 
-PackedLine ProtocolManager::pack_and_add(const Line &line) {
-  PackedLine packed;
-  packed.fill(0); // Crucial
+/*------------------------------------------------------------------------------
+  ProtocolManager::add_line
+------------------------------------------------------------------------------*/
 
+void ProtocolManager::add_line(const uint32_t duration, const Line &line) {
+  if (N_lines_ == MAX_LINES - 1) {
+    snprintf(buf, BUF_LEN, "CRITICAL: Program contains too many lines");
+    halt(8, buf);
+  }
+
+  // Pack array of PCS points into bitmasks
   for (auto p = line.begin(); p != line.end(); ++p) {
     if (p->isNull()) {
+      // Reached the end of the list as indicated by the end sentinel
       break;
     }
 
@@ -55,72 +68,44 @@ PackedLine ProtocolManager::pack_and_add(const Line &line) {
                p->y);
       halt(2, buf);
     }
-    packed[tmp_y] |= (1U << tmp_x);
+    program_[N_lines_].packed[tmp_y] |= (1U << tmp_x);
   }
+  // End of pack
 
-  return packed;
+  program_[N_lines_].duration = duration;
+  N_lines_++;
 }
 
-void ProtocolManager::pack_and_add2(const Line &line) {
-  program_[0].packed.fill(0);
+/*------------------------------------------------------------------------------
+  ProtocolManager::transfer_next_line_to_buffer
+------------------------------------------------------------------------------*/
 
-  for (auto p = line.begin(); p != line.end(); ++p) {
-    if (p->isNull()) {
-      break;
-    }
-
-    int8_t tmp_x = p->x - PCS_X_MIN;
-    int8_t tmp_y = PCS_Y_MAX - p->y;
-    if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
-        (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
-      snprintf(buf, BUF_LEN, "CRITICAL: Out-of-bounds index (%d, %d)", p->x,
-               p->y);
-      halt(2, buf);
-    }
-    program_[0].packed[tmp_y] |= (1U << tmp_x);
+void ProtocolManager::transfer_next_line_to_buffer() {
+  pos_++;
+  if (pos_ == N_lines_) {
+    pos_ = 0;
   }
-}
 
-void ProtocolManager::unpack(const PackedLine &packed) {
-  uint16_t idx_P = 0;
-  P p;
+  // Unpack array of PCS points from bitmasks
+  uint16_t idx_P = 0; // Index of newly unpacked point
+  P p;                // Unpacked point
 
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (packed[row]) {
-      // There is a mask > 0, so there must be at least one coordinate
+    if (program_[pos_].packed[row]) {
+      // There is a mask > 0, so there must be at least one coordinate to unpack
       p.y = PCS_Y_MAX - row;
-      for (uint8_t bit = 0; bit < 16; ++bit) {
-        if ((packed[row] >> (bit)) & 0x01) {
+      for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
+        if ((program_[pos_].packed[row] >> (bit)) & 0x01) {
           p.x = PCS_X_MIN + bit;
-          line_buffer[idx_P] = p;
+          timed_line_buffer.line[idx_P] = p;
           idx_P++;
         }
       }
     }
   }
-
   // Add end sentinel
-  line_buffer[idx_P].setNull();
-}
+  timed_line_buffer.line[idx_P].setNull();
+  // End of unpack
 
-void ProtocolManager::unpack() {
-  uint16_t idx_P = 0;
-  P p;
-
-  for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (program_[0].packed[row]) {
-      // There is a mask > 0, so there must be at least one coordinate
-      p.y = PCS_Y_MAX - row;
-      for (uint8_t bit = 0; bit < 16; ++bit) {
-        if ((program_[0].packed[row] >> (bit)) & 0x01) {
-          p.x = PCS_X_MIN + bit;
-          line_buffer[idx_P] = p;
-          idx_P++;
-        }
-      }
-    }
-  }
-
-  // Add end sentinel
-  line_buffer[idx_P].setNull();
+  timed_line_buffer.duration = program_[pos_].duration;
 }

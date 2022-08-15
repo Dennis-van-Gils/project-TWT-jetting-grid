@@ -36,7 +36,7 @@ uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
 
 /*------------------------------------------------------------------------------
   freeMemory
@@ -230,7 +230,7 @@ void setup() {
   Serial.print("\t\tfreemem: ");
   Serial.println(freeMemory());
 
-  ProtocolManager proto_mgr;
+  ProtocolManager protocol_mgr;
 
   Line line;
   if (0) {
@@ -247,49 +247,56 @@ void setup() {
     }
   }
 
-  //TimedLine tline{0, line};
-  //tline.time;
-
-  // ------------------------- Via return values
+  // TimedLine tline{0, line};
+  // tline.time;
 
   utick = micros();
-  PackedLine packed = proto_mgr.pack_and_add(line);
+  protocol_mgr.clear();
+  Serial.println(micros() - utick);
+  Serial.println("Done clearing");
 
+  utick = micros();
+  protocol_mgr.add_line(
+      1000, Line{P{-6, 7}, P{-5, 6}, P{-4, 5}, P{-3, 4}, P{-2, 3}, P{-1, 2}});
+  protocol_mgr.add_line(
+      1500, Line{P{6, -7}, P{5, -6}, P{4, -5}, P{3, -4}, P{2, -3}, P{1, -2}});
   Serial.println(micros() - utick);
   Serial.println("Done packing");
 
-  utick = micros();
-  proto_mgr.unpack(packed);
-  for (auto &p : proto_mgr.line_buffer) {
-    if (p.isNull()) {
-      break;
+  protocol_mgr.restart();
+  // while (!protocol_mgr.reached_end()) {
+  while (1) {
+    // utick = micros();
+    cp_mgr.clear_masks();
+    fill_solid(leds, N_LEDS, 0);
+
+    protocol_mgr.transfer_next_line_to_buffer();
+    Serial.println(protocol_mgr.timed_line_buffer.duration);
+    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+      if (p.isNull()) {
+        // Reached the end of the list as indicated by the end sentinel
+        break;
+      }
+      p.print(Serial);
+
+      uint16_t idx_valve = p2valve(p);
+      cp_mgr.add_to_masks(valve2cp(idx_valve));
+
+      uint16_t idx_led = p2led(p);
+      leds[idx_led] = CRGB::Red;
+
+      Serial.write('\n');
     }
-    // p.print(Serial);
+    // Serial.println(micros() - utick);
+
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
+    cp_mgr.send_masks();
+#endif
+    FastLED.show();
+
+    delay(protocol_mgr.timed_line_buffer.duration);
   }
 
-  Serial.println(micros() - utick);
-  Serial.println("Done unpacking");
-  Serial.print("\t\tfreemem: ");
-  Serial.println(freeMemory());
-
-  // ------------------------- Via internal program[0]
-
-  utick = micros();
-  proto_mgr.pack_and_add2(line);
-
-  Serial.println(micros() - utick);
-  Serial.println("Done packing");
-
-  utick = micros();
-  proto_mgr.unpack();
-  for (auto &p : proto_mgr.line_buffer) {
-    if (p.isNull()) {
-      break;
-    }
-    // p.print(Serial);
-  }
-
-  Serial.println(micros() - utick);
   Serial.println("Done unpacking");
   Serial.print("\t\tfreemem: ");
   Serial.println(freeMemory());

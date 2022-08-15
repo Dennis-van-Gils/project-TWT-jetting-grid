@@ -2,9 +2,11 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    11-08-2022
+ * @date    15-08-2022
  *
  * @brief   ...
+ *
+ * TODO: Explain protocol lines
  *
  * @section Abbrevations
  * - PCS: Protocol Coordinate System
@@ -50,7 +52,7 @@ const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
  * @brief Special value denoting an uninitialized point in the Protocol
  * Coordinate System (PCS).
  *
- * Also used as a sentinel to signal the end of a @p Line.
+ * Also used as a sentinel to signal the end of a @p Line array.
  */
 const int8_t P_NULL_VAL = -128;
 
@@ -124,34 +126,34 @@ using Line = std::array<P, MAX_POINTS_PER_LINE + 1>; // +1 for the end sentinel
 using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
 
 /**
- * @brief Structure to associate a timestamp to a `Line` object.
+ * @brief Structure to associate a time duration in ms to a `Line` object.
  *
  * See @p `Line` for more details.
  */
 struct TimedLine {
-  uint32_t time; // Time in [ms]
+  uint32_t duration; // Time duration in [ms]
   Line line;
 };
 
 /**
- * @brief Structure to associate a timestamp to a `PackedLine` object.
+ * @brief Structure to associate a time duration in ms to a `PackedLine` object.
  *
  * See @p `PackedLine` for more details.
  */
 struct TimedPackedLine {
-  uint32_t time; // Time in [ms]
+  uint32_t duration; // Time duration in [ms]
   PackedLine packed;
 };
 
 /**
  * @brief The protocol program fully stored in memory.
  *
- * It is an array containing timestamped protocol lines, in turn containing the
- * valves to be opened at that timestamp. Each protocol line is actually packed
- * into a bitmask to save on memory. Method `unpack()` must be called on the
- * `PackedLine` object to get the list of PCS points (which we then loop over
- * to 1: finally open the referred valves and close the others and 2: to light
- * up the appropiate LEDs of the 16x16 LED matrix).
+ * It is an array containing timed protocol lines, each line containing the
+ * valves to be opened for the time duration as specified. Each protocol line
+ * is actually packed into a bitmask to save on memory. Method `unpack()` must
+ *  be called on the `PackedLine` object to get the list of PCS points (which we
+ * then loop over to 1: finally open the referred valves and close the others
+ * and 2: to light up the appropiate LEDs of the 16x16 LED matrix).
  */
 using Program = std::array<TimedPackedLine, MAX_LINES>;
 
@@ -160,7 +162,9 @@ using Program = std::array<TimedPackedLine, MAX_LINES>;
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Manager in control of the protocol. Work in progress...
+ * @brief Class to manage loading in and retrieving the jetting grid protocol.
+ *
+ * TODO: Description. Mention member `line_buffer`. Mention packed vs unpacked.
  */
 class ProtocolManager {
 public:
@@ -168,18 +172,10 @@ public:
 
   void clear();
 
-  PackedLine pack_and_add(const Line &line);
-  void pack_and_add2(const Line &line);
+  inline void restart() { pos_ = -1; }
+  inline bool reached_end() { return (pos_ == (N_lines_ - 1)); }
 
-  /**
-   * @brief TODO descr
-   *
-   * Warning: The member `line_buffer` will be overwritten with new data when a
-   * new call to `unpack()` is made.
-   *
-   * @param packed
-   */
-  void unpack(const PackedLine &packed);
+  void add_line(uint32_t duration, const Line &line);
 
   /**
    * @brief TODO descr
@@ -187,15 +183,15 @@ public:
    * Warning: The member `line_buffer` will be overwritten with new data when a
    * new call to `unpack()` is made.
    */
-  void unpack();
+  void transfer_next_line_to_buffer();
 
   // Public members
-  Line line_buffer; // For use with `unpack()`.
+  TimedLine timed_line_buffer; // For use with `transfer_next_line_to_buffer`
 
 private:
   Program program_;
-  uint16_t N_program_lines_;
-  uint16_t current_pos_;
+  uint16_t N_lines_;
+  int16_t pos_; // -1 indicates we're at start-up of program
 };
 
 #endif
