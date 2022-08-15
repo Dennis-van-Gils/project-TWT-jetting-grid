@@ -2,7 +2,7 @@
  * @file    constants.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-08-2022
+ * @date    15-08-2022
  *
  * @brief   Constants of the TWT jetting grid.
  *
@@ -75,7 +75,11 @@
 
 ------------------------------------------------------------------------------*/
 
-const uint8_t NUMEL_PCS_AXIS = 15; // Spanning [-7, 7]
+const int8_t PCS_X_AXIS_MIN = -7; // Minimum x-axis coordinate of the PCS
+const int8_t PCS_X_AXIS_MAX = 7;  // Maximum x-axis coordinate of the PCS
+const int8_t PCS_Y_AXIS_MIN = -7; // Minimum y-axis coordinate of the PCS
+const int8_t PCS_Y_AXIS_MAX = 7;  // Maximum y-axis coordinate of the PCS
+const uint8_t NUMEL_PCS_AXIS = PCS_X_AXIS_MAX - PCS_X_AXIS_MIN + 1;
 const uint8_t NUMEL_LED_AXIS = 16; // 16x16 matrix
 const uint8_t N_VALVES = 112;      // From 1 to 112, not counting 0
 
