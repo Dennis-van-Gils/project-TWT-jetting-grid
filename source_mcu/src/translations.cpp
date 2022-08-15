@@ -20,8 +20,8 @@
 int8_t VALVE2P[N_VALVES + 1][2] = {0};
 
 uint8_t p2valve(P p) {
-  int8_t tmp_x = p.x + PCS_X_AXIS_MAX;
-  int8_t tmp_y = PCS_Y_AXIS_MAX - p.y;
+  int8_t tmp_x = p.x - PCS_X_MIN;
+  int8_t tmp_y = PCS_Y_MAX - p.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     snprintf(buf, BUF_LEN,
@@ -32,8 +32,8 @@ uint8_t p2valve(P p) {
 }
 
 uint8_t p2led(P p) {
-  int8_t tmp_x = p.x + PCS_X_AXIS_MAX;
-  int8_t tmp_y = PCS_Y_AXIS_MAX - p.y;
+  int8_t tmp_x = p.x - PCS_X_MIN;
+  int8_t tmp_y = PCS_Y_MAX - p.y;
   if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
     snprintf(buf, BUF_LEN,
@@ -62,9 +62,9 @@ void init_valve2p() {
   std::fill(*VALVE2P, *VALVE2P + (N_VALVES + 1) * 2, P_NULL_VAL);
 
   // Build the reverse look-up table
-  for (y = PCS_Y_AXIS_MAX; y > PCS_Y_AXIS_MIN - 1; y--) {
-    for (x = PCS_X_AXIS_MIN; x < PCS_X_AXIS_MAX + 1; x++) {
-      valve = P2VALVE[PCS_Y_AXIS_MAX - y][x + PCS_X_AXIS_MAX];
+  for (y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
+    for (x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
+      valve = P2VALVE[PCS_Y_MAX - y][x - PCS_X_MIN];
       if (valve > 0) {
         VALVE2P[valve][0] = x;
         VALVE2P[valve][1] = y;

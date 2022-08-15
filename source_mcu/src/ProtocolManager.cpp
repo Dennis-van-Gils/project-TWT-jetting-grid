@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    10-08-2022
+ * @date    15-08-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -35,6 +35,7 @@ void ProtocolManager::clear() {
 
   // Reset the current position
   current_pos_ = 0;
+  N_program_lines_ = 0;
 }
 
 PackedLine ProtocolManager::pack_and_add(const Line &line) {
@@ -46,8 +47,8 @@ PackedLine ProtocolManager::pack_and_add(const Line &line) {
       break;
     }
 
-    int8_t tmp_x = p->x + 7;
-    int8_t tmp_y = 7 - p->y;
+    int8_t tmp_x = p->x - PCS_X_MIN;
+    int8_t tmp_y = PCS_Y_MAX - p->y;
     if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
         (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
       snprintf(buf, BUF_LEN, "CRITICAL: Out-of-bounds index (%d, %d)", p->x,
@@ -68,8 +69,8 @@ void ProtocolManager::pack_and_add2(const Line &line) {
       break;
     }
 
-    int8_t tmp_x = p->x + 7;
-    int8_t tmp_y = 7 - p->y;
+    int8_t tmp_x = p->x - PCS_X_MIN;
+    int8_t tmp_y = PCS_Y_MAX - p->y;
     if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
         (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
       snprintf(buf, BUF_LEN, "CRITICAL: Out-of-bounds index (%d, %d)", p->x,
@@ -87,10 +88,10 @@ void ProtocolManager::unpack(const PackedLine &packed) {
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
     if (packed[row]) {
       // There is a mask > 0, so there must be at least one coordinate
-      p.y = 7 - row;
+      p.y = PCS_Y_MAX - row;
       for (uint8_t bit = 0; bit < 16; ++bit) {
         if ((packed[row] >> (bit)) & 0x01) {
-          p.x = bit - 7;
+          p.x = PCS_X_MIN + bit;
           line_buffer[idx_P] = p;
           idx_P++;
         }
@@ -109,10 +110,10 @@ void ProtocolManager::unpack() {
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
     if (program_[0].packed[row]) {
       // There is a mask > 0, so there must be at least one coordinate
-      p.y = 7 - row;
+      p.y = PCS_Y_MAX - row;
       for (uint8_t bit = 0; bit < 16; ++bit) {
         if ((program_[0].packed[row] >> (bit)) & 0x01) {
-          p.x = bit - 7;
+          p.x = PCS_X_MIN + bit;
           line_buffer[idx_P] = p;
           idx_P++;
         }
