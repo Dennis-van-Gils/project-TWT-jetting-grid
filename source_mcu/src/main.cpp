@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-08-2022
+ * @date    16-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -18,6 +18,7 @@
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "MIKROE_4_20mA_RT_Click.h"
+#include "MemoryFree.h"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -39,26 +40,10 @@ uint32_t utick = micros();
 #define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
 
 /*------------------------------------------------------------------------------
-  freeMemory
+  ProtocolManager
 ------------------------------------------------------------------------------*/
 
-#ifdef __arm__
-// should use uinstd.h to define sbrk but Due causes a conflict
-extern "C" char *sbrk(int incr);
-#else  // __ARM__
-extern char *__brkval;
-#endif // __arm__
-
-int freeMemory() {
-  char top;
-#ifdef __arm__
-  return &top - reinterpret_cast<char *>(sbrk(0));
-#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
-  return &top - __brkval;
-#else  // __arm__
-  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
-#endif // __arm__
-}
+ProtocolManager protocol_mgr;
 
 /*------------------------------------------------------------------------------
   State
@@ -183,9 +168,11 @@ void setup() {
   FastLED.show();
 
   Serial.begin(9600);
-  while (!Serial) {}
+  // while (!Serial) {}
 
-  Serial.println("GO!");
+  Serial.println(F("@ setup"));
+  Serial.print(F("Free mem: "));
+  Serial.println(freeMemory());
 
   // Build reverse look-up table
   init_valve2p();
@@ -227,98 +214,75 @@ void setup() {
   // ---------------------
   // Protocol manager test
   // ---------------------
-  Serial.print("\t\tfreemem: ");
-  Serial.println(freeMemory());
-
-  ProtocolManager protocol_mgr;
-
-  Line line;
-  if (0) {
-    line = {P{-7, 7}, P{7, 7}, P{0, 1}, P{-7, -7}, P{7, -7}, P{4, 3}};
-  } else {
-    // All valves open, including non-existing valves on PCS grid
-    uint8_t idx_P = 0;
-    for (int8_t x = -7; x < 8; ++x) {
-      for (int8_t y = -7; y < 8; ++y) {
-        line[idx_P].x = x;
-        line[idx_P].y = y;
-        idx_P++;
-      }
-    }
-  }
-
-  // TimedLine tline{0, line};
-  // tline.time;
 
   utick = micros();
   protocol_mgr.clear();
   Serial.println(micros() - utick);
-  Serial.println("Done clearing");
+  Serial.println(F("Cleared protocol"));
 
   utick = micros();
-  protocol_mgr.add_line(
-      1000, Line{P{-6, 7}, P{-5, 6}, P{-4, 5}, P{-3, 4}, P{-2, 3}, P{-1, 2}});
-  protocol_mgr.add_line(
-      1500, Line{P{6, -7}, P{5, -6}, P{4, -5}, P{3, -4}, P{2, -3}, P{1, -2}});
-  Serial.println(micros() - utick);
-  Serial.println("Done packing");
+  // clang-format off
+  /*
+  // Clock-face style
+  // ---------------------
+  protocol_mgr.add_line(1000,
+      Line{P{-6, 7}, P{-5, 6}, P{-4, 5}, P{-3, 4}, P{-2, 3}, P{-1, 2}, P{0, 1}});
+  protocol_mgr.add_line(1000,
+      Line{P{0, 7}, P{0, 5}, P{0, 3}, P{0, 1}});
+  protocol_mgr.add_line(1000,
+      Line{P{6, 7}, P{5, 6}, P{4, 5}, P{3, 4}, P{2, 3}, P{1, 2}, P{0, 1}});
+  protocol_mgr.add_line(1000,
+      Line{P{1, 0}, P{3, 0}, P{5, 0}, P{7, 0}});
+  protocol_mgr.add_line(1000,
+      Line{P{6, -7}, P{5, -6}, P{4, -5}, P{3, -4}, P{2, -3}, P{1, -2}, P{0, -1}});
+  protocol_mgr.add_line(1000,
+      Line{P{0, -1}, P{0, -3}, P{0, -5}, P{0, -7}});
+  protocol_mgr.add_line(1000,
+      Line{P{-6, -7}, P{-5, -6}, P{-4, -5}, P{-3, -4}, P{-2, -3}, P{-1, -2}, P{0, -1}});
+  protocol_mgr.add_line(1000,
+      Line{P{-7, 0}, P{-5, 0}, P{-3, 0}, P{-1, 0}});
+  // ---------------------
+  */
+  // clang-format on
 
-  protocol_mgr.restart();
-  // while (!protocol_mgr.reached_end()) {
-  while (1) {
-    // utick = micros();
-    cp_mgr.clear_masks();
-    fill_solid(leds, N_LEDS, 0);
-
-    protocol_mgr.transfer_next_line_to_buffer();
-    Serial.println(protocol_mgr.timed_line_buffer.duration);
-    for (auto &p : protocol_mgr.timed_line_buffer.line) {
-      if (p.isNull()) {
-        // Reached the end of the list as indicated by the end sentinel
-        break;
+  // Growing center square
+  // ---------------------
+  for (uint8_t rung = 0; rung < 7; rung++) {
+    Line line = {};
+    uint8_t idx_P = 0;
+    for (int8_t x = -7; x < 8; ++x) {
+      for (int8_t y = -7; y < 8; ++y) {
+        if ((x + y) & 1) {
+          if (abs(x) + abs(y) == rung * 2 + 1) {
+            line[idx_P].x = x;
+            line[idx_P].y = y;
+            idx_P++;
+          }
+        }
       }
-      p.print(Serial);
-
-      uint16_t idx_valve = p2valve(p);
-      cp_mgr.add_to_masks(valve2cp(idx_valve));
-
-      uint16_t idx_led = p2led(p);
-      leds[idx_led] = CRGB::Red;
-
-      Serial.write('\n');
     }
-    // Serial.println(micros() - utick);
-
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
-    cp_mgr.send_masks();
-#endif
-    FastLED.show();
-
-    delay(protocol_mgr.timed_line_buffer.duration);
+    protocol_mgr.add_line(500, line);
   }
+  // ---------------------
 
-  Serial.println("Done unpacking");
-  Serial.print("\t\tfreemem: ");
+  Serial.println(micros() - utick);
+  Serial.println(F("Wrote protocol"));
+
+  Serial.println(F("@ loop"));
+  Serial.print(F("Free mem: "));
   Serial.println(freeMemory());
-
-  // -------------------------
-
-  while (1) {}
 }
 
 // -----------------------------------------------------------------------------
 //  loop
 // -----------------------------------------------------------------------------
 
-P p{-7, 7};
-CP_Address cp_addr;
-CP_Masks cp_masks;
-uint16_t idx_valve = 1;
-uint16_t idx_led = 0;
-
 void loop() {
   char *str_cmd; // Incoming serial command string
-  uint32_t now = millis();
+  uint32_t now;
+  static uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
+  uint16_t idx_valve;
+  uint16_t idx_led;
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
@@ -390,78 +354,62 @@ void loop() {
              state.pres_3_bar,
              state.pres_4_bar);
     // clang-format on
-    // Serial.print(buf); // Takes 320 µs per call
+    Serial.print(buf); // Takes 320 µs per call
     // Serial.println(FastLED.getFPS());
   }
 
   // Fade LED matrix. Keep in front of any other LED color assignments.
-  EVERY_N_MILLIS(20) { fadeToBlackBy(leds, N_LEDS, 10); }
+  // Only blue LEDs will fade.
+  EVERY_N_MILLIS(20) {
+    // utick = micros();
+    for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
+      if (leds[idx_led].b) {
+        fadeToBlackBy(&leds[idx_led], 1, 10);
+      }
+    }
+    // Serial.println(micros() - utick);
+  }
 
   // ---------------------------------------------------------------------------
-  //   Centipedes
+  //   Handle the protocol program
   // ---------------------------------------------------------------------------
 
-  EVERY_N_MILLIS(100) {
-    // Recolor any previous red leds to blue
+  now = millis();
+  if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
+    // It is time to advance to the next line in the protocol program
+
+    // Recolor any previously red LEDs to blue
     for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
       if (leds[idx_led].r) {
         leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
       }
     }
 
-    /*
-    // Progress PCS coordinates
-    idx_valve = p2valve(p);
-    */
-    p = valve2p(idx_valve);
+    // Read in the next line
+    protocol_mgr.transfer_next_line_to_buffer();
 
-    if (idx_valve > 0) {
-      // Block takes 460 µs @ 1 MHz I2C clock
-      // utick = micros();
+    // Parse the line
+    cp_mgr.clear_masks();
+    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+      if (p.is_null()) {
+        // Reached the end of the list as indicated by the end sentinel
+        break;
+      }
 
-      cp_addr = valve2cp(idx_valve);
+      idx_valve = p2valve(p);
+      cp_mgr.add_to_masks(valve2cp(idx_valve));
 
-      ///*
-      snprintf(buf, BUF_LEN, "valve %3d @ cp %d, %2d\n", //
-               idx_valve, cp_addr.port, cp_addr.bit);
-      Serial.print(buf);
-      //*/
+      // Color all active valve LEDs in red
+      idx_led = p2led(p);
+      leds[idx_led] = CRGB::Red;
+    }
 
-      cp_mgr.clear_masks();
-      cp_mgr.add_to_masks(cp_addr);
-      cp_masks = cp_mgr.get_masks();
-      cp_mgr.report_masks(Serial);
-      // for (const auto bitmask : cp_masks) {}
-
+    // Activate valves
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
-      cp_mgr.send_masks();
+    cp_mgr.send_masks();
 #endif
 
-      // Serial.println(micros() - utick);
-    }
-
-    /*
-    // Progress PCS point
-    p.x++;
-    if (p.x == 8) {
-      p.x = -7;
-      p.y--;
-      if (p.y == -8) {
-        p.y = 7;
-      }
-    }
-    */
-
-    ///*
-    idx_valve++;
-    if (idx_valve > 112) {
-      idx_valve = 1;
-    }
-    //*/
-
-    // Color all active valve leds in red
-    idx_led = p2led(p);
-    leds[idx_led] = CRGB::Red;
+    tick_program = now;
   }
 
   // ---------------------------------------------------------------------------
