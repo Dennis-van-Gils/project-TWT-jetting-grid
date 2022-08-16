@@ -2,11 +2,10 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    15-08-2022
+ * @date    16-08-2022
  *
- * @brief   ...
- *
- * TODO: Explain protocol lines
+ * @brief   Provides classes `P` and `ProtocolManager`, needed for the control
+ * of the jetting grid of the Twente Water Tunnel.
  *
  * @section Abbrevations
  * - PCS: Protocol Coordinate System
@@ -65,16 +64,16 @@ class P {
 public:
   P(int8_t x_ = P_NULL_VAL, int8_t y_ = P_NULL_VAL);
 
-  inline bool isNull() const {
+  inline bool is_null() const {
     return ((x == P_NULL_VAL) || (y == P_NULL_VAL));
   }
 
-  inline void setNull() {
+  inline void set_null() {
     x = P_NULL_VAL;
     y = P_NULL_VAL;
   }
 
-  void print(Stream &mySerial);
+  void print(Stream &stream);
 
   // Public members
   int8_t x; // x-coordinate
@@ -94,7 +93,7 @@ public:
  *
  * After the last point a sentinel must be placed to indicate the end of the
  * list. This end sentinel takes the form of a special value for `P`, namely
- * `P{P_NULL_VAL, P_NULL_VAL}`. You can also call the method `setNull()` on the
+ * `P{P_NULL_VAL, P_NULL_VAL}`. You can also call the method `set_null()` on the
  * `P` object.
  *
  * https://cplusplus.com/reference/array/array/array:
@@ -103,7 +102,8 @@ public:
  * Hence, the default initialization here is an array full with special valued
  * `P` objects: `P{P_NULL_VAL, P_NULL_VAL}`.
  */
-using Line = std::array<P, MAX_POINTS_PER_LINE + 1>; // +1 for the end sentinel
+using Line = std::array<P, MAX_POINTS_PER_LINE + 1>;
+// +1 for the end sentinel
 
 /**
  * @brief Packed version of a `Line`.
@@ -162,36 +162,74 @@ using Program = std::array<TimedPackedLine, MAX_LINES>;
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Class to manage loading in and retrieving the jetting grid protocol.
- *
- * TODO: Description. Mention member `line_buffer`. Mention packed vs unpacked.
+ * @brief Class to manage loading in and retrieving the jetting grid protocol
+ * from memory. Only one protocol program can be in memory at a time.
  */
 class ProtocolManager {
 public:
   ProtocolManager();
 
+  /**
+   * @brief Clear the protocol program stored in memory.
+   */
   void clear();
 
+  /**
+   * @brief Reset the playback position of the protocol program back to start.
+   */
   inline void restart() { pos_ = -1; }
-  inline bool reached_end() { return (pos_ == (N_lines_ - 1)); }
-
-  void add_line(uint32_t duration, const Line &line);
 
   /**
-   * @brief TODO descr
+   * @return True when the end of the protocol has been reached, false otherwise
+   */
+  inline bool reached_end() { return (pos_ == (N_lines_ - 1)); }
+
+  /**
+   * @brief Adds a new Line to the protocol program.
    *
-   * Warning: The member `line_buffer` will be overwritten with new data when a
-   * new call to `unpack()` is made.
+   * @param duration Time duration in ms
+   * @param line Array of PCS points of which the corresponding valves will be
+   * set open for the given duration. All other valves will be set closed.
+   * @return True when the new line is successfully added. False otherwise,
+   * because the maximum number of lines has been reached.
+   */
+  bool add_line(uint32_t duration, const Line &line);
+  bool add_line(const TimedLine &timed_line);
+
+  /**
+   * @brief Retrieves the next available TimedLine from the stored protocol
+   * program and puts the information in the public member `timed_line_buffer`.
+   *
+   * Warning: The member `timed_line_buffer` will be overwritten with new data
+   * when a new call to `transfer_next_line_to_buffer()` is made.
    */
   void transfer_next_line_to_buffer();
 
+  void print_buffer(Stream &stream);
+
   // Public members
-  TimedLine timed_line_buffer; // For use with `transfer_next_line_to_buffer`
+  /**
+   * @brief Buffer containing the TimedLine as retreived by method
+   * `transfer_next_line_to_buffer()`.
+   *
+   * One can go through each PCS point of the TimedLine object as follows:
+   *
+   * @code{.cpp}
+   * for (auto &p : protocol_mgr.timed_line_buffer.line) {
+   *   if (p.is_null()) {
+   *     // Reached the end of the list as indicated by the end sentinel
+   *     break;
+   *   }
+   *   // Code goes here to handle each PCS point 'p'
+   * }
+   * @endcode
+   */
+  TimedLine timed_line_buffer;
 
 private:
-  Program program_;
-  uint16_t N_lines_;
-  int16_t pos_; // -1 indicates we're at start-up of program
+  Program program_;  // The protocol program
+  uint16_t N_lines_; // Total number of lines currently loaded into the program
+  int16_t pos_; // Playback position, where -1 indicates start of the program
 };
 
 #endif

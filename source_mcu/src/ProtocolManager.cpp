@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    15-08-2022
+ * @date    16-08-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -18,9 +18,9 @@ P::P(int8_t x_, int8_t y_) {
   y = y_;
 }
 
-void P::print(Stream &mySerial) {
+void P::print(Stream &stream) {
   snprintf(buf, BUF_LEN, "(%d, %d)", x, y);
-  mySerial.print(buf);
+  stream.print(buf);
 }
 
 /*------------------------------------------------------------------------------
@@ -47,15 +47,14 @@ void ProtocolManager::clear() {
   ProtocolManager::add_line
 ------------------------------------------------------------------------------*/
 
-void ProtocolManager::add_line(const uint32_t duration, const Line &line) {
-  if (N_lines_ == MAX_LINES - 1) {
-    snprintf(buf, BUF_LEN, "CRITICAL: Program contains too many lines");
-    halt(8, buf);
+bool ProtocolManager::add_line(const uint32_t duration, const Line &line) {
+  if (N_lines_ == MAX_LINES) {
+    return false;
   }
 
   // Pack array of PCS points into bitmasks
   for (auto p = line.begin(); p != line.end(); ++p) {
-    if (p->isNull()) {
+    if (p->is_null()) {
       // Reached the end of the list as indicated by the end sentinel
       break;
     }
@@ -74,6 +73,12 @@ void ProtocolManager::add_line(const uint32_t duration, const Line &line) {
 
   program_[N_lines_].duration = duration;
   N_lines_++;
+
+  return true;
+}
+
+bool ProtocolManager::add_line(const TimedLine &timed_line) {
+  return add_line(timed_line.duration, timed_line.line);
 }
 
 /*------------------------------------------------------------------------------
@@ -103,9 +108,22 @@ void ProtocolManager::transfer_next_line_to_buffer() {
       }
     }
   }
-  // Add end sentinel
-  timed_line_buffer.line[idx_P].setNull();
-  // End of unpack
-
+  timed_line_buffer.line[idx_P].set_null(); // Add end sentinel
   timed_line_buffer.duration = program_[pos_].duration;
+}
+
+/*------------------------------------------------------------------------------
+  ProtocolManager::print_buffer
+------------------------------------------------------------------------------*/
+
+void ProtocolManager::print_buffer(Stream &stream) {
+  stream.println(timed_line_buffer.duration);
+  for (auto &p : timed_line_buffer.line) {
+    if (p.is_null()) {
+      // Reached the end of the list as indicated by the end sentinel
+      break;
+    }
+    p.print(Serial);
+  }
+  stream.write('\n');
 }
