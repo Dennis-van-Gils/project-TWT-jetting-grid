@@ -217,8 +217,7 @@ public:
    * @code{.cpp}
    * for (auto &p : protocol_mgr.timed_line_buffer.line) {
    *   if (p.is_null()) {
-   *     // Reached the end of the list as indicated by the end sentinel
-   *     break;
+   *     break; // Reached the end of the list as indicated by the end sentinel
    *   }
    *   // Code goes here to handle each PCS point 'p'
    * }

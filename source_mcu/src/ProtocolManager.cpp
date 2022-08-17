@@ -120,8 +120,7 @@ void ProtocolManager::print_buffer(Stream &stream) {
   stream.println(timed_line_buffer.duration);
   for (auto &p : timed_line_buffer.line) {
     if (p.is_null()) {
-      // Reached the end of the list as indicated by the end sentinel
-      break;
+      break; // Reached the end of the list as indicated by the end sentinel
     }
     p.print(Serial);
   }
