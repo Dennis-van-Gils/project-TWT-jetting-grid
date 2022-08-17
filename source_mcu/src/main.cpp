@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    16-08-2022
+ * @date    17-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -83,6 +83,7 @@ CentipedeManager cp_mgr;
 bool alive_blinker = true; // Blinker for the 'alive' status LED
 CRGB onboard_led[1];       // Onboard NeoPixel of the Adafruit Feather M4 board
 CRGB leds[N_LEDS];         // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+uint16_t idx_led;          // Frequently used LED index
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R Click boards for reading out the OMEGA pressure sensors
@@ -207,8 +208,20 @@ void setup() {
   cp_mgr.begin();
 #endif
 
-  // Finished setup, so clear all LEDs
+  // Finished setup, so prepare LED matrix for regular operation
   FastLED.clearData();
+
+  // Set LED colors at PCS points without a valve to yellow
+  for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
+    for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
+      if ((x + y) % 2 == 0) {
+        leds[p2led(P{x, y})] = CRGB::Yellow;
+      }
+    }
+  }
+  // Set LED color at PCS center point to off-white
+  leds[p2led(P{0, 0})] = CRGB::DarkSalmon;
+
   FastLED.show();
 
   // ---------------------
@@ -281,8 +294,7 @@ void loop() {
   char *str_cmd; // Incoming serial command string
   uint32_t now;
   static uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
-  uint16_t idx_valve;
-  uint16_t idx_led;
+  uint8_t idx_valve;
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
@@ -358,16 +370,15 @@ void loop() {
     // Serial.println(FastLED.getFPS());
   }
 
-  // Fade LED matrix. Keep in front of any other LED color assignments.
-  // Only blue LEDs will fade.
+  // Fade out all purely blue LEDs over time, i.e. previously active valves.
+  // Keep in front of any other LED color assignments.
   EVERY_N_MILLIS(20) {
-    // utick = micros();
     for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
-      if (leds[idx_led].b) {
-        fadeToBlackBy(&leds[idx_led], 1, 10);
+      if (leds[idx_led].b && !leds[idx_led].r && !leds[idx_led].g) {
+        leds[idx_led].nscale8(255 - 10);
+        // ↑ equivalent to but faster `fadeToBlackBy(&leds[idx_led], 1, 10);`
       }
     }
-    // Serial.println(micros() - utick);
   }
 
   // ---------------------------------------------------------------------------
@@ -378,11 +389,12 @@ void loop() {
   if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
     // It is time to advance to the next line in the protocol program
 
-    // Recolor any previously red LEDs to blue
-    for (idx_led = 0; idx_led < N_LEDS; idx_led++) {
-      if (leds[idx_led].r) {
-        leds[idx_led] = CRGB(0, 0, leds[idx_led].r);
+    // Recolor the LEDs of previously active valves from red to blue
+    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+      if (p.is_null()) {
+        break;
       }
+      leds[p2led(p)] = CRGB::Blue;
     }
 
     // Read in the next line
@@ -392,16 +404,15 @@ void loop() {
     cp_mgr.clear_masks();
     for (auto &p : protocol_mgr.timed_line_buffer.line) {
       if (p.is_null()) {
-        // Reached the end of the list as indicated by the end sentinel
         break;
       }
 
+      // Add valve to be opened to the Centipede masks
       idx_valve = p2valve(p);
       cp_mgr.add_to_masks(valve2cp(idx_valve));
 
       // Color all active valve LEDs in red
-      idx_led = p2led(p);
-      leds[idx_led] = CRGB::Red;
+      leds[p2led(p)] = CRGB::Red;
     }
 
     // Activate valves
@@ -436,7 +447,7 @@ void loop() {
   //   unblocking, while still capping the framerate.
 
   EVERY_N_MILLIS(500) {
-    // Blink the 'alive' status LED
+    // Blink the 'alive' status LEDs
     leds[255] = alive_blinker ? CRGB::Green : CRGB::Black;
     onboard_led[0] = alive_blinker ? CRGB::Green : CRGB::Black;
     alive_blinker = !alive_blinker;
