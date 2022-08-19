@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    17-08-2022
+ * @date    19-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -17,6 +17,7 @@
 
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
+#include "FiniteStateMachine.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "MemoryFree.h"
 
@@ -49,7 +50,12 @@ ProtocolManager protocol_mgr;
   State
 ------------------------------------------------------------------------------*/
 
-struct State {
+void idle_fun() {}
+
+State state_idle(idle_fun);
+FiniteStateMachine fsm(state_idle);
+
+struct Readings {
   // Exponential moving averages (EMA) of the R Click boards
   uint32_t DAQ_obtained_DT; // Obtained oversampling interval [µs]
   float EMA_1;              // Exponential moving average of R Click 1 [bitval]
@@ -67,7 +73,7 @@ struct State {
   float pres_3_bar = NAN; // OMEGA pressure sensor 3 [bar]
   float pres_4_bar = NAN; // OMEGA pressure sensor 4 [bar]
 };
-State state; // Structure holding the sensor readings and actuator states
+Readings readings; // Structure holding the sensor readings and actuator states
 
 /*------------------------------------------------------------------------------
   Macetech Centipede boards
@@ -116,22 +122,22 @@ bool R_click_poll_EMA_collectively() {
     // Enough time has passed -> Acquire a new reading.
     // Calculate the smoothing factor every time because an exact time interval
     // is not garantueed.
-    state.DAQ_obtained_DT = now - tick;
-    alpha = 1.f - exp(-float(state.DAQ_obtained_DT) * DAQ_LP * 1e-6);
+    readings.DAQ_obtained_DT = now - tick;
+    alpha = 1.f - exp(-float(readings.DAQ_obtained_DT) * DAQ_LP * 1e-6);
 
     if (at_startup) {
       at_startup = false;
-      state.EMA_1 = R_click_1.read_bitval();
-      state.EMA_2 = R_click_2.read_bitval();
-      state.EMA_3 = R_click_3.read_bitval();
-      state.EMA_4 = R_click_4.read_bitval();
+      readings.EMA_1 = R_click_1.read_bitval();
+      readings.EMA_2 = R_click_2.read_bitval();
+      readings.EMA_3 = R_click_3.read_bitval();
+      readings.EMA_4 = R_click_4.read_bitval();
     } else {
       // Block takes 94 µs @ 1 MHz SPI clock
       // utick = micros();
-      state.EMA_1 += alpha * (R_click_1.read_bitval() - state.EMA_1);
-      state.EMA_2 += alpha * (R_click_2.read_bitval() - state.EMA_2);
-      state.EMA_3 += alpha * (R_click_3.read_bitval() - state.EMA_3);
-      state.EMA_4 += alpha * (R_click_4.read_bitval() - state.EMA_4);
+      readings.EMA_1 += alpha * (R_click_1.read_bitval() - readings.EMA_1);
+      readings.EMA_2 += alpha * (R_click_2.read_bitval() - readings.EMA_2);
+      readings.EMA_3 += alpha * (R_click_3.read_bitval() - readings.EMA_3);
+      readings.EMA_4 += alpha * (R_click_4.read_bitval() - readings.EMA_4);
       // Serial.println(micros() - utick);
     }
     tick = now;
@@ -274,7 +280,7 @@ void setup() {
         }
       }
     }
-    protocol_mgr.add_line(500, line);
+    protocol_mgr.add_line(200, line);
   }
   // ---------------------
 
@@ -318,9 +324,9 @@ void loop() {
   if (R_click_poll_EMA_collectively()) {
     /*
     // DEBUG info: Show warning when obtained interval is too large
-    if (state.DAQ_obtained_DT > DAQ_DT * 1.05) {
+    if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
       Serial.print("WARNING: Large DAQ DT ");
-      Serial.println(state.DAQ_obtained_DT);
+      Serial.println(readings.DAQ_obtained_DT);
     }
     */
   }
@@ -339,14 +345,14 @@ void loop() {
     Serial.println(millis() - t_start);
     */
 
-    state.pres_1_mA = R_click_1.bitval2mA(state.EMA_1);
-    state.pres_2_mA = R_click_2.bitval2mA(state.EMA_2);
-    state.pres_3_mA = R_click_3.bitval2mA(state.EMA_3);
-    state.pres_4_mA = R_click_4.bitval2mA(state.EMA_4);
-    state.pres_1_bar = mA2bar(state.pres_1_mA, OMEGA_1_CALIB);
-    state.pres_2_bar = mA2bar(state.pres_2_mA, OMEGA_2_CALIB);
-    state.pres_3_bar = mA2bar(state.pres_3_mA, OMEGA_3_CALIB);
-    state.pres_4_bar = mA2bar(state.pres_4_mA, OMEGA_4_CALIB);
+    readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
+    readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
+    readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
+    readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
+    readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+    readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+    readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+    readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
 
     // NOTE:
     //   Using `snprintf()` to print a large array of formatted values to a
@@ -357,14 +363,14 @@ void loop() {
     snprintf(buf, BUF_LEN,
              "%.2f\t%.2f\t%.2f\t%.2f\t\t"
              "%.3f\t%.3f\t%.3f\t%.3f\n",
-             state.pres_1_mA,
-             state.pres_2_mA,
-             state.pres_3_mA,
-             state.pres_4_mA,
-             state.pres_1_bar,
-             state.pres_2_bar,
-             state.pres_3_bar,
-             state.pres_4_bar);
+             readings.pres_1_mA,
+             readings.pres_2_mA,
+             readings.pres_3_mA,
+             readings.pres_4_mA,
+             readings.pres_1_bar,
+             readings.pres_2_bar,
+             readings.pres_3_bar,
+             readings.pres_4_bar);
     // clang-format on
     Serial.print(buf); // Takes 320 µs per call
     // Serial.println(FastLED.getFPS());
