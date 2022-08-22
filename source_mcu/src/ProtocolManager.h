@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    16-08-2022
+ * @date    22-08-2022
  *
  * @brief   Provides classes `P` and `ProtocolManager`, needed for the control
  * of the jetting grid of the Twente Water Tunnel.
