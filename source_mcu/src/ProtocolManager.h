@@ -64,13 +64,18 @@ class P {
 public:
   P(int8_t x_ = P_NULL_VAL, int8_t y_ = P_NULL_VAL);
 
-  inline bool is_null() const {
-    return ((x == P_NULL_VAL) || (y == P_NULL_VAL));
+  inline void set(int8_t x_, int8_t y_) {
+    x = x_;
+    y = y_;
   }
 
   inline void set_null() {
     x = P_NULL_VAL;
     y = P_NULL_VAL;
+  }
+
+  inline bool is_null() const {
+    return ((x == P_NULL_VAL) || (y == P_NULL_VAL));
   }
 
   void print(Stream &stream);
