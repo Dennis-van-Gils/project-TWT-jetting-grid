@@ -47,13 +47,8 @@ uint32_t utick = micros();
 ProtocolManager protocol_mgr;
 
 /*------------------------------------------------------------------------------
-  State
+  Readings
 ------------------------------------------------------------------------------*/
-
-void idle_fun() {}
-
-State state_idle(idle_fun);
-FiniteStateMachine fsm(state_idle);
 
 struct Readings {
   // Exponential moving averages (EMA) of the R Click boards
@@ -115,14 +110,14 @@ R_Click R_click_4(PIN_R_CLICK_4, R_CLICK_4_CALIB);
 bool R_click_poll_EMA_collectively() {
   static bool at_startup = true;
   static uint32_t tick = micros();
-  uint32_t now = micros();
+  uint32_t now_us = micros();
   float alpha; // Derived smoothing factor of the exponential moving average
 
-  if ((now - tick) >= DAQ_DT) {
+  if ((now_us - tick) >= DAQ_DT) {
     // Enough time has passed -> Acquire a new reading.
     // Calculate the smoothing factor every time because an exact time interval
     // is not garantueed.
-    readings.DAQ_obtained_DT = now - tick;
+    readings.DAQ_obtained_DT = now_us - tick;
     alpha = 1.f - exp(-float(readings.DAQ_obtained_DT) * DAQ_LP * 1e-6);
 
     if (at_startup) {
@@ -140,13 +135,119 @@ bool R_click_poll_EMA_collectively() {
       readings.EMA_4 += alpha * (R_click_4.read_bitval() - readings.EMA_4);
       // Serial.println(micros() - utick);
     }
-    tick = now;
+    tick = now_us;
     return true;
 
   } else {
     return false;
   }
 }
+
+/*------------------------------------------------------------------------------
+  open_all_valves
+------------------------------------------------------------------------------*/
+
+void open_all_valves() {
+  P p; // PCS point
+
+  for (int8_t x = -7; x < 8; ++x) {
+    for (int8_t y = -7; y < 8; ++y) {
+      if ((x + y) & 1) {
+        p.set(x, y);
+        cp_mgr.add_to_masks(valve2cp(p2valve(p)));
+        leds[p2led(p)] = CRGB::Red;
+      }
+    }
+  }
+  cp_mgr.send_masks();
+}
+
+/*------------------------------------------------------------------------------
+  Finite state machine
+------------------------------------------------------------------------------*/
+
+uint32_t now;              // Timestamp [ms]
+uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
+uint8_t idx_valve;         // Frequently used valve index
+
+// ----------------------
+//  Idle -- update
+// ----------------------
+void fun_idle__upd() {}
+
+// ----------------------
+//  Load program -- enter
+// ----------------------
+void fun_load_program__ent() {
+  // Make sure we open all valves to prevent excessive pressure at the pump
+  open_all_valves();
+}
+
+// ----------------------
+//  Load program -- update
+// ----------------------
+void fun_load_program__upd() {}
+
+// ----------------------
+//  Run program -- update
+// ----------------------
+void fun_run_program__upd() {
+  now = millis();
+  if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
+    // It is time to advance to the next line in the protocol program
+
+    // Recolor the LEDs of previously active valves from red to blue
+    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+      if (p.is_null()) {
+        break;
+      }
+      leds[p2led(p)] = CRGB::Blue;
+    }
+
+    // Read in the next line
+    protocol_mgr.transfer_next_line_to_buffer();
+
+    // Parse the line
+    cp_mgr.clear_masks();
+    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+      if (p.is_null()) {
+        break;
+      }
+
+      // Add valve to be opened to the Centipede masks
+      idx_valve = p2valve(p);
+      cp_mgr.add_to_masks(valve2cp(idx_valve));
+
+      // Color all active valve LEDs in red
+      leds[p2led(p)] = CRGB::Red;
+    }
+
+    // Activate valves
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
+    cp_mgr.send_masks();
+#endif
+
+    tick_program = now;
+  }
+}
+
+/**
+ * @brief Idle state, leaving any previously activated valves untouched
+ */
+State state_idle(fun_idle__upd);
+
+/**
+ * @brief Load a new protocol program into memory
+ */
+State state_load_program(fun_load_program__ent, fun_load_program__upd);
+
+/**
+ * @brief Run the protocol program, advancing line for line when it is time.
+ * Will activate solenoid valves and will drive the LED matrix.
+ */
+State state_run_program(fun_run_program__upd);
+
+FiniteStateMachine fsm(state_idle);
 
 // -----------------------------------------------------------------------------
 //  setup
@@ -273,8 +374,7 @@ void setup() {
       for (int8_t y = -7; y < 8; ++y) {
         if ((x + y) & 1) {
           if (abs(x) + abs(y) == rung * 2 + 1) {
-            line[idx_P].x = x;
-            line[idx_P].y = y;
+            line[idx_P].set(x, y);
             idx_P++;
           }
         }
@@ -298,20 +398,59 @@ void setup() {
 
 void loop() {
   char *str_cmd; // Incoming serial command string
-  uint32_t now;
-  static uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
-  uint8_t idx_valve;
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
   // ---------------------------------------------------------------------------
 
-  EVERY_N_MILLISECONDS(50) {
+  EVERY_N_MILLISECONDS(10) {
     if (sc.available()) {
       str_cmd = sc.getCmd();
 
       if (strcmp(str_cmd, "id?") == 0) {
+        // Report identity
         Serial.println("Arduino, TWT jetting grid");
+
+      } else if (strcmp(str_cmd, "on") == 0) {
+        fsm.transitionTo(state_run_program);
+
+      } else if (strcmp(str_cmd, "off") == 0) {
+        fsm.transitionTo(state_idle);
+
+      } else if (strcmp(str_cmd, "load") == 0) {
+        fsm.transitionTo(state_load_program);
+
+      } else if (strcmp(str_cmd, "?") == 0) {
+        // Report pressure readings
+        readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
+        readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
+        readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
+        readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
+        readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+        readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+        readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+        readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+
+        // NOTE:
+        //   Using `snprintf()` to print a large array of formatted values to a
+        //   buffer followed by a single `Serial.print(buf)` is many times
+        //   faster than multiple dumb `Serial.print(value, 3);
+        //   Serial.write('\t')` statements. The latter is > 3400 µs, the former
+        //   just ~ 320 µs !!!
+        // clang-format off
+        snprintf(buf, BUF_LEN,
+                 "%.2f\t%.2f\t%.2f\t%.2f\t"
+                 "%.3f\t%.3f\t%.3f\t%.3f\n",
+                 readings.pres_1_mA,
+                 readings.pres_2_mA,
+                 readings.pres_3_mA,
+                 readings.pres_4_mA,
+                 readings.pres_1_bar,
+                 readings.pres_2_bar,
+                 readings.pres_3_bar,
+                 readings.pres_4_bar);
+        // clang-format on
+        Serial.print(buf); // Takes 320 µs per call
       }
     }
   }
@@ -332,50 +471,6 @@ void loop() {
   }
 #endif
 
-  // ---------------------------------------------------------------------------
-  //   Report readings over serial
-  // ---------------------------------------------------------------------------
-
-  EVERY_N_MILLIS(1000) {
-    /*
-    static uint32_t t_start = 0;
-    if (!t_start) {
-      t_start = millis();
-    }
-    Serial.println(millis() - t_start);
-    */
-
-    readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
-    readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
-    readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
-    readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
-    readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-    readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-    readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-    readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
-
-    // NOTE:
-    //   Using `snprintf()` to print a large array of formatted values to a
-    //   buffer followed by a single `Serial.print(buf)` is many times faster
-    //   than multiple dumb `Serial.print(value, 3); Serial.write('\t')`
-    //   statements. The latter is > 3400 µs, the former just ~ 320 µs !!!
-    // clang-format off
-    snprintf(buf, BUF_LEN,
-             "%.2f\t%.2f\t%.2f\t%.2f\t\t"
-             "%.3f\t%.3f\t%.3f\t%.3f\n",
-             readings.pres_1_mA,
-             readings.pres_2_mA,
-             readings.pres_3_mA,
-             readings.pres_4_mA,
-             readings.pres_1_bar,
-             readings.pres_2_bar,
-             readings.pres_3_bar,
-             readings.pres_4_bar);
-    // clang-format on
-    Serial.print(buf); // Takes 320 µs per call
-    // Serial.println(FastLED.getFPS());
-  }
-
   // Fade out all purely blue LEDs over time, i.e. previously active valves.
   // Keep in front of any other LED color assignments.
   EVERY_N_MILLIS(20) {
@@ -388,46 +483,10 @@ void loop() {
   }
 
   // ---------------------------------------------------------------------------
-  //   Handle the protocol program
+  //   Handle the finite state machine
   // ---------------------------------------------------------------------------
 
-  now = millis();
-  if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
-    // It is time to advance to the next line in the protocol program
-
-    // Recolor the LEDs of previously active valves from red to blue
-    for (auto &p : protocol_mgr.timed_line_buffer.line) {
-      if (p.is_null()) {
-        break;
-      }
-      leds[p2led(p)] = CRGB::Blue;
-    }
-
-    // Read in the next line
-    protocol_mgr.transfer_next_line_to_buffer();
-
-    // Parse the line
-    cp_mgr.clear_masks();
-    for (auto &p : protocol_mgr.timed_line_buffer.line) {
-      if (p.is_null()) {
-        break;
-      }
-
-      // Add valve to be opened to the Centipede masks
-      idx_valve = p2valve(p);
-      cp_mgr.add_to_masks(valve2cp(idx_valve));
-
-      // Color all active valve LEDs in red
-      leds[p2led(p)] = CRGB::Red;
-    }
-
-    // Activate valves
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
-    cp_mgr.send_masks();
-#endif
-
-    tick_program = now;
-  }
+  fsm.update();
 
   // ---------------------------------------------------------------------------
   //   Send out LED data to the matrix
