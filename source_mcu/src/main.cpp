@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    19-08-2022
+ * @date    22-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -170,6 +170,10 @@ uint32_t now;              // Timestamp [ms]
 uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
 uint8_t idx_valve;         // Frequently used valve index
 
+// Switches the main serial command listener momentarily off to allow for
+// loading in a new protocol program over serial.
+bool loading_program = false;
+
 // ----------------------
 //  Idle -- update
 // ----------------------
@@ -187,6 +191,11 @@ void fun_load_program__ent() {
 //  Load program -- update
 // ----------------------
 void fun_load_program__upd() {}
+
+// ----------------------
+//  Single valve mode
+// ----------------------
+void fun_single_valve__upd() {}
 
 // ----------------------
 //  Run program -- update
