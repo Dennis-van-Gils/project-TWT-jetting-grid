@@ -1,6 +1,11 @@
 Changelog
 =========
 
+2.2.0 (2022-08-23)
+------------------
+* Buffer size is now set by MAKRO `#define BUFLEN_SERIALCOMMAND` and checked for `#ifndef`.
+This way, one can change `BUFLEN_SERIALCOMMAND` by defining it ahead of the `#include "DvG_SerialCommand.h"` statement.
+
 2.1.0 (2022-08-22)
 ------------------
 * Increased max. possible buffer size from 255 to 65535 characters

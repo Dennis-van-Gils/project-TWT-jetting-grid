@@ -12,7 +12,7 @@ BUFLEN_SERIALCOMMAND (defined in DvG_SerialCommand.h), we speak of a received
 will return true when a new command is ready to be processed. Subsequently, the
 command string can be retrieved by calling 'getCmd()'.
 
-Dennis van Gils, 22-08-2022
+Dennis van Gils, 23-08-2022
 */
 
 #ifndef H_DvG_SerialCommand
@@ -22,7 +22,9 @@ Dennis van Gils, 22-08-2022
 
 // Buffer size for storing incoming characters. Includes the '\0' termination
 // character. Change buffer size to your needs up to a maximum of 65535.
-const uint16_t BUFLEN_SERIALCOMMAND = 64;
+#ifndef BUFLEN_SERIALCOMMAND
+#  define BUFLEN_SERIALCOMMAND 64
+#endif
 
 class DvG_SerialCommand {
 public:

@@ -15,6 +15,7 @@
 #include "constants.h"
 #include "translations.h"
 
+#define BUFLEN_SERIALCOMMAND 128
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "FiniteStateMachine.h"
