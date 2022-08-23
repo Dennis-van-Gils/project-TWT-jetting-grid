@@ -15,7 +15,6 @@
 #include "constants.h"
 #include "translations.h"
 
-#define BUFLEN_SERIALCOMMAND 128
 #include "DvG_SerialCommand.h"
 #include "FastLED.h"
 #include "FiniteStateMachine.h"
@@ -175,32 +174,29 @@ uint8_t idx_valve;         // Frequently used valve index
 // loading in a new protocol program over serial.
 bool loading_program = false;
 
-// ----------------------
-//  Idle -- update
-// ----------------------
+// -------------------------
+//  FSM: Idle
+// -------------------------
+
 void fun_idle__upd() {}
 
-// ----------------------
-//  Load program -- enter
-// ----------------------
-void fun_load_program__ent() {
-  // Make sure we open all valves to prevent excessive pressure at the pump
-  open_all_valves();
-}
+/**
+ * @brief Idle state, leaving any previously activated valves untouched
+ */
+State state_idle(fun_idle__upd);
 
-// ----------------------
-//  Load program -- update
-// ----------------------
-void fun_load_program__upd() {}
+FiniteStateMachine fsm(state_idle);
 
-// ----------------------
-//  Single valve mode
-// ----------------------
+// -------------------------
+//  FSM: Single valve mode
+// -------------------------
+
 void fun_single_valve__upd() {}
 
-// ----------------------
-//  Run program -- update
-// ----------------------
+// -------------------------
+//  FSM: Run program
+// -------------------------
+
 void fun_run_program__upd() {
   now = millis();
   if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
@@ -242,22 +238,98 @@ void fun_run_program__upd() {
 }
 
 /**
- * @brief Idle state, leaving any previously activated valves untouched
- */
-State state_idle(fun_idle__upd);
-
-/**
- * @brief Load a new protocol program into memory
- */
-State state_load_program(fun_load_program__ent, fun_load_program__upd);
-
-/**
  * @brief Run the protocol program, advancing line for line when it is time.
  * Will activate solenoid valves and will drive the LED matrix.
  */
 State state_run_program(fun_run_program__upd);
 
-FiniteStateMachine fsm(state_idle);
+// -------------------------
+//  FSM: Load program
+// -------------------------
+
+void fun_load_program__ent() {
+  // Make sure we open all valves to prevent excessive pressure at the pump
+  open_all_valves();
+  Serial.println("Downloading new protocol program...");
+  loading_program = true;
+}
+
+void fun_load_program__upd() {
+  // TODO: CODE IN DEVELOPMENT
+  const uint8_t RAW_BUF_LEN = 229;
+  char raw_buf[RAW_BUF_LEN]; // Incoming binary data decoding a single protocol
+                             // line
+  static uint8_t iPos;
+  static bool fTerminated = false;
+  char c;
+
+  if (Serial.available()) {
+    while (Serial.available()) {
+      c = Serial.peek();
+      if (c == 0xFF) {
+        Serial.read(); // Remove char from serial buffer
+        raw_buf[iPos] = c;
+        fTerminated = true;
+        break;
+      } else if (iPos < RAW_BUF_LEN) {
+        Serial.read(); // Remove char from serial buffer
+        raw_buf[iPos] = c;
+        iPos++;
+      } else {
+        // Maximum length of incoming serial command is reached. Forcefully
+        // terminate string now. Leave the char in the serial buffer.
+        raw_buf[iPos] = 0xFF;
+        fTerminated = true;
+        break;
+      }
+    }
+  }
+
+  if (fTerminated) {
+    fTerminated = false;
+    iPos = 0;
+
+    // Try to parse the newly send line of the protocol program
+    // Expecting a binary stream as follows:
+    // 1 x 4 bytes: uint32_t time duration in [ms]
+    // N x 1 byte : byte-encoded PCS coordinate where
+    //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
+
+    // Sentinels
+    // EOL: end of line   , 0xFF
+    // EOP: end of program, 0xFFFF
+    const uint8_t PROTOCOL_EOL = 0xff;
+    const uint16_t PROTOCOL_EOP = 0xffff;
+
+    uint32_t duration;
+    // clang-format off
+      duration = (uint32_t)raw_buf[3] << 24 |
+                 (uint32_t)raw_buf[2] << 16 |
+                 (uint32_t)raw_buf[1] << 8  |
+                 (uint32_t)raw_buf[0];
+    // clang-format on
+    Serial.print(duration);
+
+    P p;
+    for (uint16_t idx = 4; idx < RAW_BUF_LEN; idx++) {
+      if (raw_buf[idx] == PROTOCOL_EOL) {
+        break;
+      }
+      p.unpack_byte(raw_buf[idx]);
+      p.print(Serial);
+    }
+
+    Serial.write('\n');
+    loading_program = false;
+    // fsm.transitionTo(state_idle);
+    fsm.transitionTo(state_run_program);
+  }
+}
+
+/**
+ * @brief Load a new protocol program into memory
+ */
+State state_load_program(fun_load_program__ent, fun_load_program__upd);
 
 // -----------------------------------------------------------------------------
 //  setup
@@ -413,54 +485,56 @@ void loop() {
   //   Process incoming serial commands
   // ---------------------------------------------------------------------------
 
-  EVERY_N_MILLISECONDS(10) {
-    if (sc.available()) {
-      str_cmd = sc.getCmd();
+  if (!loading_program) {
+    EVERY_N_MILLISECONDS(10) {
+      if (sc.available()) {
+        str_cmd = sc.getCmd();
 
-      if (strcmp(str_cmd, "id?") == 0) {
-        // Report identity
-        Serial.println("Arduino, TWT jetting grid");
+        if (strcmp(str_cmd, "id?") == 0) {
+          // Report identity
+          Serial.println("Arduino, TWT jetting grid");
 
-      } else if (strcmp(str_cmd, "on") == 0) {
-        fsm.transitionTo(state_run_program);
+        } else if (strcmp(str_cmd, "on") == 0) {
+          fsm.transitionTo(state_run_program);
 
-      } else if (strcmp(str_cmd, "off") == 0) {
-        fsm.transitionTo(state_idle);
+        } else if (strcmp(str_cmd, "off") == 0) {
+          fsm.transitionTo(state_idle);
 
-      } else if (strcmp(str_cmd, "load") == 0) {
-        fsm.transitionTo(state_load_program);
+        } else if (strcmp(str_cmd, "load") == 0) {
+          fsm.transitionTo(state_load_program);
 
-      } else if (strcmp(str_cmd, "?") == 0) {
-        // Report pressure readings
-        readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
-        readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
-        readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
-        readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
-        readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-        readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-        readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-        readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+        } else if (strcmp(str_cmd, "?") == 0) {
+          // Report pressure readings
+          readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
+          readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
+          readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
+          readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
+          readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+          readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+          readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+          readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
 
-        // NOTE:
-        //   Using `snprintf()` to print a large array of formatted values to a
-        //   buffer followed by a single `Serial.print(buf)` is many times
-        //   faster than multiple dumb `Serial.print(value, 3);
-        //   Serial.write('\t')` statements. The latter is > 3400 µs, the former
-        //   just ~ 320 µs !!!
-        // clang-format off
-        snprintf(buf, BUF_LEN,
-                 "%.2f\t%.2f\t%.2f\t%.2f\t"
-                 "%.3f\t%.3f\t%.3f\t%.3f\n",
-                 readings.pres_1_mA,
-                 readings.pres_2_mA,
-                 readings.pres_3_mA,
-                 readings.pres_4_mA,
-                 readings.pres_1_bar,
-                 readings.pres_2_bar,
-                 readings.pres_3_bar,
-                 readings.pres_4_bar);
-        // clang-format on
-        Serial.print(buf); // Takes 320 µs per call
+          // NOTE:
+          //   Using `snprintf()` to print a large array of formatted values to
+          //   a buffer followed by a single `Serial.print(buf)` is many times
+          //   faster than multiple dumb `Serial.print(value, 3);
+          //   Serial.write('\t')` statements. The latter is > 3400 µs, the
+          //   former just ~ 320 µs !!!
+          // clang-format off
+          snprintf(buf, BUF_LEN,
+                   "%.2f\t%.2f\t%.2f\t%.2f\t"
+                   "%.3f\t%.3f\t%.3f\t%.3f\n",
+                   readings.pres_1_mA,
+                   readings.pres_2_mA,
+                   readings.pres_3_mA,
+                   readings.pres_4_mA,
+                   readings.pres_1_bar,
+                   readings.pres_2_bar,
+                   readings.pres_3_bar,
+                   readings.pres_4_bar);
+          // clang-format on
+          Serial.print(buf); // Takes 320 µs per call
+        }
       }
     }
   }
