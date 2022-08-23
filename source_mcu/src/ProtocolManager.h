@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    22-08-2022
+ * @date    23-08-2022
  *
  * @brief   Provides classes `P` and `ProtocolManager`, needed for the control
  * of the jetting grid of the Twente Water Tunnel.
@@ -76,6 +76,38 @@ public:
 
   inline bool is_null() const {
     return ((x == P_NULL_VAL) || (y == P_NULL_VAL));
+  }
+
+  /**
+   * @brief Pack the PCS coordinate into a single byte.
+   *
+   * The upper 4 bits decode the PCS x-coordinate.
+   * The lower 4 bits decode the PCS y-coordinate.
+   *
+   * @return The byte-encoded PCS coordinate
+   */
+  inline uint8_t pack_into_byte() {
+    /*
+    uint8_t c;
+    c = (x - PCS_X_MIN) << 4;
+    c |= ((y - PCS_Y_MIN) & 0xF);
+    return c;
+    */
+    return (uint8_t)((x - PCS_X_MIN) << 4) | //
+           (uint8_t)((y - PCS_Y_MIN) & 0xF);
+  }
+
+  /**
+   * @brief Unpack the packed PCS coordinate and store it.
+   *
+   * The upper 4 bits decode the PCS x-coordinate.
+   * The lower 4 bits decode the PCS y-coordinate.
+   *
+   * @param c The byte-encoded PCS coordinate
+   */
+  inline void unpack_byte(uint8_t c) {
+    x = (c >> 4) + PCS_X_MIN;
+    y = (c & 0xF) + PCS_Y_MIN;
   }
 
   void print(Stream &stream);
