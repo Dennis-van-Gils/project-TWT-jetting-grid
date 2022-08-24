@@ -33,7 +33,7 @@ ard.auto_connect()
 print(ard.query("load"))
 
 # Time duration
-raw = bytearray(struct.pack("<L", 123456))
+raw = bytearray(struct.pack("<L", 255))
 
 # List of PCS points
 for p in line:
@@ -41,8 +41,17 @@ for p in line:
 
 # EOL sentinel
 raw.append(0xff)
-#print(raw)
 
+ard.write(raw)
+success, ans = ard.readline()
+print(ans)
+
+# Second line
+raw = bytearray(struct.pack("<L", 2000))
+line = (P(0, 1), P(1, 0), P(0, -1), P(-1, 0))
+for p in line:
+    raw.append(p.pack_into_byte())
+raw.append(0xff)
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)

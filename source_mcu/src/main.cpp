@@ -20,6 +20,7 @@
 #include "FiniteStateMachine.h"
 #include "MIKROE_4_20mA_RT_Click.h"
 #include "MemoryFree.h"
+#include "halt.h"
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -263,25 +264,25 @@ void fun_load_program__upd() {
   static bool fTerminated = false;
   char c;
 
-  if (Serial.available()) {
-    while (Serial.available()) {
-      c = Serial.peek();
-      if (c == 0xFF) {
-        Serial.read(); // Remove char from serial buffer
-        raw_buf[iPos] = c;
-        fTerminated = true;
-        break;
-      } else if (iPos < RAW_BUF_LEN) {
-        Serial.read(); // Remove char from serial buffer
-        raw_buf[iPos] = c;
-        iPos++;
-      } else {
-        // Maximum length of incoming serial command is reached. Forcefully
-        // terminate string now. Leave the char in the serial buffer.
-        raw_buf[iPos] = 0xFF;
-        fTerminated = true;
-        break;
-      }
+  // Sentinels
+  // EOL: end of line   , 0xFF
+  // EOP: end of program, 0xFFFF
+  const uint8_t PROTOCOL_EOL = 0xff;
+  const uint16_t PROTOCOL_EOP = 0xffff;
+
+  // TODO: Major problem with too small EOL sentinel. Make at least 4 bytes long
+  while (Serial.available()) {
+    c = Serial.read();
+    if (c == PROTOCOL_EOL) {
+      raw_buf[iPos] = c;
+      fTerminated = true;
+      break;
+    } else if (iPos < RAW_BUF_LEN) {
+      raw_buf[iPos] = c;
+      iPos++;
+    } else {
+      // Maximum buffer length is reached. Halt.
+      halt(8, "Buffer overrun in `load_program()`");
     }
   }
 
@@ -295,18 +296,12 @@ void fun_load_program__upd() {
     // N x 1 byte : byte-encoded PCS coordinate where
     //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
 
-    // Sentinels
-    // EOL: end of line   , 0xFF
-    // EOP: end of program, 0xFFFF
-    const uint8_t PROTOCOL_EOL = 0xff;
-    const uint16_t PROTOCOL_EOP = 0xffff;
-
     uint32_t duration;
     // clang-format off
-      duration = (uint32_t)raw_buf[3] << 24 |
-                 (uint32_t)raw_buf[2] << 16 |
-                 (uint32_t)raw_buf[1] << 8  |
-                 (uint32_t)raw_buf[0];
+    duration = (uint32_t)raw_buf[3] << 24 |
+               (uint32_t)raw_buf[2] << 16 |
+               (uint32_t)raw_buf[1] << 8  |
+               (uint32_t)raw_buf[0];
     // clang-format on
     Serial.print(duration);
 
@@ -320,9 +315,10 @@ void fun_load_program__upd() {
     }
 
     Serial.write('\n');
+
     loading_program = false;
-    // fsm.transitionTo(state_idle);
-    fsm.transitionTo(state_run_program);
+    fsm.transitionTo(state_idle);
+    // fsm.transitionTo(state_run_program);
   }
 }
 
