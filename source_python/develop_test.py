@@ -40,12 +40,14 @@ for p in line:
     raw.append(p.pack_into_byte())
 
 # EOL sentinel
+raw.append(0xfe)
 raw.append(0xff)
 
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)
 
+"""
 # Second line
 raw = bytearray(struct.pack("<L", 2000))
 line = (P(0, 1), P(1, 0), P(0, -1), P(-1, 0))
@@ -55,3 +57,4 @@ raw.append(0xff)
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)
+"""

@@ -260,30 +260,36 @@ void fun_load_program__upd() {
   const uint8_t RAW_BUF_LEN = 229;
   char raw_buf[RAW_BUF_LEN]; // Incoming binary data decoding a single protocol
                              // line
-  static uint8_t iPos;
+  static uint8_t iPos = 0;
   static bool fTerminated = false;
   char c;
 
   // Sentinels
-  // EOL: end of line   , 0xFF
-  // EOP: end of program, 0xFFFF
-  const uint8_t PROTOCOL_EOL = 0xff;
-  const uint16_t PROTOCOL_EOP = 0xffff;
+  // EOL: end of line
+  const uint8_t EOL[] = {0xfe, 0xff};
+  const uint8_t N_EOL = sizeof(EOL);
 
-  // TODO: Major problem with too small EOL sentinel. Make at least 4 bytes long
   while (Serial.available()) {
     c = Serial.read();
-    if (c == PROTOCOL_EOL) {
+
+    if (iPos < RAW_BUF_LEN) {
       raw_buf[iPos] = c;
-      fTerminated = true;
-      break;
-    } else if (iPos < RAW_BUF_LEN) {
-      raw_buf[iPos] = c;
-      iPos++;
     } else {
       // Maximum buffer length is reached. Halt.
       halt(8, "Buffer overrun in `load_program()`");
     }
+
+    // Check for EOL, from right to left starting at the end
+    if (iPos + 1 >= N_EOL) {
+      fTerminated = true;
+      for (uint8_t i = 0; i < N_EOL; ++i) {
+        if (raw_buf[iPos - i] != EOL[N_EOL - i - 1]) {
+          fTerminated = false;
+        }
+      }
+    }
+
+    iPos++;
   }
 
   if (fTerminated) {
@@ -306,10 +312,7 @@ void fun_load_program__upd() {
     Serial.print(duration);
 
     P p;
-    for (uint16_t idx = 4; idx < RAW_BUF_LEN; idx++) {
-      if (raw_buf[idx] == PROTOCOL_EOL) {
-        break;
-      }
+    for (uint16_t idx = 4; idx < RAW_BUF_LEN - N_EOL; idx++) {
       p.unpack_byte(raw_buf[idx]);
       p.print(Serial);
     }
@@ -511,9 +514,9 @@ void loop() {
           readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
 
           // NOTE:
-          //   Using `snprintf()` to print a large array of formatted values to
-          //   a buffer followed by a single `Serial.print(buf)` is many times
-          //   faster than multiple dumb `Serial.print(value, 3);
+          //   Using `snprintf()` to print a large array of formatted values
+          //   to a buffer followed by a single `Serial.print(buf)` is many
+          //   times faster than multiple dumb `Serial.print(value, 3);
           //   Serial.write('\t')` statements. The latter is > 3400 µs, the
           //   former just ~ 320 µs !!!
           // clang-format off
@@ -573,8 +576,8 @@ void loop() {
   // ---------------------------------------------------------------------------
   //
   // NOTE:
-  //   It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16 LED
-  //   matrix is takes 7680 µs. I actually measure 8000 µs, using
+  //   It takes 30 µs to write to one WS2812 LED. Hence, for the full 16x16
+  //   LED matrix is takes 7680 µs. I actually measure 8000 µs, using
   //   '''
   //     utick = micros();
   //     FastLED.show();
@@ -586,8 +589,8 @@ void loop() {
   //
   // NOTE:
   //   Capping the framerate by calling `FastLED.setMaxRefreshRate(80)` is not
-  //   advised, because this makes `FastLED.show()` blocking while it is waiting
-  //   for the correct time to pass. Hence, we simply put the call to
+  //   advised, because this makes `FastLED.show()` blocking while it is
+  //   waiting for the correct time to pass. Hence, we simply put the call to
   //   `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it
   //   unblocking, while still capping the framerate.
 
