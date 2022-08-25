@@ -2,7 +2,7 @@
  * @file    halt.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    10-08-2022
+ * @date    25-08-2022
  *
  * @brief   Gracefully halt the microcontroller of the TWT jetting grid.
  *
@@ -17,6 +17,7 @@
 
 // See `main.cpp`
 extern CRGB leds[256];
+extern CRGB onboard_led[1];
 
 /**
  * @brief Halt execution and flash the text 'HALT' on the LED matrix and repeat
