@@ -32,29 +32,37 @@ ard.auto_connect()
 
 print(ard.query("load"))
 
-# Time duration
-raw = bytearray(struct.pack("<L", 255))
+# Prepare binary data stream
 
-# List of PCS points
-for p in line:
+ard.set_write_termination(bytes((0xff, 0xff, 0xff, 0xff)))   # EOL
+
+### First line
+
+raw = bytearray(struct.pack(">L", 255))  # Time duration
+for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
-
-# EOL sentinel
-raw.append(0xfe)
-raw.append(0xff)
 
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)
 
-"""
-# Second line
-raw = bytearray(struct.pack("<L", 2000))
+### Second line
+
+raw = bytearray(struct.pack(">L", 65535))  # Time duration
 line = (P(0, 1), P(1, 0), P(0, -1), P(-1, 0))
-for p in line:
+for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
-raw.append(0xff)
+
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)
-"""
+
+### Send EOP
+
+ard.write(b"")
+success, ans = ard.readline()
+print(ans)
+
+### Restore
+
+ard.set_write_termination("\n")

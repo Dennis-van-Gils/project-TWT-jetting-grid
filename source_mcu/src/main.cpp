@@ -39,7 +39,7 @@ uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -83,9 +83,10 @@ CentipedeManager cp_mgr;
 ------------------------------------------------------------------------------*/
 
 bool alive_blinker = true; // Blinker for the 'alive' status LED
-CRGB onboard_led[1];       // Onboard NeoPixel of the Adafruit Feather M4 board
-CRGB leds[N_LEDS];         // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
-uint16_t idx_led;          // Frequently used LED index
+CRGB alive_blinker_color = CRGB::Green;
+CRGB onboard_led[1]; // Onboard NeoPixel of the Adafruit Feather M4 board
+CRGB leds[N_LEDS];   // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
+uint16_t idx_led;    // Frequently used LED index
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R Click boards for reading out the OMEGA pressure sensors
@@ -160,7 +161,10 @@ void open_all_valves() {
       }
     }
   }
-  cp_mgr.send_masks();
+
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
+  cp_mgr.send_masks(); // Activate valves
+#endif
 }
 
 /*------------------------------------------------------------------------------
@@ -179,12 +183,14 @@ bool loading_program = false;
 //  FSM: Idle
 // -------------------------
 
+void fun_idle__ent() { alive_blinker_color = CRGB::Yellow; }
+
 void fun_idle__upd() {}
 
 /**
  * @brief Idle state, leaving any previously activated valves untouched
  */
-State state_idle(fun_idle__upd);
+State state_idle(fun_idle__ent, fun_idle__upd);
 
 FiniteStateMachine fsm(state_idle);
 
@@ -197,6 +203,8 @@ void fun_single_valve__upd() {}
 // -------------------------
 //  FSM: Run program
 // -------------------------
+
+void fun_run_program__ent() { alive_blinker_color = CRGB::Green; }
 
 void fun_run_program__upd() {
   now = millis();
@@ -229,9 +237,8 @@ void fun_run_program__upd() {
       leds[p2led(p)] = CRGB::Red;
     }
 
-    // Activate valves
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
-    cp_mgr.send_masks();
+    cp_mgr.send_masks(); // Activate valves
 #endif
 
     tick_program = now;
@@ -242,7 +249,7 @@ void fun_run_program__upd() {
  * @brief Run the protocol program, advancing line for line when it is time.
  * Will activate solenoid valves and will drive the LED matrix.
  */
-State state_run_program(fun_run_program__upd);
+State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 // -------------------------
 //  FSM: Load program
@@ -250,51 +257,83 @@ State state_run_program(fun_run_program__upd);
 
 void fun_load_program__ent() {
   // Make sure we open all valves to prevent excessive pressure at the pump
-  open_all_valves();
+  // TODO: Handshake with Python to start flush and download
+
+  /*
+  // Flush any remaining bytes in the incoming serial buffer for safety
+  while (Serial.available()) {
+    char c = Serial.read();
+  }
+  */
   Serial.println("Downloading new protocol program...");
+  open_all_valves();
   loading_program = true;
+  alive_blinker_color = CRGB::Blue;
 }
 
 void fun_load_program__upd() {
   // TODO: CODE IN DEVELOPMENT
   const uint8_t RAW_BUF_LEN = 229;
-  char raw_buf[RAW_BUF_LEN]; // Incoming binary data decoding a single protocol
-                             // line
-  static uint8_t iPos = 0;
-  static bool fTerminated = false;
+  char raw_buf[RAW_BUF_LEN]; // Incoming binary data: single protocol line
+  static uint8_t cur_len = 0;
+  static bool found_EOL = false; // End-of-line
   char c;
 
   // Sentinels
   // EOL: end of line
-  const uint8_t EOL[] = {0xfe, 0xff};
+  const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff};
   const uint8_t N_EOL = sizeof(EOL);
 
   while (Serial.available()) {
     c = Serial.read();
+    Serial.print(c, HEX);
+    Serial.print('\t');
 
-    if (iPos < RAW_BUF_LEN) {
-      raw_buf[iPos] = c;
+    if (cur_len < RAW_BUF_LEN) {
+      raw_buf[cur_len] = c;
     } else {
       // Maximum buffer length is reached. Halt.
       halt(8, "Buffer overrun in `load_program()`");
     }
 
-    // Check for EOL, from right to left starting at the end
-    if (iPos + 1 >= N_EOL) {
-      fTerminated = true;
-      for (uint8_t i = 0; i < N_EOL; ++i) {
-        if (raw_buf[iPos - i] != EOL[N_EOL - i - 1]) {
-          fTerminated = false;
+    cur_len++;
+
+    // Check for EOL at the end
+    if (cur_len >= N_EOL) {
+      found_EOL = true;
+      for (uint8_t i = 0; i < N_EOL; i++) {
+        if (raw_buf[cur_len - i - 1] != EOL[N_EOL - i - 1]) {
+          found_EOL = false;
         }
       }
+      if (found_EOL) {
+        // Found the EOL. Parse the protocol line first, before reading in more
+        // characters from the serial buffer.
+        Serial.print("EOL\t");
+        break;
+      }
     }
-
-    iPos++;
   }
 
-  if (fTerminated) {
-    fTerminated = false;
-    iPos = 0;
+  if (found_EOL) {
+    if (cur_len == N_EOL) {
+      // Found just the EOL sentinel without further information on the line -->
+      // This signals the end-of-program EOP.
+      Serial.println("EOP");
+
+      // Flush any remaining bytes in the incoming serial buffer for safety
+      while (Serial.available()) {
+        c = Serial.read();
+      }
+
+      // Reset serial parser
+      found_EOL = false;
+      cur_len = 0;
+
+      loading_program = false;
+      fsm.transitionTo(state_idle);
+      return;
+    }
 
     // Try to parse the newly send line of the protocol program
     // Expecting a binary stream as follows:
@@ -304,24 +343,30 @@ void fun_load_program__upd() {
 
     uint32_t duration;
     // clang-format off
-    duration = (uint32_t)raw_buf[3] << 24 |
-               (uint32_t)raw_buf[2] << 16 |
-               (uint32_t)raw_buf[1] << 8  |
-               (uint32_t)raw_buf[0];
+    duration = (uint32_t)raw_buf[0] << 24 |
+               (uint32_t)raw_buf[1] << 16 |
+               (uint32_t)raw_buf[2] << 8  |
+               (uint32_t)raw_buf[3];
     // clang-format on
     Serial.print(duration);
 
     P p;
-    for (uint16_t idx = 4; idx < RAW_BUF_LEN - N_EOL; idx++) {
+    for (uint16_t idx = 4; idx < cur_len - N_EOL; idx++) {
       p.unpack_byte(raw_buf[idx]);
       p.print(Serial);
     }
 
     Serial.write('\n');
 
+    // Reset serial parser
+    found_EOL = false;
+    cur_len = 0;
+  }
+
+  // Time-out
+  if (fsm.timeInCurrentState() > 4000) {
     loading_program = false;
     fsm.transitionTo(state_idle);
-    // fsm.transitionTo(state_run_program);
   }
 }
 
@@ -596,8 +641,8 @@ void loop() {
 
   EVERY_N_MILLIS(500) {
     // Blink the 'alive' status LEDs
-    leds[255] = alive_blinker ? CRGB::Green : CRGB::Black;
-    onboard_led[0] = alive_blinker ? CRGB::Green : CRGB::Black;
+    leds[255] = alive_blinker ? alive_blinker_color : CRGB::Black;
+    onboard_led[0] = alive_blinker ? alive_blinker_color : CRGB::Black;
     alive_blinker = !alive_blinker;
   }
 
