@@ -27,10 +27,16 @@
 #include <Wire.h>
 #include <array>
 
-// Serial command listener
+// Serial port listener for receiving ASCII commands
 const uint8_t CMD_BUF_LEN = 64;  // Incoming ASCII-command buffer
 char cmd_buf[CMD_BUF_LEN]{'\0'}; // Incoming ASCII-command buffer
 DvG_SerialCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
+
+// Serial port listener for receiving binary data decoding a protocol program
+const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // Binary end-of-line sentinel
+const uint8_t BIN_BUF_LEN = 229;                // Incoming binary-data buffer
+uint8_t bin_buf[BIN_BUF_LEN];                   // Incoming binary-data buffer
+DvG_BinarySerialCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
 
 // Will be used externally
 const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
@@ -275,62 +281,20 @@ void fun_load_program__ent() {
 
 void fun_load_program__upd() {
   // TODO: CODE IN DEVELOPMENT
-  const uint8_t RAW_BUF_LEN = 229;
-  char raw_buf[RAW_BUF_LEN]; // Incoming binary data: single protocol line
-  static uint8_t cur_len = 0;
-  static bool found_EOL = false; // End-of-line
-  char c;
+  uint16_t bin_data_len; // Incoming binary data length in bytes
 
-  // Sentinels
-  // EOL: end of line
-  const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff};
-  const uint8_t N_EOL = sizeof(EOL);
+  if (bsc.available()) {
+    bin_data_len = bsc.getCommandLength();
 
-  while (Serial.available()) {
-    c = Serial.read();
-    Serial.print(c, HEX);
-    Serial.print('\t');
-
-    if (cur_len < RAW_BUF_LEN) {
-      raw_buf[cur_len] = c;
-    } else {
-      // Maximum buffer length is reached. Halt.
-      halt(8, "Buffer overrun in `load_program()`");
-    }
-
-    cur_len++;
-
-    // Check for EOL at the end
-    if (cur_len >= N_EOL) {
-      found_EOL = true;
-      for (uint8_t i = 0; i < N_EOL; i++) {
-        if (raw_buf[cur_len - i - 1] != EOL[N_EOL - i - 1]) {
-          found_EOL = false;
-        }
-      }
-      if (found_EOL) {
-        // Found the EOL. Parse the protocol line first, before reading in more
-        // characters from the serial buffer.
-        Serial.print("EOL\t");
-        break;
-      }
-    }
-  }
-
-  if (found_EOL) {
-    if (cur_len == N_EOL) {
+    if (bin_data_len == 0) {
       // Found just the EOL sentinel without further information on the line -->
       // This signals the end-of-program EOP.
       Serial.println("EOP");
 
       // Flush any remaining bytes in the incoming serial buffer for safety
       while (Serial.available()) {
-        c = Serial.read();
+        Serial.read();
       }
-
-      // Reset serial parser
-      found_EOL = false;
-      cur_len = 0;
 
       loading_program = false;
       fsm.transitionTo(state_idle);
@@ -345,24 +309,20 @@ void fun_load_program__upd() {
 
     uint32_t duration;
     // clang-format off
-    duration = (uint32_t)raw_buf[0] << 24 |
-               (uint32_t)raw_buf[1] << 16 |
-               (uint32_t)raw_buf[2] << 8  |
-               (uint32_t)raw_buf[3];
+    duration = (uint32_t)bin_buf[0] << 24 |
+               (uint32_t)bin_buf[1] << 16 |
+               (uint32_t)bin_buf[2] << 8  |
+               (uint32_t)bin_buf[3];
     // clang-format on
     Serial.print(duration);
 
     P p;
-    for (uint16_t idx = 4; idx < cur_len - N_EOL; idx++) {
-      p.unpack_byte(raw_buf[idx]);
+    for (uint16_t idx = 4; idx < bin_data_len; idx++) {
+      p.unpack_byte(bin_buf[idx]);
       p.print(Serial);
     }
 
     Serial.write('\n');
-
-    // Reset serial parser
-    found_EOL = false;
-    cur_len = 0;
   }
 
   // Time-out
@@ -525,7 +485,7 @@ void setup() {
 // -----------------------------------------------------------------------------
 
 void loop() {
-  char *str_cmd; // Incoming serial command string
+  char *str_cmd; // Incoming serial ASCII-command string
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
@@ -533,10 +493,8 @@ void loop() {
 
   if (!loading_program) {
     EVERY_N_MILLISECONDS(10) {
-      // Serial.println(sc.getCmd());
       if (sc.available()) {
         str_cmd = sc.getCommand();
-        Serial.println(str_cmd);
 
         if (strcmp(str_cmd, "id?") == 0) {
           // Report identity
@@ -550,6 +508,9 @@ void loop() {
 
         } else if (strcmp(str_cmd, "load") == 0) {
           fsm.transitionTo(state_load_program);
+
+        } else if (strncmp(str_cmd, "t", 1) == 0) {
+          // sbc.test();
 
         } else if (strncmp(str_cmd, "s", 1) == 0) {
           Serial.println(parseFloatInString(str_cmd, 1));

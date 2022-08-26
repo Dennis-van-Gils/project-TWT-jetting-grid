@@ -105,6 +105,88 @@ char *DvG_SerialCommand::getCommand() {
 }
 
 /*******************************************************************************
+  DvG_BinarySerialCommand
+*******************************************************************************/
+
+DvG_BinarySerialCommand::DvG_BinarySerialCommand(Stream &stream,
+                                                 uint8_t *buffer,
+                                                 uint16_t max_len,
+                                                 const uint8_t *EOL,
+                                                 uint8_t EOL_len)
+    : _port(stream) // Initialize reference before body
+{
+  _buffer = buffer;
+  _buffer[0] = 0;
+  _max_len = max_len;
+  _cur_len = 0;
+  _EOL = EOL;
+  _EOL_len = EOL_len;
+  _found_EOL = false;
+}
+
+bool DvG_BinarySerialCommand::available(bool debug_info) {
+  uint8_t c;
+
+  while (_port.available()) {
+    c = _port.read();
+    if (debug_info) {
+      Serial.print(c, HEX);
+      Serial.write('\t');
+    }
+
+    if (_cur_len < _max_len) {
+      _buffer[_cur_len] = c;
+    } else {
+      // Maximum buffer length is reached. Halt.
+      // TODO: figure out how to catch this error
+      // halt(8, "Buffer overrun in `load_program()`");
+      // Research:
+      // https://stackoverflow.com/questions/8480640/how-to-throw-a-c-exception
+      // https://en.cppreference.com/w/cpp/error/exception
+    }
+
+    _cur_len++;
+
+    // Check for EOL at the end
+    if (_cur_len >= _EOL_len) {
+      _found_EOL = true;
+      for (uint8_t i = 0; i < _EOL_len; ++i) {
+        if (_buffer[_cur_len - i - 1] != _EOL[_EOL_len - i - 1]) {
+          _found_EOL = false;
+          break; // Any mismatch will exit early
+        }
+      }
+      if (_found_EOL) {
+        // Wait with reading in more bytes from the serial buffer to let the
+        // user act upon the currently received command
+        if (debug_info) {
+          Serial.print("EOL\t");
+        }
+        break;
+      }
+    }
+  }
+
+  return _found_EOL;
+}
+
+uint16_t DvG_BinarySerialCommand::getCommandLength() {
+  uint16_t len;
+
+  if (_found_EOL) {
+    len = _cur_len - _EOL_len;
+
+    // Reset serial command buffer
+    _found_EOL = false;
+    _cur_len = 0;
+  } else {
+    len = 0;
+  }
+
+  return len;
+}
+
+/*******************************************************************************
   Parse functions
 *******************************************************************************/
 
