@@ -28,7 +28,9 @@
 #include <array>
 
 // Serial command listener
-DvG_SerialCommand sc(Serial);
+const uint8_t CMD_BUF_LEN = 64;  // Incoming ASCII-command buffer
+char cmd_buf[CMD_BUF_LEN]{'\0'}; // Incoming ASCII-command buffer
+DvG_SerialCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
 
 // Will be used externally
 const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
@@ -531,8 +533,10 @@ void loop() {
 
   if (!loading_program) {
     EVERY_N_MILLISECONDS(10) {
+      // Serial.println(sc.getCmd());
       if (sc.available()) {
-        str_cmd = sc.getCmd();
+        str_cmd = sc.getCommand();
+        Serial.println(str_cmd);
 
         if (strcmp(str_cmd, "id?") == 0) {
           // Report identity
@@ -546,6 +550,11 @@ void loop() {
 
         } else if (strcmp(str_cmd, "load") == 0) {
           fsm.transitionTo(state_load_program);
+
+        } else if (strncmp(str_cmd, "s", 1) == 0) {
+          Serial.println(parseFloatInString(str_cmd, 1));
+          Serial.println(parseBoolInString(str_cmd, 1));
+          Serial.println(parseIntInString(str_cmd, 1));
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings
