@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    22-08-2022
+ * @date    27-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -280,13 +280,18 @@ void fun_load_program__ent() {
 }
 
 void fun_load_program__upd() {
-  // TODO: CODE IN DEVELOPMENT
-  uint16_t bin_data_len; // Incoming binary data length in bytes
+  // Binary serial command availability status
+  int8_t bsc_available = bsc.available();
 
-  if (bsc.available()) {
-    bin_data_len = bsc.getCommandLength();
+  if (bsc_available == -1) {
+    halt(8, "Buffer overrun in `load_program()`");
+  }
 
-    if (bin_data_len == 0) {
+  if (bsc_available) {
+    // Incoming binary data length in bytes
+    uint16_t data_len = bsc.getCommandLength();
+
+    if (data_len == 0) {
       // Found just the EOL sentinel without further information on the line -->
       // This signals the end-of-program EOP.
       Serial.println("EOP");
@@ -317,7 +322,7 @@ void fun_load_program__upd() {
     Serial.print(duration);
 
     P p;
-    for (uint16_t idx = 4; idx < bin_data_len; idx++) {
+    for (uint16_t idx = 4; idx < data_len; idx++) {
       p.unpack_byte(bin_buf[idx]);
       p.print(Serial);
     }

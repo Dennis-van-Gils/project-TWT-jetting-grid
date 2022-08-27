@@ -19,9 +19,9 @@
  * @brief Class to manage listening to a serial port for ASCII commands and act
  * upon them.
  *
- * Once a linefeed ('\\n', ASCII 10) character is received, or else when the
- * number of incoming characters has exceeded the command buffer size, we speak
- * of a completely received 'command'. Carriage return ('\\r', ASCII 13)
+ * We speak of a completely received 'command' once a linefeed ('\\n', ASCII 10)
+ * character is received, or else when the number of incoming characters has
+ * exceeded the command buffer size. Carriage return ('\\r', ASCII 13)
  * characters are ignored from the stream.
  */
 class DvG_SerialCommand {
@@ -58,7 +58,7 @@ public:
   char *getCommand();
 
 private:
-  Stream &_port;           // Reference to the serial port stream to listen to
+  Stream &_stream;         // Reference to the serial port stream to listen to
   char *_buffer;           // Reference to the command buffer
   uint16_t _max_len;       // Array size of the command buffer
   uint16_t _cur_len;       // Number of currently received command characters
@@ -74,9 +74,8 @@ private:
  * @brief Class to manage listening to a serial port for binary commands and act
  * upon them.
  *
- * Once a sequence of bytes is received that matches the end-of-line (EOL)
- * sentinel, or else when the number of incoming bytes has exceeded the command
- * buffer size, we speak of a completely received 'command'.
+ * We speak of a completely received 'command' once a sequence of bytes is
+ * received that matches the end-of-line (EOL) sentinel.
  */
 class DvG_BinarySerialCommand {
 public:
@@ -99,10 +98,17 @@ public:
    * @brief Poll the serial port refered to by @p stream for incoming bytes
    * and append them one-by-one to the command buffer @p buffer.
    *
-   * @return True when a complete command has been received and is ready to be
-   * returned by @ref getCommand(), false otherwise.
+   * @param debug_info When true it will print debug information to @p stream
+   * showing a tab-delimited list of all received bytes in HEX format. WARNING:
+   * Enabling this will likely interfere with downstream code listening in to
+   * the @p stream for I/O, so use it only for troubleshooting while developing.
+   *
+   * @return 1 (true) when a complete command has been received and is ready to
+   * be returned by @ref getCommand(). 0 (false) otherwise. The special value of
+   * -1 indicates that the command buffer was about to get overrun and that the
+   * exceeding bytes got discarded.
    */
-  bool available(bool debug_info = false);
+  int8_t available(bool debug_info = false);
 
   /**
    * @brief Returns the size of the command minus the EOL sentinel
@@ -113,7 +119,7 @@ public:
   uint16_t getCommandLength();
 
 private:
-  Stream &_port;           // Reference to the serial port stream to listen to
+  Stream &_stream;         // Reference to the serial port stream to listen to
   uint8_t *_buffer;        // Reference to the command buffer
   uint16_t _max_len;       // Array size of the command buffer
   uint16_t _cur_len;       // Number of currently received command bytes
