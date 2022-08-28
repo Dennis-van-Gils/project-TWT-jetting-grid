@@ -48,8 +48,8 @@
  * #include "DvG_StreamCommand.h"
  *
  * // Serial port listener for receiving binary commands
- * const uint8_t BIN_BUF_LEN = 64;  // Length of the binary command buffer
- * char bin_buf[BIN_BUF_LEN];       // The binary command buffer
+ * const uint8_t BIN_BUF_LEN = 64; // Length of the binary command buffer
+ * uint8_t bin_buf[BIN_BUF_LEN];   // The binary command buffer
  * const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // End-of-line sentinel
  * DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
  *
