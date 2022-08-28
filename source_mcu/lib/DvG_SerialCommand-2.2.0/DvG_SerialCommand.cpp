@@ -1,49 +1,100 @@
 /**
- * @file    DvG_SerialCommand.cpp
+ * @file    DvG_StreamCommand.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
- * @version https://github.com/Dennis-van-Gils/DvG_SerialCommand
- * @version 3.0.0
- * @date    27-08-2022
+ * @version https://github.com/Dennis-van-Gils/DvG_StreamCommand
+ * @version 1.0.0
+ * @date    28-08-2022
  *
- * @mainpage An Arduino library to listen to a serial port for incoming commands
- * and act upon them.
+ * @mainpage A lightweight Arduino library to listen for commands over a stream.
  *
- * @section Introduction
- * To keep the memory usage low, it uses a C-string (null-terminated character
- * array) to store incoming characters received over the serial port, instead of
- * using a memory hungry C++ string.
- *
- * TODO: mention ASCII and byte (raw) classes
+ * It provides two classes to allow listening to a stream, such as Serial or
+ * Wire, for incoming commands (or data packets in general) and act upon them.
+ * Class `DvG_StreamCommand` will listen for ASCII commands, while class
+ * `DvG_BinaryStreamCommand` will listen for binary commands.
  *
  * @section Usage
- * 'available()' should be called periodically to poll for incoming characters.
- * It will return true when a new command is ready to be processed.
- * Subsequently, the command string can be retrieved by calling 'getCmd()'.
+ * Method `available()` should be called repeatedly to poll for incoming
+ * characters or bytes to the stream. It will return true when a new command is
+ * ready to be processed.
  *
+ * @section example_1 Example: Serial ASCII
  * @code{.cpp}
+ * #include <Arduino.h>
+ * #include "DvG_StreamCommand.h"
+ *
+ * // Serial port listener for receiving ASCII commands
+ * const uint8_t CMD_BUF_LEN = 64;  // Length of the ASCII command buffer
+ * char cmd_buf[CMD_BUF_LEN]{'\0'}; // The ASCII command buffer
+ * DvG_StreamCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
+ *
+ * void loop() {
+ *   char *str_cmd; // Will hold a completed ASCII command string
+ *
+ *   if (sc.available()) {
+ *     str_cmd = sc.getCommand();
+ *
+ *     // Example command, put your own code here
+ *     if (strcmp(str_cmd, "id?") == 0) {
+ *       // Report identity
+ *       Serial.println("Arduino");
+ *     }
+ *   }
+ * }
+ * @endcode
+ *
+ * @section example_2 Example: Serial binary
+ * @code{.cpp}
+ * #include <Arduino.h>
+ * #include "DvG_StreamCommand.h"
+ *
+ * // Serial port listener for receiving binary commands
+ * const uint8_t BIN_BUF_LEN = 64;  // Length of the binary command buffer
+ * char bin_buf[BIN_BUF_LEN];       // The binary command buffer
+ * const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // End-of-line sentinel
+ * DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
+ *
+ * void loop() {
+ *   int8_t bsc_available = bsc.available();
+ *
+ *   if (bsc_available == -1) {
+ *     Serial.println("Buffer has overrun and bytes got dropped.");
+ *   }
+ *
+ *   if (bsc_available) {
+ *     uint16_t data_len = bsc.getCommandLength();
+ *
+ *     // Example command parser, put your own code here
+ *     for (uint16_t idx = 0; idx < data_len; ++idx) {
+ *       // Simply print all received bytes as HEX to the serial port
+ *       Serial.println(bin_buf[idx], HEX);
+ *     }
+ *   }
+ * }
  * @endcode
  *
  * @section author Author
  * Dennis van Gils (vangils.dennis@gmail.com)
  *
  * @section version Version
- * - https://github.com/Dennis-van-Gils/DvG_SerialCommand
- * - v3.0.0
+ * - https://github.com/Dennis-van-Gils/DvG_StreamCommand
+ * - v1.0.0
  *
  * @section Changelog
- * - v3.0.0 - ...
+ * - v1.0.0 - Initial commit. This is the improved successor to
+ * `DvG_SerialCommand`.
  *
  * @section license License
  * MIT License. See the LICENSE file for details.
  */
 
 #include "DvG_SerialCommand.h"
+//#include "DvG_StreamCommand.h" TODO: switch around
 
 /*******************************************************************************
-  DvG_SerialCommand
+  DvG_StreamCommand
 *******************************************************************************/
 
-DvG_SerialCommand::DvG_SerialCommand(Stream &stream, char *buffer,
+DvG_StreamCommand::DvG_StreamCommand(Stream &stream, char *buffer,
                                      uint16_t max_len)
     : _stream(stream) // Initialize reference before body
 {
@@ -54,10 +105,10 @@ DvG_SerialCommand::DvG_SerialCommand(Stream &stream, char *buffer,
   _fTerminated = false;
 }
 
-bool DvG_SerialCommand::available() {
+bool DvG_StreamCommand::available() {
   char c;
 
-  // Poll serial buffer
+  // Poll the input buffer of the stream for data
   if (_stream.available()) {
     _fTerminated = false;
     while (_stream.available()) {
@@ -65,24 +116,24 @@ bool DvG_SerialCommand::available() {
 
       if (c == 13) {
         // Ignore ASCII 13 (carriage return)
-        _stream.read(); // Remove char from serial buffer
+        _stream.read(); // Remove char from the stream input buffer
 
       } else if (c == 10) {
         // Found ASCII 10 (line feed) --> Terminate string
-        _stream.read(); // Remove char from serial buffer
+        _stream.read(); // Remove char from the stream input buffer
         _buffer[_cur_len] = '\0';
         _fTerminated = true;
         break;
 
       } else if (_cur_len < _max_len - 1) {
         // Append char to string
-        _stream.read(); // Remove char from serial buffer
+        _stream.read(); // Remove char from the stream input buffer
         _buffer[_cur_len] = c;
         _cur_len++;
 
       } else {
-        // Maximum length of incoming serial command is reached. Forcefully
-        // terminate string now. Leave the char in the serial buffer.
+        // Maximum buffer length is reached. Forcefully terminate the string
+        // in the command buffer now. Leave the char in the stream input buffer.
         _buffer[_cur_len] = '\0';
         _fTerminated = true;
         break;
@@ -93,22 +144,22 @@ bool DvG_SerialCommand::available() {
   return _fTerminated;
 }
 
-char *DvG_SerialCommand::getCommand() {
+char *DvG_StreamCommand::getCommand() {
   if (_fTerminated) {
-    // Reset serial command buffer
     _fTerminated = false;
     _cur_len = 0;
     return _buffer;
+
   } else {
     return (char *)_empty;
   }
 }
 
 /*******************************************************************************
-  DvG_BinarySerialCommand
+  DvG_BinaryStreamCommand
 *******************************************************************************/
 
-DvG_BinarySerialCommand::DvG_BinarySerialCommand(Stream &stream,
+DvG_BinaryStreamCommand::DvG_BinaryStreamCommand(Stream &stream,
                                                  uint8_t *buffer,
                                                  uint16_t max_len,
                                                  const uint8_t *EOL,
@@ -124,9 +175,10 @@ DvG_BinarySerialCommand::DvG_BinarySerialCommand(Stream &stream,
   _found_EOL = false;
 }
 
-int8_t DvG_BinarySerialCommand::available(bool debug_info) {
+int8_t DvG_BinaryStreamCommand::available(bool debug_info) {
   uint8_t c;
 
+  // Poll the input buffer of the stream for data
   while (_stream.available()) {
     c = _stream.read();
     if (debug_info) {
@@ -138,8 +190,8 @@ int8_t DvG_BinarySerialCommand::available(bool debug_info) {
       _buffer[_cur_len] = c;
       _cur_len++;
     } else {
-      // Maximum buffer length is reached. Discard the byte and return the
-      // special value of -1.
+      // Maximum buffer length is reached. Drop the byte and return the special
+      // value of -1 to signal the user.
       return -1;
     }
 
@@ -153,8 +205,8 @@ int8_t DvG_BinarySerialCommand::available(bool debug_info) {
         }
       }
       if (_found_EOL) {
-        // Wait with reading in more bytes from the serial buffer to let the
-        // user act upon the currently received command
+        // Wait with reading in more bytes from the stream input buffer to let
+        // the user act upon the currently received command
         if (debug_info) {
           _stream.print("EOL\t");
         }
@@ -166,15 +218,14 @@ int8_t DvG_BinarySerialCommand::available(bool debug_info) {
   return _found_EOL;
 }
 
-uint16_t DvG_BinarySerialCommand::getCommandLength() {
+uint16_t DvG_BinaryStreamCommand::getCommandLength() {
   uint16_t len;
 
   if (_found_EOL) {
     len = _cur_len - _EOL_len;
-
-    // Reset serial command buffer
     _found_EOL = false;
     _cur_len = 0;
+
   } else {
     len = 0;
   }

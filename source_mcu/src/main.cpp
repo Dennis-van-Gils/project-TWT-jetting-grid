@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    27-08-2022
+ * @date    28-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -28,15 +28,15 @@
 #include <array>
 
 // Serial port listener for receiving ASCII commands
-const uint8_t CMD_BUF_LEN = 64;  // Incoming ASCII-command buffer
-char cmd_buf[CMD_BUF_LEN]{'\0'}; // Incoming ASCII-command buffer
-DvG_SerialCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
+const uint8_t CMD_BUF_LEN = 64;  // Length of the ASCII command buffer
+char cmd_buf[CMD_BUF_LEN]{'\0'}; // The ASCII command buffer
+DvG_StreamCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
 
 // Serial port listener for receiving binary data decoding a protocol program
-const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // Binary end-of-line sentinel
-const uint8_t BIN_BUF_LEN = 229;                // Incoming binary-data buffer
-uint8_t bin_buf[BIN_BUF_LEN];                   // Incoming binary-data buffer
-DvG_BinarySerialCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
+const uint8_t BIN_BUF_LEN = 229; // Length of the binary data buffer
+uint8_t bin_buf[BIN_BUF_LEN];    // The binary data buffer
+const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // End-of-line sentinel
+DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
 
 // Will be used externally
 const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
