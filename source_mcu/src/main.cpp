@@ -322,7 +322,7 @@ void fun_load_program__upd() {
     P p;
     for (uint16_t idx = 2; idx < data_len; idx++) {
       p.unpack_byte(bin_buf[idx]);
-      p.print(Serial);
+      p.print();
     }
 
     Serial.write('\n');
@@ -512,8 +512,11 @@ void loop() {
         } else if (strcmp(str_cmd, "load") == 0) {
           fsm.transitionTo(state_load_program);
 
-        } else if (strncmp(str_cmd, "t", 1) == 0) {
-          // sbc.test();
+        } else if (strncmp(str_cmd, "b?", 2) == 0) {
+          protocol_mgr.print_buffer();
+
+        } else if (strncmp(str_cmd, "p?", 2) == 0) {
+          protocol_mgr.print();
 
         } else if (strncmp(str_cmd, "s", 1) == 0) {
           Serial.println(parseFloatInString(str_cmd, 1));

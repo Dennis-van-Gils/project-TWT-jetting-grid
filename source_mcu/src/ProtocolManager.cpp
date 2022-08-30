@@ -34,13 +34,13 @@ ProtocolManager::ProtocolManager() { clear(); }
 ------------------------------------------------------------------------------*/
 
 void ProtocolManager::clear() {
-  for (auto t_packed = program_.begin(); t_packed != program_.end();
+  for (auto t_packed = _program.begin(); t_packed != _program.end();
        ++t_packed) {
     t_packed->duration = 0;
     t_packed->packed.fill(0);
   }
-  N_lines_ = 0;
-  pos_ = -1; // -1 indicates we're at start-up of program
+  _N_lines = 0;
+  _pos = -1; // -1 indicates we're at start-up of program
 }
 
 /*------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ void ProtocolManager::clear() {
 ------------------------------------------------------------------------------*/
 
 bool ProtocolManager::add_line(const uint16_t duration, const Line &line) {
-  if (N_lines_ == MAX_LINES) {
+  if (_N_lines == MAX_LINES) {
     return false;
   }
 
@@ -67,12 +67,12 @@ bool ProtocolManager::add_line(const uint16_t duration, const Line &line) {
                p->y);
       halt(2, buf);
     }
-    program_[N_lines_].packed[tmp_y] |= (1U << tmp_x);
+    _program[_N_lines].packed[tmp_y] |= (1U << tmp_x);
   }
   // End of pack
 
-  program_[N_lines_].duration = duration;
-  N_lines_++;
+  _program[_N_lines].duration = duration;
+  _N_lines++;
 
   return true;
 }
@@ -86,9 +86,9 @@ bool ProtocolManager::add_line(const TimedLine &timed_line) {
 ------------------------------------------------------------------------------*/
 
 void ProtocolManager::transfer_next_line_to_buffer() {
-  pos_++;
-  if (pos_ == N_lines_) {
-    pos_ = 0;
+  _pos++;
+  if (_pos == _N_lines) {
+    _pos = 0;
   }
 
   // Unpack array of PCS points from bitmasks
@@ -96,11 +96,11 @@ void ProtocolManager::transfer_next_line_to_buffer() {
   P p;                // Unpacked point
 
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (program_[pos_].packed[row]) {
+    if (_program[_pos].packed[row]) {
       // There is a mask > 0, so there must be at least one coordinate to unpack
       p.y = PCS_Y_MAX - row;
       for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
-        if ((program_[pos_].packed[row] >> (bit)) & 0x01) {
+        if ((_program[_pos].packed[row] >> (bit)) & 0x01) {
           p.x = PCS_X_MIN + bit;
           timed_line_buffer.line[idx_P] = p;
           idx_P++;
@@ -109,7 +109,37 @@ void ProtocolManager::transfer_next_line_to_buffer() {
     }
   }
   timed_line_buffer.line[idx_P].set_null(); // Add end sentinel
-  timed_line_buffer.duration = program_[pos_].duration;
+  timed_line_buffer.duration = _program[_pos].duration;
+}
+
+/*------------------------------------------------------------------------------
+  ProtocolManager::print
+------------------------------------------------------------------------------*/
+
+void ProtocolManager::print(Stream &stream) {
+  P p; // Unpacked point
+
+  for (uint16_t i = 0; i < _N_lines; ++i) {
+    snprintf(buf, BUF_LEN, "*** Line %d | %d [ms]\n", i, _program[i].duration);
+    stream.print(buf);
+
+    for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+      if (_program[i].packed[row]) {
+        // There is a mask > 0, so there must be at least one coordinate to
+        // unpack
+        p.y = PCS_Y_MAX - row;
+        for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
+          if ((_program[i].packed[row] >> (bit)) & 0x01) {
+            p.x = PCS_X_MIN + bit;
+            p.print(stream);
+          }
+        }
+      }
+    }
+
+    stream.write('\n');
+    stream.write('\n');
+  }
 }
 
 /*------------------------------------------------------------------------------
@@ -117,12 +147,17 @@ void ProtocolManager::transfer_next_line_to_buffer() {
 ------------------------------------------------------------------------------*/
 
 void ProtocolManager::print_buffer(Stream &stream) {
-  stream.println(timed_line_buffer.duration);
+  snprintf(buf, BUF_LEN, "*** Line %d | %d [ms]\n", _pos,
+           timed_line_buffer.duration);
+  stream.print(buf);
+
   for (auto &p : timed_line_buffer.line) {
     if (p.is_null()) {
       break; // Reached the end of the list as indicated by the end sentinel
     }
-    p.print(Serial);
+    p.print(stream);
   }
+
+  stream.write('\n');
   stream.write('\n');
 }

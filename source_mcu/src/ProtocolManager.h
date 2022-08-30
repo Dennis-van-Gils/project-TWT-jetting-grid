@@ -87,12 +87,6 @@ public:
    * @return The byte-encoded PCS coordinate
    */
   inline uint8_t pack_into_byte() {
-    /*
-    uint8_t c;
-    c = (x - PCS_X_MIN) << 4;
-    c |= ((y - PCS_Y_MIN) & 0xF);
-    return c;
-    */
     return (uint8_t)((x - PCS_X_MIN) << 4) | //
            (uint8_t)((y - PCS_Y_MIN) & 0xF);
   }
@@ -110,7 +104,12 @@ public:
     y = (c & 0xF) + PCS_Y_MIN;
   }
 
-  void print(Stream &stream);
+  /**
+   * @brief Pretty print the PCS coordinate as '(x, y)', useful for debugging.
+   *
+   * @param stream The stream to print to. Default: Serial.
+   */
+  void print(Stream &stream = Serial);
 
   // Public members
   int8_t x; // x-coordinate
@@ -214,12 +213,12 @@ public:
   /**
    * @brief Reset the playback position of the protocol program back to start.
    */
-  inline void restart() { pos_ = -1; }
+  inline void restart() { _pos = -1; }
 
   /**
    * @return True when the end of the protocol has been reached, false otherwise
    */
-  inline bool reached_end() { return (pos_ == (N_lines_ - 1)); }
+  inline bool reached_end() { return (_pos == (_N_lines - 1)); }
 
   /**
    * @brief Adds a new Line to the protocol program.
@@ -242,9 +241,20 @@ public:
    */
   void transfer_next_line_to_buffer();
 
-  void print_buffer(Stream &stream);
+  /**
+   * @brief Pretty print to full protocol program, useful for debugging.
+   *
+   * @param stream The stream to print to. Default: Serial.
+   */
+  void print(Stream &stream = Serial);
 
-  // Public members
+  /**
+   * @brief Pretty print to current line buffer, useful for debugging.
+   *
+   * @param stream The stream to print to. Default: Serial.
+   */
+  void print_buffer(Stream &stream = Serial);
+
   /**
    * @brief Buffer containing the TimedLine as retreived by method
    * `transfer_next_line_to_buffer()`.
@@ -263,9 +273,9 @@ public:
   TimedLine timed_line_buffer;
 
 private:
-  Program program_;  // The protocol program
-  uint16_t N_lines_; // Total number of lines currently loaded into the program
-  int16_t pos_; // Playback position, where -1 indicates start of the program
+  Program _program;  // The protocol program
+  uint16_t _N_lines; // Total number of lines currently loaded into the program
+  int16_t _pos; // Playback position, where -1 indicates start of the program
 };
 
 #endif
