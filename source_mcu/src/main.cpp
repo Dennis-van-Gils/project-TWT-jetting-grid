@@ -33,9 +33,9 @@ char cmd_buf[CMD_BUF_LEN]{'\0'}; // The ASCII command buffer
 DvG_StreamCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
 
 // Serial port listener for receiving binary data decoding a protocol program
-const uint8_t BIN_BUF_LEN = 229; // Length of the binary data buffer
-uint8_t bin_buf[BIN_BUF_LEN];    // The binary data buffer
-const uint8_t EOL[] = {0xff, 0xff, 0xff, 0xff}; // End-of-line sentinel
+const uint8_t BIN_BUF_LEN = 229;          // Length of the binary data buffer
+uint8_t bin_buf[BIN_BUF_LEN];             // The binary data buffer
+const uint8_t EOL[] = {0xff, 0xff, 0xff}; // End-of-line sentinel
 DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
 
 // Will be used externally
@@ -308,21 +308,19 @@ void fun_load_program__upd() {
 
     // Try to parse the newly send line of the protocol program
     // Expecting a binary stream as follows:
-    // 1 x 4 bytes: uint32_t time duration in [ms]
+    // 1 x 2 bytes: uint16_t time duration in [ms]
     // N x 1 byte : byte-encoded PCS coordinate where
     //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
 
-    uint32_t duration;
+    uint16_t duration;
     // clang-format off
-    duration = (uint32_t)bin_buf[0] << 24 |
-               (uint32_t)bin_buf[1] << 16 |
-               (uint32_t)bin_buf[2] << 8  |
-               (uint32_t)bin_buf[3];
+    duration = (uint16_t)bin_buf[0] << 8 |
+               (uint16_t)bin_buf[1];
     // clang-format on
     Serial.print(duration);
 
     P p;
-    for (uint16_t idx = 4; idx < data_len; idx++) {
+    for (uint16_t idx = 2; idx < data_len; idx++) {
       p.unpack_byte(bin_buf[idx]);
       p.print(Serial);
     }
