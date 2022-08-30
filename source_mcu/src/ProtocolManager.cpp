@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    16-08-2022
+ * @date    30-08-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -47,7 +47,7 @@ void ProtocolManager::clear() {
   ProtocolManager::add_line
 ------------------------------------------------------------------------------*/
 
-bool ProtocolManager::add_line(const uint32_t duration, const Line &line) {
+bool ProtocolManager::add_line(const uint16_t duration, const Line &line) {
   if (N_lines_ == MAX_LINES) {
     return false;
   }

@@ -3,7 +3,7 @@ Protocol:
 	Name: Protocol nr 1
 	Stats: delta T = 2 s, delta X = 2.5 (info to be able to generate this protocol)
 	[DATA]
-	[timestamp in ms]    [list of open valves in grid (-7,-7) to (7,7)]
+	[duration in ms, max 2^16-1] [list of open valves in grid (-7,-7) to (7,7)]
 	0       -7,-2    3,2    1,2    4,-2
 	500     -6,-4    3,6    -3,2
 	1000    ..... 
@@ -15,12 +15,13 @@ Memory allocation @ Arduino:
 
 	Protocol:
 
-	Send to Arduino via ASCII
-	-------------------------
-	[timestamp in ms] \t [coord 1 as x, y] \t [coord 2 as xy] \t .... \n
-	0   \t 7,6 \t -3,2 \t -7,-5 \t ... \n
-	100 \t 5,2 \t -1,2 \t  2,-4 \t ... \n
-	Sends a single line each time
+	Send from Python to Arduino via binary
+	--------------------------------------
+	Sends a single protocol line each time as follows:
+	  2 bytes: Duration in ms, big-endian
+	  N bytes: Each PCS point (x, y) packed into a single byte
+	  3 bytes: EOL sentinel
+	
 
 	When received at Arduino side
 	-----------------------------
@@ -28,8 +29,8 @@ Memory allocation @ Arduino:
 	send PCS coordinates are 1's, the rest 0.
 	Next, we pack each row of the matrix in a 16 bit structure, i.e. uint16_t.
 	We have 15 rows of each 16 bits --> 30 bytes for the full boolean matrix
-	+4 bytes for the timestamp in ms as uint32_t
-	----> 30 + 4 = 34 bytes per protocol line, fixed number of bytes, regardless
+	+2 bytes for the time duration in ms as uint16_t
+	----> 30 + 2 = 32 bytes per protocol line, fixed number of bytes, regardless
 	of how many valves should be open or close
 	This allows us to define a fixed-size array within C++, yeay!
-	Say we have 180.000 bytes of RAM left over to play with --> 180000/34 = 5294 protocol lines
+	Say we have 180.000 bytes of RAM left over to play with --> 180000/32 = 5625 protocol lines

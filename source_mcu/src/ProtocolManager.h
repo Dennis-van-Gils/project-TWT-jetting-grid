@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    23-08-2022
+ * @date    30-08-2022
  *
  * @brief   Provides classes `P` and `ProtocolManager`, needed for the control
  * of the jetting grid of the Twente Water Tunnel.
@@ -168,7 +168,7 @@ using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
  * See @p `Line` for more details.
  */
 struct TimedLine {
-  uint32_t duration; // Time duration in [ms]
+  uint16_t duration; // Time duration in [ms]
   Line line;
 };
 
@@ -178,7 +178,7 @@ struct TimedLine {
  * See @p `PackedLine` for more details.
  */
 struct TimedPackedLine {
-  uint32_t duration; // Time duration in [ms]
+  uint16_t duration; // Time duration in [ms]
   PackedLine packed;
 };
 
@@ -230,7 +230,7 @@ public:
    * @return True when the new line is successfully added. False otherwise,
    * because the maximum number of lines has been reached.
    */
-  bool add_line(uint32_t duration, const Line &line);
+  bool add_line(uint16_t duration, const Line &line);
   bool add_line(const TimedLine &timed_line);
 
   /**

@@ -34,11 +34,11 @@ print(ard.query("load"))
 
 # Prepare binary data stream
 
-ard.set_write_termination(bytes((0xff, 0xff, 0xff, 0xff)))   # EOL
+ard.set_write_termination(bytes((0xff, 0xff, 0xff)))   # EOL
 
 ### First line
 
-raw = bytearray(struct.pack(">L", 255))  # Time duration
+raw = bytearray(struct.pack(">H", 255))  # Time duration
 for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
 
@@ -48,7 +48,7 @@ print(ans)
 
 ### Second line
 
-raw = bytearray(struct.pack(">L", 65535))  # Time duration
+raw = bytearray(struct.pack(">H", 2**16 - 1))  # Time duration
 line = (P(0, 1), P(1, 0), P(0, -1), P(-1, 0))
 for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
