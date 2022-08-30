@@ -2,7 +2,7 @@
  * @file    DvG_StreamCommand.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/DvG_StreamCommand
- * @version 1.0.0
+ * @version 1.1.0
  * @date    30-08-2022
  *
  * @mainpage A lightweight Arduino library to listen for commands over a stream.
@@ -23,9 +23,10 @@
  *
  * @section version Version
  * - https://github.com/Dennis-van-Gils/DvG_StreamCommand
- * - v1.0.0
+ * - v1.1.0
  *
  * @section Changelog
+ * - v1.1.0 - Added method `reset()`
  * - v1.0.0 - Initial commit. This is the improved successor to
  * `DvG_SerialCommand`.
  *
@@ -44,10 +45,8 @@ DvG_StreamCommand::DvG_StreamCommand(Stream &stream, char *buffer,
     : _stream(stream) // Initialize reference before body
 {
   _buffer = buffer;
-  _buffer[0] = '\0';
   _max_len = max_len;
-  _cur_len = 0;
-  _fTerminated = false;
+  reset();
 }
 
 bool DvG_StreamCommand::available() {
@@ -112,12 +111,10 @@ DvG_BinaryStreamCommand::DvG_BinaryStreamCommand(Stream &stream,
     : _stream(stream) // Initialize reference before body
 {
   _buffer = buffer;
-  _buffer[0] = 0;
   _max_len = max_len;
-  _cur_len = 0;
   _EOL = EOL;
   _EOL_len = EOL_len;
-  _found_EOL = false;
+  reset();
 }
 
 int8_t DvG_BinaryStreamCommand::available(bool debug_info) {

@@ -61,6 +61,15 @@ public:
    */
   char *getCommand();
 
+  /**
+   * @brief Empty the command buffer.
+   */
+  inline void reset() {
+    _fTerminated = false;
+    _buffer[0] = '\0';
+    _cur_len = 0;
+  }
+
 private:
   Stream &_stream;         // Reference to the stream to listen to
   char *_buffer;           // Reference to the command buffer
@@ -134,10 +143,12 @@ public:
   uint16_t getCommandLength();
 
   /**
-   * @brief TODO: descr
-   *
+   * @brief Empty the command buffer.
    */
   inline void reset() {
+    for (uint16_t i = 0; i < _max_len; ++i) {
+      _buffer[i] = 0;
+    }
     _found_EOL = false;
     _cur_len = 0;
   }
