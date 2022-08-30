@@ -117,7 +117,7 @@ public:
    *
    * @return 1 (true) when a complete command has been received and its size is
    * ready to be returned by @ref getCommandLength(). Otherwise 0 (false) when
-   * no complete command has been received yet, or -1 (false) as a special value
+   * no complete command has been received yet, or -1 (true!) as a special value
    * to indicate that the command buffer was overrun and that the exceeding byte
    * got dropped.
    */
@@ -132,6 +132,15 @@ public:
    * @return uint16_t
    */
   uint16_t getCommandLength();
+
+  /**
+   * @brief TODO: descr
+   *
+   */
+  inline void reset() {
+    _found_EOL = false;
+    _cur_len = 0;
+  }
 
 private:
   Stream &_stream;     // Reference to the stream to listen to
@@ -153,17 +162,20 @@ private:
  *
  * @return The parsed float value when successful, 0.0 otherwise.
  */
-float parseFloatInString(const char *str_in, uint16_t pos);
+float parseFloatInString(const char *str_in, uint16_t pos = 0);
 
 /**
  * @brief Safely parse a boolean value in C-string @p str_in from of position
  * @p pos.
  *
- * @return 1 when the string starts with '1' after any leading spaces, zeros or
- * '+' sign has been removed. 1 when the string perfectly matches 'true', 'True'
- * or 'TRUE'. 0 otherwise.
+ * @return
+ *   - False, when @p str_in is empty or @p pos is past the @p str_in length.
+ *   - True, when the string perfectly matches 'true', 'True' or 'TRUE'.
+ *   - Else, it will interpret the string as an integer, where 0 is considered
+ * to be false and all other integers are considered be true. Leading spaces,
+ * zeros or signs will be ignored from the integer.
  */
-bool parseBoolInString(const char *str_in, uint16_t pos);
+bool parseBoolInString(const char *str_in, uint16_t pos = 0);
 
 /**
  * @brief Safely parse an integer value in C-string @p str_in from of position
@@ -171,6 +183,6 @@ bool parseBoolInString(const char *str_in, uint16_t pos);
  *
  * @return The parsed integer value when successful, 0 otherwise.
  */
-int parseIntInString(const char *str_in, uint16_t pos);
+int parseIntInString(const char *str_in, uint16_t pos = 0);
 
 #endif

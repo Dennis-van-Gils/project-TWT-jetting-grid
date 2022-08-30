@@ -15,7 +15,7 @@
 #include "constants.h"
 #include "translations.h"
 
-#include "DvG_SerialCommand.h"
+#include "DvG_StreamCommand.h"
 #include "FastLED.h"
 #include "FiniteStateMachine.h"
 #include "MIKROE_4_20mA_RT_Click.h"
