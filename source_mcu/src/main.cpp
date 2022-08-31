@@ -279,9 +279,12 @@ void fun_load_program__ent() {
   open_all_valves();
   loading_program = true;
   alive_blinker_color = CRGB::Blue;
+  protocol_mgr.clear();
 }
 
 void fun_load_program__upd() {
+  Line line;
+
   // Binary serial command availability status
   int8_t bsc_available = bsc.available();
 
@@ -313,18 +316,19 @@ void fun_load_program__upd() {
     // 1 x 2 bytes: uint16_t time duration in [ms]
     // N x 1 byte : byte-encoded PCS coordinate where
     //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
+    line.duration = (uint16_t)bin_buf[0] << 8 | //
+                    (uint16_t)bin_buf[1];
 
-    uint16_t duration;
-    duration = (uint16_t)bin_buf[0] << 8 | //
-               (uint16_t)bin_buf[1];
-    Serial.print(duration);
-
-    P p;
-    for (uint16_t idx = 2; idx < data_len; idx++) {
-      p.unpack_byte(bin_buf[idx]);
-      p.print();
+    uint16_t idx_P = 0; // Index of newly unpacked point
+    for (uint16_t idx = 2; idx < data_len; ++idx) {
+      line.points[idx_P].unpack_byte(bin_buf[idx]);
+      idx_P++;
     }
+    line.points[idx_P].set_null(); // Add end sentinel
 
+    protocol_mgr.add_line(line);
+
+    line.print();
     Serial.write('\n');
   }
 

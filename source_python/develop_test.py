@@ -38,22 +38,26 @@ ard.set_write_termination(bytes((0xff, 0xff, 0xff)))   # EOL
 
 ### First line
 
-raw = bytearray(struct.pack(">H", 255))  # Time duration
+raw = bytearray(struct.pack(">H", 2000))  # Time duration
 for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
 
 ard.write(raw)
 success, ans = ard.readline()
 print(ans)
+success, ans = ard.readline()
+print(ans)
 
 ### Second line
 
-raw = bytearray(struct.pack(">H", 2**16 - 1))  # Time duration
+raw = bytearray(struct.pack(">H", 2000))  # Time duration
 line = (P(0, 1), P(1, 0), P(0, -1), P(-1, 0))
 for p in line:  # List of PCS points
     raw.append(p.pack_into_byte())
 
 ard.write(raw)
+success, ans = ard.readline()
+print(ans)
 success, ans = ard.readline()
 print(ans)
 
