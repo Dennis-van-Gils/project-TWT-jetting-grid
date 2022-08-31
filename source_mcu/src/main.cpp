@@ -158,16 +158,10 @@ bool R_click_poll_EMA_collectively() {
 ------------------------------------------------------------------------------*/
 
 void open_all_valves() {
-  P p; // PCS point
-
-  for (int8_t x = -7; x < 8; ++x) {
-    for (int8_t y = -7; y < 8; ++y) {
-      if ((x + y) & 1) {
-        p.set(x, y);
-        cp_mgr.add_to_masks(valve2cp(p2valve(p)));
-        leds[p2led(p)] = CRGB::Red;
-      }
-    }
+  cp_mgr.clear_masks();
+  for (uint8_t idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
+    cp_mgr.add_to_masks(valve2cp(idx_valve + 1));
+    leds[p2led(valve2p(idx_valve + 1))] = CRGB::Red;
   }
 
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
@@ -214,7 +208,13 @@ void fun_single_valve__upd() {}
 //  FSM: Run program
 // -------------------------
 
-void fun_run_program__ent() { alive_blinker_color = CRGB::Green; }
+void fun_run_program__ent() {
+  alive_blinker_color = CRGB::Green;
+  // Clear all valve leds
+  for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
+    leds[p2led(valve2p(idx_valve + 1))] = 0;
+  }
+}
 
 void fun_run_program__upd() {
   now = millis();
