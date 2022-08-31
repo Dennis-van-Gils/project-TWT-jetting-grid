@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    30-08-2022
+ * @date    31-08-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -13,50 +13,20 @@
   P "Point in the Protocol Coordinate System (PCS)"
 ------------------------------------------------------------------------------*/
 
-P::P(int8_t x_, int8_t y_) {
-  x = x_;
-  y = y_;
-}
-
 void P::print(Stream &stream) {
   snprintf(buf, BUF_LEN, "(%d, %d)", x, y);
   stream.print(buf);
 }
 
 /*------------------------------------------------------------------------------
-  ProtocolManager
+  Line
 ------------------------------------------------------------------------------*/
 
-ProtocolManager::ProtocolManager() { clear(); }
-
-/*------------------------------------------------------------------------------
-  ProtocolManager::clear
-------------------------------------------------------------------------------*/
-
-void ProtocolManager::clear() {
-  for (auto t_packed = _program.begin(); t_packed != _program.end();
-       ++t_packed) {
-    t_packed->duration = 0;
-    t_packed->packed.fill(0);
-  }
-  _N_lines = 0;
-  _pos = -1; // -1 indicates we're at start-up of program
-}
-
-/*------------------------------------------------------------------------------
-  ProtocolManager::add_line
-------------------------------------------------------------------------------*/
-
-bool ProtocolManager::add_line(const uint16_t duration, const Line &line) {
-  if (_N_lines == MAX_LINES) {
-    return false;
-  }
-
+void Line::pack_into(PackedLine &output) const {
   // Pack array of PCS points into bitmasks
-  for (auto p = line.begin(); p != line.end(); ++p) {
+  for (auto p = points.begin(); p != points.end(); ++p) {
     if (p->is_null()) {
-      // Reached the end of the list as indicated by the end sentinel
-      break;
+      break; // Reached the end sentinel
     }
 
     int8_t tmp_x = p->x - PCS_X_MIN;
@@ -67,23 +37,80 @@ bool ProtocolManager::add_line(const uint16_t duration, const Line &line) {
                p->y);
       halt(2, buf);
     }
-    _program[_N_lines].packed[tmp_y] |= (1U << tmp_x);
+    output.masks[tmp_y] |= (1U << tmp_x);
+    output.duration = duration;
   }
-  // End of pack
-
-  _program[_N_lines].duration = duration;
-  _N_lines++;
-
-  return true;
 }
 
-bool ProtocolManager::add_line(const TimedLine &timed_line) {
-  return add_line(timed_line.duration, timed_line.line);
+void Line::print(Stream &stream) {
+  snprintf(buf, BUF_LEN, "%d [ms]\n", duration);
+  stream.print(buf);
+
+  for (auto &p : points) {
+    if (p.is_null()) {
+      break; // Reached the end sentinel
+    }
+    p.print(stream);
+  }
 }
 
 /*------------------------------------------------------------------------------
-  ProtocolManager::transfer_next_line_to_buffer
+  PackedLine
 ------------------------------------------------------------------------------*/
+
+void PackedLine::unpack_into(Line &output) const {
+  uint16_t idx_P = 0; // Index of newly unpacked point
+  P p;                // Unpacked point
+
+  // Unpack array of PCS points from bitmasks
+  for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
+    if (masks[row]) {
+      // There is a mask > 0, so there must be at least one coordinate to unpack
+      p.y = PCS_Y_MAX - row;
+      for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
+        if ((masks[row] >> (bit)) & 0x01) {
+          p.x = PCS_X_MIN + bit;
+          output.points[idx_P] = p;
+          idx_P++;
+        }
+      }
+    }
+  }
+  output.points[idx_P].set_null(); // Add end sentinel
+  output.duration = duration;
+}
+
+/*------------------------------------------------------------------------------
+  ProtocolManager
+------------------------------------------------------------------------------*/
+
+ProtocolManager::ProtocolManager() { clear(); }
+
+void ProtocolManager::clear() {
+  for (auto packed_line = _program.begin(); packed_line != _program.end();
+       ++packed_line) {
+    packed_line->duration = 0;
+    packed_line->masks.fill(0);
+  }
+  _N_lines = 0;
+  _pos = -1; // -1 indicates we're at start-up of program
+}
+
+bool ProtocolManager::add_line(const Line &line) {
+  if (_N_lines == MAX_LINES) {
+    return false;
+  }
+
+  line.pack_into(_program[_N_lines]);
+  _N_lines++;
+  return true;
+}
+
+bool ProtocolManager::add_line(const uint16_t duration,
+                               const PointsArray &points) {
+  Line line(duration, points);
+  return add_line(line);
+}
 
 void ProtocolManager::transfer_next_line_to_buffer() {
   _pos++;
@@ -91,73 +118,26 @@ void ProtocolManager::transfer_next_line_to_buffer() {
     _pos = 0;
   }
 
-  // Unpack array of PCS points from bitmasks
-  uint16_t idx_P = 0; // Index of newly unpacked point
-  P p;                // Unpacked point
-
-  for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-    if (_program[_pos].packed[row]) {
-      // There is a mask > 0, so there must be at least one coordinate to unpack
-      p.y = PCS_Y_MAX - row;
-      for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
-        if ((_program[_pos].packed[row] >> (bit)) & 0x01) {
-          p.x = PCS_X_MIN + bit;
-          timed_line_buffer.line[idx_P] = p;
-          idx_P++;
-        }
-      }
-    }
-  }
-  timed_line_buffer.line[idx_P].set_null(); // Add end sentinel
-  timed_line_buffer.duration = _program[_pos].duration;
+  _program[_pos].unpack_into(line_buffer);
 }
-
-/*------------------------------------------------------------------------------
-  ProtocolManager::print
-------------------------------------------------------------------------------*/
 
 void ProtocolManager::print(Stream &stream) {
-  P p; // Unpacked point
+  Line line;
 
   for (uint16_t i = 0; i < _N_lines; ++i) {
-    snprintf(buf, BUF_LEN, "*** Line %d | %d [ms]\n", i, _program[i].duration);
+    snprintf(buf, BUF_LEN, "*** Line %d | ", i);
     stream.print(buf);
-
-    for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
-      if (_program[i].packed[row]) {
-        // There is a mask > 0, so there must be at least one coordinate to
-        // unpack
-        p.y = PCS_Y_MAX - row;
-        for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
-          if ((_program[i].packed[row] >> (bit)) & 0x01) {
-            p.x = PCS_X_MIN + bit;
-            p.print(stream);
-          }
-        }
-      }
-    }
-
+    _program[i].unpack_into(line);
+    line.print();
     stream.write('\n');
     stream.write('\n');
   }
 }
 
-/*------------------------------------------------------------------------------
-  ProtocolManager::print_buffer
-------------------------------------------------------------------------------*/
-
 void ProtocolManager::print_buffer(Stream &stream) {
-  snprintf(buf, BUF_LEN, "*** Line %d | %d [ms]\n", _pos,
-           timed_line_buffer.duration);
+  snprintf(buf, BUF_LEN, "*** Line %d | ", _pos);
   stream.print(buf);
-
-  for (auto &p : timed_line_buffer.line) {
-    if (p.is_null()) {
-      break; // Reached the end of the list as indicated by the end sentinel
-    }
-    p.print(stream);
-  }
-
+  line_buffer.print();
   stream.write('\n');
   stream.write('\n');
 }

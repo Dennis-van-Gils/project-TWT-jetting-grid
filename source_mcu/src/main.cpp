@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    28-08-2022
+ * @date    31-08-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -47,7 +47,7 @@ uint32_t utick = micros();
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -183,8 +183,8 @@ uint32_t now;              // Timestamp [ms]
 uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
 uint8_t idx_valve;         // Frequently used valve index
 
-// Switches the main serial command listener momentarily off to allow for
-// loading in a new protocol program over serial.
+// Switches the ASCII-command listener momentarily off to allow for loading in a
+// new protocol program via a binary-command listener.
 bool loading_program = false;
 
 // -------------------------
@@ -202,11 +202,13 @@ State state_idle(fun_idle__ent, fun_idle__upd);
 
 FiniteStateMachine fsm(state_idle);
 
+/*
 // -------------------------
 //  FSM: Single valve mode
 // -------------------------
 
 void fun_single_valve__upd() {}
+*/
 
 // -------------------------
 //  FSM: Run program
@@ -216,11 +218,11 @@ void fun_run_program__ent() { alive_blinker_color = CRGB::Green; }
 
 void fun_run_program__upd() {
   now = millis();
-  if (now - tick_program >= protocol_mgr.timed_line_buffer.duration) {
+  if (now - tick_program >= protocol_mgr.line_buffer.duration) {
     // It is time to advance to the next line in the protocol program
 
     // Recolor the LEDs of previously active valves from red to blue
-    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+    for (auto &p : protocol_mgr.line_buffer.points) {
       if (p.is_null()) {
         break;
       }
@@ -232,9 +234,9 @@ void fun_run_program__upd() {
 
     // Parse the line
     cp_mgr.clear_masks();
-    for (auto &p : protocol_mgr.timed_line_buffer.line) {
+    for (auto &p : protocol_mgr.line_buffer.points) {
       if (p.is_null()) {
-        break;
+        break; // Reached the end sentinel
       }
 
       // Add valve to be opened to the Centipede masks
@@ -313,10 +315,8 @@ void fun_load_program__upd() {
     //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
 
     uint16_t duration;
-    // clang-format off
-    duration = (uint16_t)bin_buf[0] << 8 |
+    duration = (uint16_t)bin_buf[0] << 8 | //
                (uint16_t)bin_buf[1];
-    // clang-format on
     Serial.print(duration);
 
     P p;
@@ -432,48 +432,28 @@ void setup() {
   Serial.println(F("Cleared protocol"));
 
   utick = micros();
-  // clang-format off
-  /*
-  // Clock-face style
-  // ---------------------
-  protocol_mgr.add_line(1000,
-      Line{P{-6, 7}, P{-5, 6}, P{-4, 5}, P{-3, 4}, P{-2, 3}, P{-1, 2}, P{0, 1}});
-  protocol_mgr.add_line(1000,
-      Line{P{0, 7}, P{0, 5}, P{0, 3}, P{0, 1}});
-  protocol_mgr.add_line(1000,
-      Line{P{6, 7}, P{5, 6}, P{4, 5}, P{3, 4}, P{2, 3}, P{1, 2}, P{0, 1}});
-  protocol_mgr.add_line(1000,
-      Line{P{1, 0}, P{3, 0}, P{5, 0}, P{7, 0}});
-  protocol_mgr.add_line(1000,
-      Line{P{6, -7}, P{5, -6}, P{4, -5}, P{3, -4}, P{2, -3}, P{1, -2}, P{0, -1}});
-  protocol_mgr.add_line(1000,
-      Line{P{0, -1}, P{0, -3}, P{0, -5}, P{0, -7}});
-  protocol_mgr.add_line(1000,
-      Line{P{-6, -7}, P{-5, -6}, P{-4, -5}, P{-3, -4}, P{-2, -3}, P{-1, -2}, P{0, -1}});
-  protocol_mgr.add_line(1000,
-      Line{P{-7, 0}, P{-5, 0}, P{-3, 0}, P{-1, 0}});
-  // ---------------------
-  */
-  // clang-format on
 
-  // Growing center square
-  // ---------------------
+  // DEMO: Growing center square
+  // ---------------------------
+  Line line;
+
   for (uint8_t rung = 0; rung < 7; rung++) {
-    Line line = {};
     uint8_t idx_P = 0;
     for (int8_t x = -7; x < 8; ++x) {
       for (int8_t y = -7; y < 8; ++y) {
         if ((x + y) & 1) {
           if (abs(x) + abs(y) == rung * 2 + 1) {
-            line[idx_P].set(x, y);
+            line.points[idx_P].set(x, y);
+            line.duration = 200; // [ms]
             idx_P++;
           }
         }
       }
     }
-    protocol_mgr.add_line(200, line);
+    line.points[idx_P].set_null(); // Add end sentinel
+    protocol_mgr.add_line(line);
   }
-  // ---------------------
+  // ---------------------------
 
   Serial.println(micros() - utick);
   Serial.println(F("Wrote protocol"));
@@ -517,11 +497,6 @@ void loop() {
 
         } else if (strncmp(str_cmd, "p?", 2) == 0) {
           protocol_mgr.print();
-
-        } else if (strncmp(str_cmd, "s", 1) == 0) {
-          Serial.println(parseFloatInString(str_cmd, 1));
-          Serial.println(parseBoolInString(str_cmd, 1));
-          Serial.println(parseIntInString(str_cmd, 1));
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings

@@ -2,10 +2,11 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    30-08-2022
+ * @date    31-08-2022
  *
- * @brief   Provides classes `P` and `ProtocolManager`, needed for the control
- * of the jetting grid of the Twente Water Tunnel.
+ * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
+ * needed for reading in and playing back a protocol program for the jetting
+ * grid of the Twente Water Tunnel.
  *
  * @section Abbrevations
  * - PCS: Protocol Coordinate System
@@ -27,9 +28,7 @@ extern char buf[];
 
 /**
  * @brief The maximum number of protocol lines that a protocol program can
- * contain.
- *
- * Make it as large as free RAM allows.
+ * contain. Make it as large as free RAM allows.
  */
 const uint16_t MAX_LINES = 5000;
 
@@ -48,21 +47,20 @@ const uint16_t MAX_POINTS_PER_LINE = NUMEL_PCS_AXIS * NUMEL_PCS_AXIS;
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Special value denoting an uninitialized point in the Protocol
- * Coordinate System (PCS).
+ * @brief Special value denoting an uninitialized point in the PCS.
  *
- * Also used as a sentinel to signal the end of a @p Line array.
+ * Also used as a sentinel to signal the end of a @p PointsArray.
  */
 const int8_t P_NULL_VAL = -128;
 
 /**
- * @brief Class to hold a single point in the Protocol Coordinate System (PCS).
+ * @brief Class to hold a single point in the PCS.
  *
  * Default initialization value is `{P_NULL_VAL, P_NULL_VAL}`.
  */
 class P {
 public:
-  P(int8_t x_ = P_NULL_VAL, int8_t y_ = P_NULL_VAL);
+  P(int8_t x_ = P_NULL_VAL, int8_t y_ = P_NULL_VAL) : x(x_), y(y_) {}
 
   inline void set(int8_t x_, int8_t y_) {
     x = x_;
@@ -105,7 +103,7 @@ public:
   }
 
   /**
-   * @brief Pretty print the PCS coordinate as '(x, y)', useful for debugging.
+   * @brief Pretty print the PCS coordinate as "(x, y)", useful for debugging.
    *
    * @param stream The stream to print to. Default: Serial.
    */
@@ -117,11 +115,11 @@ public:
 };
 
 /*------------------------------------------------------------------------------
-  Structures and typedefs
+  PointsArray
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Array of PCS points (objects of class `P`) making up a protocol line.
+ * @brief List of PCS points (objects of class `P`).
  *
  * The coordinates of each point `P` should correspond to a valve that needs to
  * be turned open. All unmentioned valves will remain/be set closed. The maximum
@@ -138,14 +136,56 @@ public:
  * Hence, the default initialization here is an array full with special valued
  * `P` objects: `P{P_NULL_VAL, P_NULL_VAL}`.
  */
-using Line = std::array<P, MAX_POINTS_PER_LINE + 1>;
+using PointsArray = std::array<P, MAX_POINTS_PER_LINE + 1>;
 // +1 for the end sentinel
 
+/*------------------------------------------------------------------------------
+  Line
+------------------------------------------------------------------------------*/
+
+// Forward declaration
+class PackedLine;
+
 /**
- * @brief Packed version of a `Line`.
+ * @brief Class to manage a duration-timed list of PCS points, corresponding to
+ * valves that need to be turned open all at once for the specified duration.
  *
- * Meaning that the full list of PCS points that have to have their valves
- * turned open, is now encoded into 16-bit bitmasks, one for each PCS row.
+ * See @p PointsArray for more details.
+ */
+class Line {
+public:
+  Line() {}
+  Line(uint16_t duration_, PointsArray points_)
+      : duration(duration_), points(points_) {}
+
+  /**
+   * @brief Pack the list of PCS points into 16-bit bitmasks.
+   *
+   * @param output Reference to a `PackedLine` to pack into.
+   */
+  void pack_into(PackedLine &output) const;
+
+  /**
+   * @brief Pretty print the list of PCS points.
+   *
+   * @param stream The stream to print to. Default: Serial.
+   */
+  void print(Stream &stream = Serial);
+
+  // Public members
+  uint16_t duration;  // Time duration in [ms]
+  PointsArray points; // List of PCS points
+};
+
+/*------------------------------------------------------------------------------
+  PackedLine
+------------------------------------------------------------------------------*/
+
+/**
+ * @brief Class to manage a packed version of a @p Line object.
+ *
+ * Packing a `Line` means that the full list of PCS points that make up that
+ * line will get encoded into 16-bit bitmasks, one for each PCS row.
  *
  * Benefit to packing is the constant array dimension and less memory footprint
  * than using `Line` when using a large number of points `P`. This allows for
@@ -159,47 +199,48 @@ using Line = std::array<P, MAX_POINTS_PER_LINE + 1>;
  * Hence, the default initialization here is zero-initialized only when declared
  * non-local.
  */
-using PackedLine = std::array<uint16_t, NUMEL_PCS_AXIS>;
+class PackedLine {
+public:
+  PackedLine() {}
 
-/**
- * @brief Structure to associate a time duration in ms to a `Line` object.
- *
- * See @p `Line` for more details.
- */
-struct TimedLine {
+  /**
+   * @brief Unpack the bitmasks into a list of PCS points.
+   *
+   * @param output Reference to a `Line` to unpack into.
+   */
+  void unpack_into(Line &output) const;
+
+  // Public members
   uint16_t duration; // Time duration in [ms]
-  Line line;
+
+  // List of PCS points packed into bitmasks
+  std::array<uint16_t, NUMEL_PCS_AXIS> masks;
 };
 
-/**
- * @brief Structure to associate a time duration in ms to a `PackedLine` object.
- *
- * See @p `PackedLine` for more details.
- */
-struct TimedPackedLine {
-  uint16_t duration; // Time duration in [ms]
-  PackedLine packed;
-};
+/*------------------------------------------------------------------------------
+  Program
+------------------------------------------------------------------------------*/
 
 /**
  * @brief The protocol program fully stored in memory.
  *
  * It is an array containing timed protocol lines, each line containing the
  * valves to be opened for the time duration as specified. Each protocol line
- * is actually packed into a bitmask to save on memory. Method `unpack()` must
- *  be called on the `PackedLine` object to get the list of PCS points (which we
- * then loop over to 1: finally open the referred valves and close the others
- * and 2: to light up the appropiate LEDs of the 16x16 LED matrix).
+ * is actually packed into a bitmask to save on memory. Method @p unpack_into()
+ * must be called on the @p PackedLine object to get the list of PCS points
+ * (which we then loop over in @p main.cpp to 1: finally open the referred
+ * valves and close the others and 2: to light up the appropiate LEDs of the
+ * 16x16 LED matrix).
  */
-using Program = std::array<TimedPackedLine, MAX_LINES>;
+using Program = std::array<PackedLine, MAX_LINES>;
 
 /*------------------------------------------------------------------------------
   ProtocolManager
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Class to manage loading in and retrieving the jetting grid protocol
- * from memory. Only one protocol program can be in memory at a time.
+ * @brief Class to manage reading in and playing back a protocol program. Only
+ * one protocol program can be in memory at a time.
  */
 class ProtocolManager {
 public:
@@ -224,20 +265,20 @@ public:
    * @brief Adds a new Line to the protocol program.
    *
    * @param duration Time duration in ms
-   * @param line Array of PCS points of which the corresponding valves will be
+   * @param points List of PCS points of which the corresponding valves will be
    * set open for the given duration. All other valves will be set closed.
    * @return True when the new line is successfully added. False otherwise,
    * because the maximum number of lines has been reached.
    */
-  bool add_line(uint16_t duration, const Line &line);
-  bool add_line(const TimedLine &timed_line);
+  bool add_line(uint16_t duration, const PointsArray &points);
+  bool add_line(const Line &line);
 
   /**
-   * @brief Retrieves the next available TimedLine from the stored protocol
-   * program and puts the information in the public member `timed_line_buffer`.
+   * @brief Retrieves the next available Line from the stored protocol
+   * program and puts the information in the public member @p line_buffer.
    *
-   * Warning: The member `timed_line_buffer` will be overwritten with new data
-   * when a new call to `transfer_next_line_to_buffer()` is made.
+   * Warning: The member @p line_buffer will be overwritten with new data
+   * when a new call to @p transfer_next_line_to_buffer() is made.
    */
   void transfer_next_line_to_buffer();
 
@@ -249,28 +290,28 @@ public:
   void print(Stream &stream = Serial);
 
   /**
-   * @brief Pretty print to current line buffer, useful for debugging.
+   * @brief Pretty print the current line buffer, useful for debugging.
    *
    * @param stream The stream to print to. Default: Serial.
    */
   void print_buffer(Stream &stream = Serial);
 
   /**
-   * @brief Buffer containing the TimedLine as retreived by method
-   * `transfer_next_line_to_buffer()`.
+   * @brief Buffer containing the @p Line as retreived by method
+   * @p transfer_next_line_to_buffer().
    *
-   * One can go through each PCS point of the TimedLine object as follows:
+   * One can go through each PCS point of the Line object as follows:
    *
    * @code{.cpp}
-   * for (auto &p : protocol_mgr.timed_line_buffer.line) {
+   * for (auto &p : protocol_mgr.line_buffer.points) {
    *   if (p.is_null()) {
-   *     break; // Reached the end of the list as indicated by the end sentinel
+   *     break; // Reached the end sentinel
    *   }
-   *   // Code goes here to handle each PCS point 'p'
+   *   // Code goes here to handle each PCS point `p`
    * }
    * @endcode
    */
-  TimedLine timed_line_buffer;
+  Line line_buffer;
 
 private:
   Program _program;  // The protocol program
