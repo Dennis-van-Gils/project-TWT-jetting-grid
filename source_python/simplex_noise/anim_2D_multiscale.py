@@ -9,12 +9,18 @@ pip install ipython numpy numba matplotlib opensimplex pylint black
 pip install dvg-devices
 """
 
+from time import perf_counter
+
 from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
-from numba import njit
 import opensimplex
-from time import perf_counter
+from numba import njit
+
+"""
+import tracemalloc
+tracemalloc.start()
+"""
 
 opensimplex.seed(1)
 N_pixels = 1000  # Number of pixels on a single axis
@@ -32,6 +38,9 @@ LS_img_stack = opensimplex.noise3array(LS_px, LS_px, LS_time)
 SS_px = np.linspace(0, 20, N_pixels, endpoint=False)
 SS_time = np.linspace(0, 10, N_frames, endpoint=False)
 SS_img_stack = opensimplex.noise3array(SS_px, SS_px, SS_time)
+
+del LS_px, LS_time
+del SS_px, SS_time
 
 elapsed = perf_counter() - t0
 print(" done in %.2f s" % elapsed)
@@ -57,6 +66,8 @@ for idx_frame, img in enumerate(SS_img_stack):
 
     img_stack[idx_frame] = img
     img_stack_BW[idx_frame][np.where(img > 128)] = 255
+
+del LS_img_stack, SS_img_stack
 
 elapsed = perf_counter() - t0
 print(" done in %.2f s" % elapsed)
@@ -94,3 +105,12 @@ plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 plt.show()
+
+"""
+snapshot = tracemalloc.take_snapshot()
+top_stats = snapshot.statistics("lineno")
+
+print("[ Top 10 ]")
+for stat in top_stats[:10]:
+    print(stat)
+"""
