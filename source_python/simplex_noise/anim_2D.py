@@ -15,6 +15,7 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
 import opensimplex
+from numba import njit, prange
 
 opensimplex.seed(1)
 N_pixels = 1000  # Number of pixels on a single axis
@@ -30,14 +31,20 @@ img_stack = opensimplex.noise3array(px, px, time)
 
 elapsed = perf_counter() - t0
 print(" done in %.2f s" % elapsed)
-print("Rescaling noise... ", end="")
+print("Rescaling noise... ")
 t0 = perf_counter()
 
 # Rescale noise
-for idx_frame, img in enumerate(img_stack):
-    # Rescale noise from [-1, 1] to [0, 255]
-    img = np.multiply(img + 1, 128).astype(int)
-    img_stack[idx_frame] = img
+# NOTE: range is [-sqrt(n)/2, sqrt(n)/2], where n is the dimensionality
+noise_dim = 3
+noise_range = np.sqrt(noise_dim) / 2
+print(np.min(img_stack[0]))
+print(np.max(img_stack[0]))
+
+for i in range(N_frames):
+    # Rescale noise to [0, 255]
+    np.multiply(img_stack[i], 128 / noise_range, out=img_stack[i])
+    np.add(img_stack[i], 128, out=img_stack[i])
 
 elapsed = perf_counter() - t0
 print(" done in %.2f s" % elapsed)
@@ -45,7 +52,13 @@ print(" done in %.2f s" % elapsed)
 # Plot
 fig = plt.figure()
 ax = plt.axes()
-img = plt.imshow(img_stack[0], cmap="gray", interpolation="none")
+img = plt.imshow(
+    img_stack[0],
+    cmap="gray",
+    vmin=0,
+    vmax=255,
+    interpolation="none",
+)
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 
