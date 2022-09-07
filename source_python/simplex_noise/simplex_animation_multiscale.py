@@ -1,42 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+conda create -n simplex python=3.9
+conda activate simplex
+pip install ipython numpy numba matplotlib opensimplex pylint black
+
+# Additionally
+pip install dvg-devices
+"""
 
 from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
+from numba import njit
 import opensimplex
-
-
-def create_simplex_img_stack(N_frames_, N_pixels_, end_time_, px_max_):
-    px_x = np.linspace(0, px_max_, N_pixels_, endpoint=False)
-    px_y = np.linspace(0, px_max_, N_pixels_, endpoint=False)
-    time = np.linspace(0, end_time_, N_frames_, endpoint=False)
-    return opensimplex.noise3array(px_x, px_y, time)
-
+from time import perf_counter
 
 opensimplex.seed(1)
 N_pixels = 1000  # Number of pixels on a single axis
 N_frames = 200  # Number of time frames
 
 print("Generating noise...", end="")
+t0 = perf_counter()
 
 # Generate large-scale noise
-img_stack_LS = create_simplex_img_stack(
-    N_frames_=N_frames, N_pixels_=N_pixels, end_time_=10, px_max_=5
-)
+LS_px = np.linspace(0, 5, N_pixels, endpoint=False)
+LS_time = np.linspace(0, 10, N_frames, endpoint=False)
+LS_img_stack = opensimplex.noise3array(LS_px, LS_px, LS_time)
 
 # Generate small-scale noise
-img_stack_SS = create_simplex_img_stack(
-    N_frames_=N_frames, N_pixels_=N_pixels, end_time_=10, px_max_=20
-)
+SS_px = np.linspace(0, 20, N_pixels, endpoint=False)
+SS_time = np.linspace(0, 10, N_frames, endpoint=False)
+SS_img_stack = opensimplex.noise3array(SS_px, SS_px, SS_time)
+
+elapsed = perf_counter() - t0
+print(" done in %.2f s" % elapsed)
+print("Mixing noise...    ", end="")
+t0 = perf_counter()
 
 # Mix small-scale and large-scale noise together and rescale
 img_stack = np.empty((N_frames, N_pixels, N_pixels), dtype=int)
 img_stack_BW = np.zeros((N_frames, N_pixels, N_pixels), dtype=int)
 alpha = np.zeros(N_frames)  # Grid transparency
-for idx_frame, img in enumerate(img_stack_SS):
+for idx_frame, img in enumerate(SS_img_stack):
     # Mix
-    np.add(img, img_stack_LS[idx_frame], out=img)
+    np.add(img, LS_img_stack[idx_frame], out=img)
     np.divide(img, 2, out=img)
 
     # Calculate grid transparency
@@ -50,7 +58,8 @@ for idx_frame, img in enumerate(img_stack_SS):
     img_stack[idx_frame] = img
     img_stack_BW[idx_frame][np.where(img > 128)] = 255
 
-print(" done.")
+elapsed = perf_counter() - t0
+print(" done in %.2f s" % elapsed)
 
 fig = plt.figure()
 ax = plt.axes()
