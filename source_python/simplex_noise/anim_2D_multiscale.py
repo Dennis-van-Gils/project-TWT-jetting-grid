@@ -15,6 +15,7 @@ from time import perf_counter
 from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
+from numba import prange
 import opensimplex
 
 """
@@ -42,38 +43,41 @@ img_stack_B = opensimplex.noise3array(LS_x_table, LS_x_table, LS_t_table)
 del SS_x_table, SS_t_table
 del LS_x_table, LS_t_table
 
-# NOTE: The output range of Simplex noise is [-sqrt(n)/2, sqrt(n)/2], where n is
-# the dimensionality
-noise3d_range = np.sqrt(3) / 2
+# Add A & B into A
+for i in prange(N_frames):  # pylint: disable=not-an-iterable
+    np.add(img_stack_A[i], img_stack_B[i], out=img_stack_A[i])
+img_stack_min = np.min(img_stack_A)
+img_stack_max = np.max(img_stack_A)
 
 elapsed = perf_counter() - t0
 print(f" done in {elapsed:.2f} s")
-print(f"  min = {np.min(img_stack_A[0]):.3f}")
-print(f"  max = {np.max(img_stack_A[0]):.3f}")
+print(f"  min = {img_stack_min:.3f}")
+print(f"  max = {img_stack_max:.3f}")
 print("Rescaling noise... ", end="")
 t0 = perf_counter()
 
-# Mix small-scale and large-scale noise together and rescale
+# Rescale noise symmetrically to [0, 1]
 img_stack_BW = np.zeros((N_frames, N_pixels, N_pixels), dtype=bool)
 alpha = np.zeros(N_frames)  # Grid transparency
-
-for i in range(N_frames):
-    # Mix A & B into A
-    np.add(img_stack_A[i], img_stack_B[i], out=img_stack_A[i])
-
-    # Rescale noise to [0, 255]
-    np.multiply(img_stack_A[i], 64 / noise3d_range, out=img_stack_A[i])
-    np.add(img_stack_A[i], 128, out=img_stack_A[i])
+f_norm = max([abs(img_stack_min), abs(img_stack_max)]) * 2
+for i in prange(N_frames):  # pylint: disable=not-an-iterable
+    np.divide(img_stack_A[i], f_norm, out=img_stack_A[i])
+    np.add(img_stack_A[i], 0.5, out=img_stack_A[i])
 
     # Calculate grid transparency
-    white_pxs = np.where(img_stack_A[i] > 128)
+    white_pxs = np.where(img_stack_A[i] > 0.5)
     alpha[i] = len(white_pxs[0]) / N_pixels / N_pixels
 
     # Binary map
     img_stack_BW[i][white_pxs] = 1
 
+img_stack_min = np.min(img_stack_A)
+img_stack_max = np.max(img_stack_A)
+
 elapsed = perf_counter() - t0
 print(f" done in {elapsed:.2f} s")
+print(f"  min = {img_stack_min:.3f}")
+print(f"  max = {img_stack_max:.3f}")
 
 del img_stack_B
 
@@ -84,7 +88,7 @@ img = plt.imshow(
     img_stack_A[0],
     cmap="gray",
     vmin=0,
-    vmax=255,
+    vmax=1,
     interpolation="none",
 )
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
