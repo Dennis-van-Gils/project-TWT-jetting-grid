@@ -81,7 +81,10 @@ print(f"  max = {img_stack_max:.3f}")
 
 del img_stack_B
 
-# Plot
+# ------------------------------------------------------------------------------
+#  Plot
+# ------------------------------------------------------------------------------
+
 fig = plt.figure()
 ax = plt.axes()
 img = plt.imshow(
@@ -114,8 +117,8 @@ plt.grid(False)
 plt.axis("off")
 plt.show()
 
-fig2 = plt.figure(2)
-ax2 = plt.plot(alpha)
+plt.figure(2)
+plt.plot(alpha)
 plt.xlim(0, N_frames)
 plt.title("transparency")
 plt.xlabel("frame #")

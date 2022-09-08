@@ -53,7 +53,10 @@ print(f" done in {elapsed:.2f} s")
 print(f"  min = {img_stack_min:.3f}")
 print(f"  max = {img_stack_max:.3f}")
 
-# Plot
+# ------------------------------------------------------------------------------
+#  Plot
+# ------------------------------------------------------------------------------
+
 fig = plt.figure()
 ax = plt.axes()
 img = plt.imshow(
