@@ -15,7 +15,6 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
 import opensimplex
-from numba import njit, prange
 
 opensimplex.seed(1)
 N_pixels = 1000  # Number of pixels on a single axis
@@ -25,29 +24,28 @@ print("Generating noise...", end="")
 t0 = perf_counter()
 
 # Generate noise
-px = np.linspace(0, 10, N_pixels, endpoint=False)
-time = np.linspace(0, 10, N_frames, endpoint=False)
-img_stack = opensimplex.noise3array(px, px, time)
+x_table = np.linspace(0, 10, N_pixels, endpoint=False)  # Spatial axis
+t_table = np.linspace(0, 10, N_frames, endpoint=False)  # Temporal axis
+img_stack = opensimplex.noise3array(x_table, x_table, t_table)
+
+# NOTE: The output range of Simplex noise is [-sqrt(n)/2, sqrt(n)/2], where n is
+# the dimensionality
+noise3d_range = np.sqrt(3) / 2
 
 elapsed = perf_counter() - t0
-print(" done in %.2f s" % elapsed)
-print("Rescaling noise... ")
+print(f" done in {elapsed:.2f} s")
+print(f"  min = {np.min(img_stack[0]):.3f}")
+print(f"  max = {np.max(img_stack[0]):.3f}")
+print("Rescaling noise... ", end="")
 t0 = perf_counter()
 
-# Rescale noise
-# NOTE: range is [-sqrt(n)/2, sqrt(n)/2], where n is the dimensionality
-noise_dim = 3
-noise_range = np.sqrt(noise_dim) / 2
-print(np.min(img_stack[0]))
-print(np.max(img_stack[0]))
-
+# Rescale noise to [0, 255]
 for i in range(N_frames):
-    # Rescale noise to [0, 255]
-    np.multiply(img_stack[i], 128 / noise_range, out=img_stack[i])
+    np.multiply(img_stack[i], 128 / noise3d_range, out=img_stack[i])
     np.add(img_stack[i], 128, out=img_stack[i])
 
 elapsed = perf_counter() - t0
-print(" done in %.2f s" % elapsed)
+print(f" done in {elapsed:.2f} s")
 
 # Plot
 fig = plt.figure()

@@ -30,27 +30,30 @@ print("Generating noise...", end="")
 t0 = perf_counter()
 
 # Generate small-scale noise
-SS_px = np.linspace(0, 20, N_pixels, endpoint=False)
-SS_time = np.linspace(0, 10, N_frames, endpoint=False)
-img_stack_A = opensimplex.noise3array(SS_px, SS_px, SS_time)
+SS_x_table = np.linspace(0, 20, N_pixels, endpoint=False)
+SS_t_table = np.linspace(0, 10, N_frames, endpoint=False)
+img_stack_A = opensimplex.noise3array(SS_x_table, SS_x_table, SS_t_table)
 
 # Generate large-scale noise
-LS_px = np.linspace(0, 5, N_pixels, endpoint=False)
-LS_time = np.linspace(0, 10, N_frames, endpoint=False)
-img_stack_B = opensimplex.noise3array(LS_px, LS_px, LS_time)
+LS_x_table = np.linspace(0, 5, N_pixels, endpoint=False)
+LS_t_table = np.linspace(0, 10, N_frames, endpoint=False)
+img_stack_B = opensimplex.noise3array(LS_x_table, LS_x_table, LS_t_table)
 
-del LS_px, LS_time
-del SS_px, SS_time
+del SS_x_table, SS_t_table
+del LS_x_table, LS_t_table
+
+# NOTE: The output range of Simplex noise is [-sqrt(n)/2, sqrt(n)/2], where n is
+# the dimensionality
+noise3d_range = np.sqrt(3) / 2
 
 elapsed = perf_counter() - t0
-print(" done in %.2f s" % elapsed)
-print("Mixing noise...    ", end="")
+print(f" done in {elapsed:.2f} s")
+print(f"  min = {np.min(img_stack_A[0]):.3f}")
+print(f"  max = {np.max(img_stack_A[0]):.3f}")
+print("Rescaling noise... ", end="")
 t0 = perf_counter()
 
 # Mix small-scale and large-scale noise together and rescale
-# NOTE: range is [-sqrt(n)/2, sqrt(n)/2], where n is the dimensionality
-noise_dim = 3
-noise_range = np.sqrt(noise_dim) / 2
 img_stack_BW = np.zeros((N_frames, N_pixels, N_pixels), dtype=bool)
 alpha = np.zeros(N_frames)  # Grid transparency
 
@@ -59,7 +62,7 @@ for i in range(N_frames):
     np.add(img_stack_A[i], img_stack_B[i], out=img_stack_A[i])
 
     # Rescale noise to [0, 255]
-    np.multiply(img_stack_A[i], 64 / noise_range, out=img_stack_A[i])
+    np.multiply(img_stack_A[i], 64 / noise3d_range, out=img_stack_A[i])
     np.add(img_stack_A[i], 128, out=img_stack_A[i])
 
     # Calculate grid transparency
@@ -69,11 +72,12 @@ for i in range(N_frames):
     # Binary map
     img_stack_BW[i][white_pxs] = 1
 
+elapsed = perf_counter() - t0
+print(f" done in {elapsed:.2f} s")
+
 del img_stack_B
 
-elapsed = perf_counter() - t0
-print(" done in %.2f s" % elapsed)
-
+# Plot
 fig = plt.figure()
 ax = plt.axes()
 img = plt.imshow(
