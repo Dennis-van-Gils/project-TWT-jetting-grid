@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint:disable = pointless-string-statement
 """
 conda create -n simplex python=3.9
 conda activate simplex
@@ -15,7 +16,6 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 import numpy as np
 import opensimplex
-from numba import njit, prange
 
 """
 import tracemalloc
@@ -96,9 +96,9 @@ def init_anim():
     return img, frame_text
 
 
-def anim(i):
-    img.set_data(img_stack_A[i])
-    frame_text.set_text("frame %03d, transparency = %.2f" % (i, alpha[i]))
+def anim(j):
+    img.set_data(img_stack_A[j])
+    frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
     return img, frame_text
 
 

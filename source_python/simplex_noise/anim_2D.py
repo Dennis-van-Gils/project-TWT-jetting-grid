@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint:disable = pointless-string-statement
 """
 conda create -n simplex python=3.9
 conda activate simplex
@@ -66,9 +67,9 @@ def init_anim():
     return img, frame_text
 
 
-def anim(i):
-    img.set_data(img_stack[i])
-    frame_text.set_text("frame %d" % i)
+def anim(j):
+    img.set_data(img_stack[j])
+    frame_text.set_text(f"frame {j}")
     return img, frame_text
 
 
