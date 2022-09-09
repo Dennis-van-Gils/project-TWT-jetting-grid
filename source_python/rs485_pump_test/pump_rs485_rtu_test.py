@@ -60,3 +60,16 @@ ans = ser.read_all()
 
 for b in ans:
     print("%02x " % b, end="")
+print("")
+
+# Read baudrate
+cmd = bytearray([0x01, 0x03, 0x01, 0x0E, 0x00, 0x01])
+cmd.extend(CRC_check(cmd))
+
+ser.write(cmd)
+time.sleep(0.1)
+ans = ser.read_all()
+
+for b in ans:
+    print("%02x " % b, end="")
+    # print(b, end="")
