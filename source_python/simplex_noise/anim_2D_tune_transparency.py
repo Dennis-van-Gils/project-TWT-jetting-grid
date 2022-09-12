@@ -264,9 +264,6 @@ def f(x, arr_in, target):
     return target - len(white_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
 
 
-# @njit(
-#    parallel=True,
-# )
 def _binary_map_with_tuning_newton(
     arr: np.ndarray,
     arr_BW: np.ndarray,
@@ -274,14 +271,14 @@ def _binary_map_with_tuning_newton(
     wanted_transp: float,
 ):
     """
-    NOTE: In-place operation on arguments `arr_BW` and `transp`
-    TODO: Use Newton's method instead to tune transparency
+    Using Newton's method to tune transparency:
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
+    NOTE: In-place operation on arguments `arr_BW` and `transp`
     """
+    # NOTE: Can't `njit` on `optimize.newton()`
 
-    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
+    for i in range(arr.shape[0]):
         # Tune transparency
-
         # print(i)
         threshold = optimize.newton(
             f,
@@ -295,14 +292,11 @@ def _binary_map_with_tuning_newton(
         transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
 
         # Binary map
-        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
         arr_BW[i][white_pxs] = 1
-        # for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
-        #    arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
 
 
 def binary_map_with_tuning_newton(arr: np.ndarray, tuning_transp=0.5):
-    print(f"{'Binary mapping and tuning...':30s}", end="")
+    print(f"{'Binary mapping and newton...':30s}", end="")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)
@@ -329,8 +323,7 @@ def _binary_map_with_tuning(
 ):
     """
     NOTE: In-place operation on arguments `arr_BW` and `transp`
-    TODO: Use Newton's method instead to tune transparency
-    https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
+    TODO: Add `reached max-iteration` warning with escape
     """
 
     for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
@@ -406,9 +399,9 @@ rescale(img_stack, symmetrically=False)
 
 # Map into binary and calculate transparency
 # img_stack_BW, alpha = binary_map(img_stack)
-img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.3)
+img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.6)
 img_stack_BW, alpha = binary_map_with_tuning_newton(
-    img_stack, tuning_transp=0.3
+    img_stack, tuning_transp=0.6
 )
 
 # ------------------------------------------------------------------------------
