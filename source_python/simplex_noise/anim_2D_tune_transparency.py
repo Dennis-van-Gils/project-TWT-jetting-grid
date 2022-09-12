@@ -13,7 +13,8 @@ pip install pylint black dvg-devices
 from time import perf_counter
 
 import numpy as np
-from numba import jit, njit, prange
+from scipy import optimize
+from numba import njit, prange
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -87,6 +88,7 @@ def move_figure(f, x, y):
     "float32[:, :, :](int64, int64, float64, float64, int64[:])",
     cache=True,
     parallel=True,
+    nogil=True,
 )
 def _generate_Simplex2D_closed_timeloop(
     N_frames: int,
@@ -247,6 +249,71 @@ def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
 
 
 # ------------------------------------------------------------------------------
+#  binary_map_with_tuning_newton
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "float64(float64, float32[:, :], float64)",
+    cache=True,
+    parallel=True,
+    nogil=True,
+)
+def f(x, arr_in, target):
+    white_pxs = np.where(arr_in > x)
+    return target - len(white_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
+
+
+# @njit(
+#    parallel=True,
+# )
+def _binary_map_with_tuning_newton(
+    arr: np.ndarray,
+    arr_BW: np.ndarray,
+    transp: np.ndarray,
+    wanted_transp: float,
+):
+    """
+    NOTE: In-place operation on arguments `arr_BW` and `transp`
+    TODO: Use Newton's method instead to tune transparency
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
+    """
+
+    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
+        # Tune transparency
+
+        # print(i)
+        threshold = optimize.newton(
+            f,
+            1 - wanted_transp,
+            args=(arr[i], wanted_transp),
+            maxiter=20,
+            tol=0.02,
+        )
+
+        white_pxs = np.where(arr[i] > threshold)
+        transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
+
+        # Binary map
+        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
+        arr_BW[i][white_pxs] = 1
+        # for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
+        #    arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
+
+
+def binary_map_with_tuning_newton(arr: np.ndarray, tuning_transp=0.5):
+    print(f"{'Binary mapping and tuning...':30s}", end="")
+    tick = perf_counter()
+
+    arr_BW = np.zeros(arr.shape, dtype=bool)
+    transp = np.zeros(arr.shape[0])
+    _binary_map_with_tuning_newton(arr, arr_BW, transp, tuning_transp)
+
+    print(f"done in {(perf_counter() - tick):.2f} s")
+    return arr_BW, transp
+
+
+# ------------------------------------------------------------------------------
 #  binary_map_with_tuning
 # ------------------------------------------------------------------------------
 
@@ -272,7 +339,7 @@ def _binary_map_with_tuning(
         threshold = 1 - wanted_transp
         # print(i)
         while abs(error) > 0.02:
-            white_pxs = np.where(img_stack[i] > threshold)
+            white_pxs = np.where(arr[i] > threshold)
             transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
             error = transp[i] - wanted_transp
             # print(error)
@@ -339,7 +406,10 @@ rescale(img_stack, symmetrically=False)
 
 # Map into binary and calculate transparency
 # img_stack_BW, alpha = binary_map(img_stack)
-img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.5)
+img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.3)
+img_stack_BW, alpha = binary_map_with_tuning_newton(
+    img_stack, tuning_transp=0.3
+)
 
 # ------------------------------------------------------------------------------
 #  Plot
