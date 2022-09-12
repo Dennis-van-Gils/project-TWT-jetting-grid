@@ -14,11 +14,26 @@ from time import perf_counter
 
 import numpy as np
 from numba import jit, njit, prange
+import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import animation
 
 from opensimplex.internals import _init as opensimplex_init
 from opensimplex.internals import _noise4 as opensimplex_noise4
+
+
+def move_figure(f, x, y):
+    """Move figure's upper left corner to pixel (x, y)"""
+    backend = matplotlib.get_backend()
+    if backend == "TkAgg":
+        f.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
+    elif backend == "WXAgg":
+        f.canvas.manager.window.SetPosition((x, y))
+    else:
+        # This works for QT and GTK
+        # You can also use window.setGeometry
+        f.canvas.manager.window.move(x, y)
+
 
 # ------------------------------------------------------------------------------
 #  generate_Simplex2D_closed_timeloop
@@ -97,7 +112,7 @@ def generate_Simplex2D_closed_timeloop(
         than [-1, 1].
     """
 
-    print("Generating noise...", end="")
+    print(f"{'Generating noise...':30s}", end="")
     tick = perf_counter()
 
     perm, _ = opensimplex_init(seed)  # The OpenSimplex seed table
@@ -105,7 +120,7 @@ def generate_Simplex2D_closed_timeloop(
         N_frames, N_pixels, t_step, x_step, perm
     )
 
-    print(f" done in {(perf_counter() - tick):.2f} s")
+    print(f"done in {(perf_counter() - tick):.2f} s")
     return out
 
 
@@ -121,7 +136,7 @@ def rescale(arr: np.ndarray, symmetrically: bool = True):
     # NOTE: Can't seem to get @jit or @njit to work. Fails on `out` parameter of
     # ufuncs `np.divide()` and `np.add()`. Also, `prange` will not go parallel.
 
-    print("Rescaling noise... ", end="")
+    print(f"{'Rescaling noise...':30s}", end="")
     tick = perf_counter()
 
     in_min = np.min(arr)
@@ -141,48 +156,96 @@ def rescale(arr: np.ndarray, symmetrically: bool = True):
     out_min = np.min(arr)
     out_max = np.max(arr)
 
-    print(f" done in {(perf_counter() - tick):.2f} s")
-    print(
-        f"  from [{in_min:.3f}, {in_max:.3f}] to [{out_min:.3f}, {out_max:.3f}]"
-    )
+    print(f"done in {(perf_counter() - tick):.2f} s")
+    print(f"  from [{in_min:+.3f}, {in_max:+.3f}]")
+    print(f"  to   [{out_min:+.3f}, {out_max:+.3f}]")
 
 
-# @njit(
-#    cache=True,
-#    parallel=True,
-# )
-def binary_map(
-    arr: np.ndarray, BW_threshold: float = 0.5, tune_transparency: float = 0.5
+# ------------------------------------------------------------------------------
+#  binary_map
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    cache=True,
+    parallel=True,
+)
+def _binary_map(
+    arr: np.ndarray,
+    arr_BW: np.ndarray,
+    transp: np.ndarray,
+    threshold: float,
 ):
-    arr_BW = np.zeros(arr.shape)  # , dtype=bool)
-    transp = np.zeros(arr.shape[0])  # Transparency
+    """
+    NOTE: In-place operation on arguments `arr_BW` and `transp`
+    """
 
-    for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable
-        # Tune transparency
-        """
-        error = 1
-        wanted_alpha = 0.3
-        # threshold = 0.5
-        threshold = 1 - wanted_alpha
-        print("---> Frame %d" % i)
-        while abs(error) > 0.02:
-            white_pxs = np.where(img_stack[i] > threshold)
-            alpha[i] = len(white_pxs[0]) / N_PIXELS / N_PIXELS
-            error = alpha[i] - wanted_alpha
-            print(error)
-            if error > 0:
-                threshold = threshold + 0.005
-            else:
-                threshold = threshold - 0.005
-        """
-
+    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
         # Calculate transparency
-        white_pxs = np.where(arr[i] > 0.5)
+        white_pxs = np.where(arr[i] > threshold)
         transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
 
         # Binary map
-        arr_BW[i][white_pxs] = 1
+        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
+        for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
+            arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
 
+
+def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
+    print(f"{'Binary mapping...':30s}", end="")
+    tick = perf_counter()
+
+    arr_BW = np.zeros(arr.shape, dtype=bool)
+    transp = np.zeros(arr.shape[0])
+    _binary_map(arr, arr_BW, transp, BW_threshold)
+
+    print(f"done in {(perf_counter() - tick):.2f} s")
+    return arr_BW, transp
+
+
+# ------------------------------------------------------------------------------
+#  binary_map_with_tuning
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    parallel=True,
+)
+def _binary_map_with_tuning(
+    arr: np.ndarray,
+    arr_BW: np.ndarray,
+    transp: np.ndarray,
+    wanted_transp: float,
+):
+    """
+    NOTE: In-place operation on arguments `arr_BW` and `transp`
+    """
+
+    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
+        # Tune transparency
+        error = 1
+        threshold = 1 - wanted_transp
+        while abs(error) > 0.02:
+            white_pxs = np.where(img_stack[i] > threshold)
+            transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
+            error = transp[i] - wanted_transp
+            threshold += 0.005 if error > 0 else -0.005
+
+        # Binary map
+        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
+        for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
+            arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
+
+
+def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
+    print(f"{'Binary mapping and tuning...':30s}", end="")
+    tick = perf_counter()
+
+    arr_BW = np.zeros(arr.shape, dtype=bool)
+    transp = np.zeros(arr.shape[0])
+    _binary_map_with_tuning(arr, arr_BW, transp, tuning_transp)
+
+    print(f"done in {(perf_counter() - tick):.2f} s")
     return arr_BW, transp
 
 
@@ -204,25 +267,15 @@ img_stack = generate_Simplex2D_closed_timeloop(
 # Rescale noise
 rescale(img_stack, symmetrically=True)
 
-print("More processing... ", end="")
-t0 = perf_counter()
-
-img_stack_BW, alpha = binary_map(img_stack)
-
-
-img_stack_min = np.min(img_stack)
-img_stack_max = np.max(img_stack)
-
-elapsed = perf_counter() - t0
-print(f" done in {elapsed:.2f} s")
-print(f"  min = {img_stack_min:.3f}")
-print(f"  max = {img_stack_max:.3f}")
+# Map into binary and calculate transparency
+# img_stack_BW, alpha = binary_map(img_stack)
+img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.5)
 
 # ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
 
-fig = plt.figure()
+fig_1 = plt.figure()
 ax = plt.axes()
 img = plt.imshow(
     img_stack[0],
@@ -241,13 +294,13 @@ def init_anim():
 
 
 def anim(j):
-    img.set_data(img_stack[j])
+    img.set_data(img_stack_BW[j])
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
     return img, frame_text
 
 
 ani = animation.FuncAnimation(
-    fig,
+    fig_1,
     anim,
     frames=N_FRAMES,
     interval=40,
@@ -256,12 +309,14 @@ ani = animation.FuncAnimation(
 
 # plt.grid(False)
 # plt.axis("off")
-plt.show()
+move_figure(fig_1, 0, 0)
 
-plt.figure(2)
+fig_2 = plt.figure(2)
 plt.plot(alpha)
 plt.xlim(0, N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
+move_figure(fig_2, 720, 0)
+
 plt.show()
