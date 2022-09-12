@@ -21,6 +21,49 @@ from matplotlib import animation
 from opensimplex.internals import _init as opensimplex_init
 from opensimplex.internals import _noise4 as opensimplex_noise4
 
+"""
+import linecache
+import os
+import tracemalloc
+
+
+def tracemalloc_report(snapshot, key_type="lineno", limit=10):
+    # Based on:
+    # https://python.readthedocs.io/en/stable/library/tracemalloc.html#pretty-top
+    snapshot = snapshot.filter_traces(
+        (
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<unknown>"),
+        )
+    )
+    top_stats = snapshot.statistics(key_type)
+
+    print("\nTracemalloc top %s lines" % limit)
+    for index, stat in enumerate(top_stats[:limit], 1):
+        frame = stat.traceback[0]
+        # replace "/path/to/module/file.py" with "module/file.py"
+        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+        print(
+            "#%s: %s:%s: %.1f MiB"
+            % (index, filename, frame.lineno, stat.size / 1024 / 1024)
+        )
+        line = linecache.getline(frame.filename, frame.lineno).strip()
+        if line:
+            print("    %s\n" % line)
+        else:
+            print("")
+
+    other = top_stats[limit:]
+    if other:
+        size = sum(stat.size for stat in other)
+        print("%s other: %.1f MiB" % (len(other), size / 1024 / 1024))
+    total = sum(stat.size for stat in top_stats)
+    print("Total allocated size: %.1f MiB" % (total / 1024 / 1024))
+
+
+tracemalloc.start()
+"""
+
 
 def move_figure(f, x, y):
     """Move figure's upper left corner to pixel (x, y)"""
@@ -41,7 +84,7 @@ def move_figure(f, x, y):
 
 
 @njit(
-    "float64[:, :, :](int64, int64, float64, float64, int64[:])",
+    "float32[:, :, :](int64, int64, float64, float64, int64[:])",
     cache=True,
     parallel=True,
 )
@@ -55,7 +98,7 @@ def _generate_Simplex2D_closed_timeloop(
     t_radius = N_frames * t_step / (2 * np.pi)  # Temporal radius of the loop
     t_factor = 2 * np.pi / N_frames
 
-    noise = np.empty((N_frames, N_pixels, N_pixels), dtype=np.double)
+    noise = np.empty((N_frames, N_pixels, N_pixels), dtype=np.float32)
     for t_i in prange(N_frames):  # pylint: disable=not-an-iterable
         t = t_i * t_factor
         t_cos = t_radius * np.cos(t)
@@ -219,16 +262,30 @@ def _binary_map_with_tuning(
 ):
     """
     NOTE: In-place operation on arguments `arr_BW` and `transp`
+    TODO: Use Newton's method instead to tune transparency
+    https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
     """
 
     for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
         # Tune transparency
         error = 1
         threshold = 1 - wanted_transp
+        # print(i)
         while abs(error) > 0.02:
             white_pxs = np.where(img_stack[i] > threshold)
             transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
             error = transp[i] - wanted_transp
+            # print(error)
+            """
+            if abs(error) > 0.2:
+                threshold += 0.01 if error > 0 else -0.01
+            elif abs(error) > 0.1:
+                threshold += 0.005 if error > 0 else -0.005
+            elif abs(error) > 0.5:
+                threshold += 0.0025 if error > 0 else -0.0025
+            else:
+                threshold += 0.001 if error > 0 else -0.001
+            """
             threshold += 0.005 if error > 0 else -0.005
 
         # Binary map
@@ -262,10 +319,23 @@ img_stack = generate_Simplex2D_closed_timeloop(
     N_frames=N_FRAMES,
     t_step=0.1,
     x_step=0.01,
+    seed=1,
 )
 
+img_stack_2 = generate_Simplex2D_closed_timeloop(
+    N_pixels=N_PIXELS,
+    N_frames=N_FRAMES,
+    t_step=0.1,
+    x_step=0.005,
+    seed=13,
+)
+
+# Add A & B into A
+for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable
+    np.add(img_stack[i], img_stack_2[i], out=img_stack[i])
+
 # Rescale noise
-rescale(img_stack, symmetrically=True)
+rescale(img_stack, symmetrically=False)
 
 # Map into binary and calculate transparency
 # img_stack_BW, alpha = binary_map(img_stack)
@@ -318,5 +388,9 @@ plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 move_figure(fig_2, 720, 0)
+
+"""
+tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
+"""
 
 plt.show()
