@@ -417,7 +417,7 @@ rescale(img_stack, symmetrically=False)
 
 # Map into binary and calculate transparency
 # img_stack_BW, alpha = binary_map(img_stack)
-img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.6)
+# img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.6)
 img_stack_BW, alpha = binary_map_with_tuning_newton(
     img_stack, tuning_transp=0.6
 )
