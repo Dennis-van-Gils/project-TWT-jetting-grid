@@ -87,7 +87,7 @@ def move_figure(f, x, y):
 
 
 @njit(
-    # "float32[:, :, :](int64, int64, float64, float64, int64[:])",
+    # "float32[:, :, :](int64, int64, float64, float64, float64, int64[:])",
     cache=True,
     parallel=True,
     nogil=True,
@@ -97,6 +97,7 @@ def _generate_Simplex2D_closed_timeloop(
     N_pixels: int,
     t_step: float,
     x_step: float,
+    y_step: float,
     perm: np.ndarray,
     progress_hook: Union[ProgressBar, None],
 ) -> np.ndarray:
@@ -111,7 +112,7 @@ def _generate_Simplex2D_closed_timeloop(
         if progress_hook is not None:
             progress_hook.update(1)
         for y_i in prange(N_pixels):  # pylint: disable=not-an-iterable
-            y = y_i * x_step
+            y = y_i * y_step
             for x_i in prange(N_pixels):  # pylint: disable=not-an-iterable
                 x = x_i * x_step
                 noise[t_i, y_i, x_i] = opensimplex_noise4(
@@ -126,6 +127,7 @@ def generate_Simplex2D_closed_timeloop(
     N_pixels: int = 1000,
     t_step: float = 0.1,
     x_step: float = 0.01,
+    y_step: Union[float, None] = None,
     seed: int = 1,
     verbose: bool = True,
 ) -> np.ndarray:
@@ -152,6 +154,10 @@ def generate_Simplex2D_closed_timeloop(
         x_step (float):
             Spatial step in arb. units. Good values are around 0.01
 
+        y_step (float | None):
+            Spatial step in arb. units. Good values are around 0.01. When set to
+            None `y_step` will be set equal to `x_step`.
+
         seed (int):
             Seed value of the OpenSimplex noise
 
@@ -167,6 +173,8 @@ def generate_Simplex2D_closed_timeloop(
     """
 
     perm, _ = opensimplex_init(seed)  # The OpenSimplex seed table
+    if y_step is None:
+        y_step = x_step
 
     if verbose:
         print(f"{'Generating noise...':30s}")  # , end="")
@@ -174,14 +182,14 @@ def generate_Simplex2D_closed_timeloop(
 
         with ProgressBar(total=N_FRAMES, dynamic_ncols=True) as numba_progress:
             out = _generate_Simplex2D_closed_timeloop(
-                N_frames, N_pixels, t_step, x_step, perm, numba_progress
+                N_frames, N_pixels, t_step, x_step, y_step, perm, numba_progress
             )
 
         print(f"done in {(perf_counter() - tick):.2f} s")
 
     else:
         out = _generate_Simplex2D_closed_timeloop(
-            N_frames, N_pixels, t_step, x_step, perm, None
+            N_frames, N_pixels, t_step, x_step, y_step, perm, None
         )
 
     return out
