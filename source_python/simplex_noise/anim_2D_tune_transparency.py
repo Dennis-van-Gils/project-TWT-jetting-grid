@@ -11,10 +11,12 @@ pip install pylint black dvg-devices
 """
 
 from time import perf_counter
+from typing import Union
 
 import numpy as np
 from scipy import optimize
 from numba import njit, prange
+from numba_progress import ProgressBar
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -85,7 +87,7 @@ def move_figure(f, x, y):
 
 
 @njit(
-    "float32[:, :, :](int64, int64, float64, float64, int64[:])",
+    # "float32[:, :, :](int64, int64, float64, float64, int64[:])",
     cache=True,
     parallel=True,
     nogil=True,
@@ -96,6 +98,7 @@ def _generate_Simplex2D_closed_timeloop(
     t_step: float,
     x_step: float,
     perm: np.ndarray,
+    progress_hook: Union[ProgressBar, None],
 ) -> np.ndarray:
     t_radius = N_frames * t_step / (2 * np.pi)  # Temporal radius of the loop
     t_factor = 2 * np.pi / N_frames
@@ -105,6 +108,8 @@ def _generate_Simplex2D_closed_timeloop(
         t = t_i * t_factor
         t_cos = t_radius * np.cos(t)
         t_sin = t_radius * np.sin(t)
+        if progress_hook is not None:
+            progress_hook.update(1)
         for y_i in prange(N_pixels):  # pylint: disable=not-an-iterable
             y = y_i * x_step
             for x_i in prange(N_pixels):  # pylint: disable=not-an-iterable
@@ -122,6 +127,7 @@ def generate_Simplex2D_closed_timeloop(
     t_step: float = 0.1,
     x_step: float = 0.01,
     seed: int = 1,
+    verbose: bool = True,
 ) -> np.ndarray:
     """Generates Simplex noise as 2D bitmap images that animate over time in a
     closed-loop fashion. I.e., the bitmap image of the last time frame will
@@ -149,6 +155,9 @@ def generate_Simplex2D_closed_timeloop(
         seed (int):
             Seed value of the OpenSimplex noise
 
+        verbose (bool):
+            Print 'Generating noise...' progress bar to the terminal?
+
     Returns:
         The image stack as 3D matrix [time, y-pixel, x-pixel] containing the
         Simplex noise values as a 'grayscale' intensity in floating point.
@@ -157,15 +166,24 @@ def generate_Simplex2D_closed_timeloop(
         than [-1, 1].
     """
 
-    print(f"{'Generating noise...':30s}", end="")
-    tick = perf_counter()
-
     perm, _ = opensimplex_init(seed)  # The OpenSimplex seed table
-    out = _generate_Simplex2D_closed_timeloop(
-        N_frames, N_pixels, t_step, x_step, perm
-    )
 
-    print(f"done in {(perf_counter() - tick):.2f} s")
+    if verbose:
+        print(f"{'Generating noise...':30s}")  # , end="")
+        tick = perf_counter()
+
+        with ProgressBar(total=N_FRAMES, dynamic_ncols=True) as numba_progress:
+            out = _generate_Simplex2D_closed_timeloop(
+                N_frames, N_pixels, t_step, x_step, perm, numba_progress
+            )
+
+        print(f"done in {(perf_counter() - tick):.2f} s")
+
+    else:
+        out = _generate_Simplex2D_closed_timeloop(
+            N_frames, N_pixels, t_step, x_step, perm, None
+        )
+
     return out
 
 
