@@ -149,14 +149,14 @@ def generate_Simplex2D_closed_timeloop(
             Number of pixels on a single axis
 
         t_step (float):
-            Time step in arb. units. Good values are between 0.02 and 0.2
+            Time step in arb. units
 
         x_step (float):
-            Spatial step in arb. units. Good values are around 0.01
+            Spatial step in arb. units
 
         y_step (float | None):
-            Spatial step in arb. units. Good values are around 0.01. When set to
-            None `y_step` will be set equal to `x_step`.
+            Spatial step in arb. units. When set to None `y_step` will be set
+            equal to `x_step`.
 
         seed (int):
             Seed value of the OpenSimplex noise
