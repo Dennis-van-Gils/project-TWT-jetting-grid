@@ -11,9 +11,12 @@ pip install pylint black dvg-devices
 """
 
 from time import perf_counter
-from typing import Union
 
+import opensimplex
 import numpy as np
+import matplotlib
+from matplotlib import pyplot as plt
+from matplotlib import animation
 from scipy import optimize
 
 try:
@@ -27,19 +30,6 @@ except ImportError:
 
         return wrapper
 
-
-try:
-    from numba_progress import ProgressBar
-except (ImportError, ModuleNotFoundError):
-    ProgressBar = None
-
-import matplotlib
-from matplotlib import pyplot as plt
-from matplotlib import animation
-
-import opensimplex
-from opensimplex.internals import _init as opensimplex_init
-from opensimplex.internals import _noise4 as opensimplex_noise4
 
 """
 import linecache
@@ -96,120 +86,6 @@ def move_figure(f, x, y):
         # This works for QT and GTK
         # You can also use window.setGeometry
         f.canvas.manager.window.move(x, y)
-
-
-# ------------------------------------------------------------------------------
-#  closed_loop_2D_stack
-# ------------------------------------------------------------------------------
-
-
-@njit(
-    # "float32[:, :, :](int64, int64, float64, float64, float64, int64[:])",
-    cache=True,
-    parallel=True,
-    nogil=True,
-)
-def _closed_loop_2D_stack(
-    N_frames: int,
-    N_pixels: int,
-    t_step: float,
-    x_step: float,
-    y_step: float,
-    perm: np.ndarray,
-    progress_hook: Union[ProgressBar, None],
-) -> np.ndarray:
-    t_radius = N_frames * t_step / (2 * np.pi)  # Temporal radius of the loop
-    t_factor = 2 * np.pi / N_frames
-
-    noise = np.empty((N_frames, N_pixels, N_pixels), dtype=np.float32)
-    for t_i in prange(N_frames):  # pylint: disable=not-an-iterable
-        t = t_i * t_factor
-        t_cos = t_radius * np.cos(t)
-        t_sin = t_radius * np.sin(t)
-        if progress_hook is not None:
-            progress_hook.update(1)
-        for y_i in prange(N_pixels):  # pylint: disable=not-an-iterable
-            y = y_i * y_step
-            for x_i in prange(N_pixels):  # pylint: disable=not-an-iterable
-                x = x_i * x_step
-                noise[t_i, y_i, x_i] = opensimplex_noise4(
-                    x, y, t_sin, t_cos, perm
-                )
-
-    return noise
-
-
-def closed_loop_2D_stack(
-    N_frames: int = 200,
-    N_pixels: int = 1000,
-    t_step: float = 0.1,
-    x_step: float = 0.01,
-    y_step: Union[float, None] = None,
-    seed: int = 1,
-    verbose: bool = True,
-) -> np.ndarray:
-    """Generates Simplex noise as 2D bitmap images that animate over time in a
-    closed-loop fashion. I.e., the bitmap image of the last time frame will
-    smoothly animate into the bitmap image of the first time frame again. The
-    animation path is /not/ a simple reversal of time in order to have the loop
-    closed, but rather is a fully unique path from start to finish.
-
-    It does so by calculating Simplex noise in 4 dimensions. The latter two
-    dimensions are used to describe a 'circle' in time, in turn used to
-    projection map the first two dimensions into bitmap images.
-
-    Args:
-        N_frames (int):
-            Number of time frames
-
-        N_pixels (int):
-            Number of pixels on a single axis
-
-        t_step (float):
-            Time step in arb. units
-
-        x_step (float):
-            Spatial step in arb. units
-
-        y_step (float | None):
-            Spatial step in arb. units. When set to None `y_step` will be set
-            equal to `x_step`.
-
-        seed (int):
-            Seed value of the OpenSimplex noise
-
-        verbose (bool):
-            Print 'Generating noise...' progress bar to the terminal?
-
-    Returns:
-        The image stack as 3D matrix [time, y-pixel, x-pixel] containing the
-        Simplex noise values as a 'grayscale' intensity in floating point.
-        The output intensity is garantueed to be in the range [-1, 1], but the
-        exact extrema cannot be known a-priori and are most probably way smaller
-        than [-1, 1].
-    """
-
-    perm, _ = opensimplex_init(seed)  # The OpenSimplex seed table
-    if y_step is None:
-        y_step = x_step
-
-    if verbose:
-        print(f"{'Generating noise...':30s}")  # , end="")
-        tick = perf_counter()
-
-        with ProgressBar(total=N_FRAMES, dynamic_ncols=True) as numba_progress:
-            out = _closed_loop_2D_stack(
-                N_frames, N_pixels, t_step, x_step, y_step, perm, numba_progress
-            )
-
-        print(f"done in {(perf_counter() - tick):.2f} s")
-
-    else:
-        out = _closed_loop_2D_stack(
-            N_frames, N_pixels, t_step, x_step, y_step, perm, None
-        )
-
-    return out
 
 
 # ------------------------------------------------------------------------------
@@ -416,43 +292,25 @@ def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
 N_PIXELS = 1000  # Number of pixels on a single axis
 N_FRAMES = 200  # Number of time frames
 
-# Generate noise
-"""
-img_stack = closed_loop_2D_stack(
-    N_pixels=N_PIXELS,
+img_stack = opensimplex.looping_animated_2D_image(
     N_frames=N_FRAMES,
+    N_pixels_x=N_PIXELS,
     t_step=0.1,
     x_step=0.01,
     seed=1,
-)
-
-img_stack_2 = closed_loop_2D_stack(
-    N_pixels=N_PIXELS,
-    N_frames=N_FRAMES,
-    t_step=0.1,
-    x_step=0.005,
-    seed=13,
-)
-"""
-
-img_stack = opensimplex.closed_loop_2D_stack(
-    N_pixels=N_PIXELS,
-    N_frames=N_FRAMES,
-    t_step=0.1,
-    x_step=0.01,
-    seed=1,
+    dtype=np.float32,
     verbose=True,
 )
 
-img_stack_2 = opensimplex.closed_loop_2D_stack(
-    N_pixels=N_PIXELS,
+img_stack_2 = opensimplex.looping_animated_2D_image(
     N_frames=N_FRAMES,
+    N_pixels_x=N_PIXELS,
     t_step=0.1,
     x_step=0.005,
     seed=13,
+    dtype=np.float32,
     verbose=True,
 )
-# """
 
 # Add A & B into A
 for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable
