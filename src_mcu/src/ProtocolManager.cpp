@@ -8,6 +8,7 @@
 
 #include "ProtocolManager.h"
 #include "halt.h"
+#include "translations.h"
 
 /*------------------------------------------------------------------------------
   P "Point in the Protocol Coordinate System (PCS)"
@@ -94,6 +95,13 @@ void ProtocolManager::clear() {
   }
   _N_lines = 0;
   _pos = -1; // -1 indicates we're at start-up of program
+
+  // For safety, we fill the current line buffer such that all valves will be
+  // opened up
+  line_buffer.duration = 1000;
+  for (uint8_t idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
+    line_buffer.points[idx_valve] = valve2p(idx_valve + 1);
+  }
 }
 
 bool ProtocolManager::add_line(const Line &line) {
@@ -113,12 +121,15 @@ bool ProtocolManager::add_line(const uint16_t duration,
 }
 
 void ProtocolManager::transfer_next_line_to_buffer() {
-  _pos++;
-  if (_pos == _N_lines) {
-    _pos = 0;
+  // Note: A freshly loaded program starts at `_pos == -1`. Once running, we
+  // loop around `_N_lines` to 0 again.
+  if (_N_lines > 0) { // If not, then we don't have a program loaded in
+    _pos++;
+    if (_pos == _N_lines) {
+      _pos = 0;
+    }
+    _program[_pos].unpack_into(line_buffer);
   }
-
-  _program[_pos].unpack_into(line_buffer);
 }
 
 void ProtocolManager::print(Stream &stream) {

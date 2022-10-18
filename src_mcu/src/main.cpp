@@ -155,10 +155,10 @@ bool R_click_poll_EMA_collectively() {
 }
 
 /*------------------------------------------------------------------------------
-  open_all_valves
+  immediately_open_all_valves
 ------------------------------------------------------------------------------*/
 
-void open_all_valves() {
+void immediately_open_all_valves() {
   cp_mgr.clear_masks();
   for (uint8_t idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
     cp_mgr.add_to_masks(valve2cp(idx_valve + 1));
@@ -294,7 +294,7 @@ void fun_load_program__ent() {
   }
   */
   Serial.println("Downloading new protocol program...");
-  open_all_valves();
+  immediately_open_all_valves();
   loading_program = true;
   alive_blinker_color = CRGB::Blue;
   protocol_mgr.clear();
@@ -303,11 +303,11 @@ void fun_load_program__ent() {
 void fun_load_program__upd() {
   Line line;
 
-  // Binary serial command availability status
+  // Binary stream command availability status
   int8_t bsc_available = bsc.available();
 
   if (bsc_available == -1) {
-    halt(8, "Buffer overrun in `load_program()`");
+    halt(8, "Stream command buffer overrun in `load_program()`");
   }
 
   if (bsc_available) {
@@ -508,14 +508,20 @@ void loop() {
         } else if (strcmp(str_cmd, "load") == 0) {
           fsm.transitionTo(state_load_program);
 
-        } else if (strncmp(str_cmd, "b?", 2) == 0) {
+        } else if (strcmp(str_cmd, "b?") == 0) { // For debugging only
+          // Print current line buffer to serial
+          Serial.println("Line buffer contents");
+          Serial.println("--------------------");
           protocol_mgr.print_buffer();
 
-        } else if (strncmp(str_cmd, "p?", 2) == 0) {
+        } else if (strcmp(str_cmd, "p?") == 0) { // For debugging only
+          // Print current protocol program to serial
+          Serial.println("Protocol program contents");
+          Serial.println("-------------------------");
           protocol_mgr.print();
 
-        } else if (strcmp(str_cmd, "trip") == 0) {
-          halt(0,"Halted by user command.");
+        } else if (strcmp(str_cmd, "halt") == 0) { // For debugging only
+          halt(0, "Halted by user command.");
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings
