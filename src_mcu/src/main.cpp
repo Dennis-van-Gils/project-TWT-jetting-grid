@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    31-08-2022
+ * @date    18-10-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -15,6 +15,7 @@
 #include "constants.h"
 #include "translations.h"
 
+#include "Adafruit_SleepyDog.h"
 #include "DvG_StreamCommand.h"
 #include "FastLED.h"
 #include "FiniteStateMachine.h"
@@ -167,6 +168,23 @@ void open_all_valves() {
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
   cp_mgr.send_masks(); // Activate valves
 #endif
+}
+
+/*------------------------------------------------------------------------------
+  set_LED_matrix_fixed_grid_nodes
+------------------------------------------------------------------------------*/
+
+void set_LED_matrix_fixed_grid_nodes() {
+  // Set LED colors at PCS points without a valve to yellow
+  for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
+    for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
+      if ((x + y) % 2 == 0) {
+        leds[p2led(P{x, y})] = CRGB::Yellow;
+      }
+    }
+  }
+  // Set LED color at PCS center point to off-white
+  leds[p2led(P{0, 0})] = CRGB::DarkSalmon;
 }
 
 /*------------------------------------------------------------------------------
@@ -334,6 +352,7 @@ void fun_load_program__upd() {
 
   // Time-out
   if (fsm.timeInCurrentState() > 4000) {
+    Serial.println("Downloading protocol timed out. Going back to idle.");
     loading_program = false;
     fsm.transitionTo(state_idle);
   }
@@ -351,6 +370,9 @@ State state_load_program(fun_load_program__ent, fun_load_program__upd);
 void setup() {
   // To enable float support in `snprintf()` we must add the following
   asm(".global _printf_float");
+
+  // Watchdog timer
+  Watchdog.enable(WATCHDOG_TIMEOUT);
 
   // Onboard LED & LED matrix
   //
@@ -412,18 +434,7 @@ void setup() {
 
   // Finished setup, so prepare LED matrix for regular operation
   FastLED.clearData();
-
-  // Set LED colors at PCS points without a valve to yellow
-  for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
-    for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
-      if ((x + y) % 2 == 0) {
-        leds[p2led(P{x, y})] = CRGB::Yellow;
-      }
-    }
-  }
-  // Set LED color at PCS center point to off-white
-  leds[p2led(P{0, 0})] = CRGB::DarkSalmon;
-
+  set_LED_matrix_fixed_grid_nodes();
   FastLED.show();
 
   // ---------------------
@@ -473,6 +484,7 @@ void setup() {
 
 void loop() {
   char *str_cmd; // Incoming serial ASCII-command string
+  Watchdog.reset();
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
@@ -501,6 +513,9 @@ void loop() {
 
         } else if (strncmp(str_cmd, "p?", 2) == 0) {
           protocol_mgr.print();
+
+        } else if (strcmp(str_cmd, "trip") == 0) {
+          halt(0,"Halted by user command.");
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings

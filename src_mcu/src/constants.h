@@ -2,7 +2,7 @@
  * @file    constants.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    15-08-2022
+ * @date    18-10-2022
  *
  * @brief   Constants of the TWT jetting grid.
  *
@@ -311,5 +311,13 @@ const Omega_Calib OMEGA_4_CALIB{3.995, 16.001, 7.0};
 inline float mA2bar(float mA, const Omega_Calib calib) {
   return (mA - calib.balance_mA) / calib.sensitivity_mA * calib.full_range_bar;
 }
+
+/*------------------------------------------------------------------------------
+  Watchdog
+------------------------------------------------------------------------------*/
+
+// The microcontroller will auto-reboot when it fails to get a
+// `Watchdog.reset()` within this time period [ms]
+const uint16_t WATCHDOG_TIMEOUT = 8000;
 
 #endif
