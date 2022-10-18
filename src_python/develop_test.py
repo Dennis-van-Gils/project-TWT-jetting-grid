@@ -63,9 +63,12 @@ for line in lines:
 
     ard.write(raw)
     success, ans = ard.readline()
-    # print(ans)
+    print(ans)
     success, ans = ard.readline()
-    # print(ans)
+    print(ans)
+
+    # if ~success:
+    #    continue
 
 ### Send EOP
 ard.write(b"")

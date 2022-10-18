@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    31-08-2022
+ * @date    18-10-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -53,6 +53,7 @@ void Line::print(Stream &stream) {
     }
     p.print(stream);
   }
+  stream.write('\n');
 }
 
 /*------------------------------------------------------------------------------
@@ -140,7 +141,6 @@ void ProtocolManager::print(Stream &stream) {
     stream.print(buf);
     _program[i].unpack_into(line);
     line.print();
-    stream.write('\n');
     stream.write('\n');
   }
 }

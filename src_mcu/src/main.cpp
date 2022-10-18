@@ -43,8 +43,9 @@ DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
 const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
 char buf[BUF_LEN]{'\0'};     // Common character buffer for string formatting
 
-// DEBUG: timer
-uint32_t utick = micros();
+// Debugging flags
+const bool DEBUG = true;   // Print debug info over serial?
+uint32_t utick = micros(); // DEBUG timer
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
@@ -293,7 +294,9 @@ void fun_load_program__ent() {
     char c = Serial.read();
   }
   */
-  Serial.println("Downloading new protocol program...");
+  if (DEBUG) {
+    Serial.println("Downloading new protocol program...");
+  }
   immediately_open_all_valves();
   loading_program = true;
   alive_blinker_color = CRGB::Blue;
@@ -317,7 +320,9 @@ void fun_load_program__upd() {
     if (data_len == 0) {
       // Found just the EOL sentinel without further information on the line -->
       // This signals the end-of-program EOP.
-      Serial.println("EOP");
+      if (DEBUG) {
+        Serial.println("EOP");
+      }
 
       // Flush any remaining bytes in the incoming serial buffer for safety
       while (Serial.available()) {
@@ -344,15 +349,19 @@ void fun_load_program__upd() {
     }
     line.points[idx_P].set_null(); // Add end sentinel
 
+    // TODO: check for return value FALSE, signalling program can't fit in mem
     protocol_mgr.add_line(line);
 
-    line.print();
-    Serial.write('\n');
+    if (DEBUG) {
+      line.print();
+    }
   }
 
   // Time-out
   if (fsm.timeInCurrentState() > 4000) {
-    Serial.println("Downloading protocol timed out. Going back to idle.");
+    if (DEBUG) {
+      Serial.println("Downloading protocol timed out. Going back to idle.");
+    }
     loading_program = false;
     fsm.transitionTo(state_idle);
   }
@@ -393,11 +402,11 @@ void setup() {
   FastLED.show();
 
   Serial.begin(9600);
-  // while (!Serial) {}
-
-  Serial.println(F("@ setup"));
-  Serial.print(F("Free mem: "));
-  Serial.println(freeMemory());
+  if (DEBUG) {
+    while (!Serial) {}
+    Serial.print("Free mem @ setup: ");
+    Serial.println(freeMemory());
+  }
 
   // Build reverse look-up table
   init_valve2p();
@@ -438,15 +447,10 @@ void setup() {
   FastLED.show();
 
   // ---------------------
-  // Protocol manager test
+  // Protocol manager
   // ---------------------
 
-  utick = micros();
   protocol_mgr.clear();
-  Serial.println(micros() - utick);
-  Serial.println(F("Cleared protocol"));
-
-  utick = micros();
 
   // DEMO: Growing center square
   // ---------------------------
@@ -470,12 +474,10 @@ void setup() {
   }
   // ---------------------------
 
-  Serial.println(micros() - utick);
-  Serial.println(F("Wrote protocol"));
-
-  Serial.println(F("@ loop"));
-  Serial.print(F("Free mem: "));
-  Serial.println(freeMemory());
+  if (DEBUG) {
+    Serial.print("Free mem @ loop : ");
+    Serial.println(freeMemory());
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -484,7 +486,10 @@ void setup() {
 
 void loop() {
   char *str_cmd; // Incoming serial ASCII-command string
-  Watchdog.reset();
+
+  EVERY_N_SECONDS(1) { // Slowed down, because of overhead otherwise
+    Watchdog.reset();
+  }
 
   // ---------------------------------------------------------------------------
   //   Process incoming serial commands
@@ -563,15 +568,15 @@ void loop() {
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
   if (R_click_poll_EMA_collectively()) {
-    /*
-    // DEBUG info: Show warning when obtained interval is too large
-    if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
-      Serial.print("WARNING: Large DAQ DT ");
-      Serial.println(readings.DAQ_obtained_DT);
+    if (DEBUG) {
+      // DEBUG info: Show warning when obtained interval is too large
+      if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
+        //Serial.print("WARNING: Large DAQ DT ");
+        //Serial.println(readings.DAQ_obtained_DT);
+      }
     }
-    */
   }
 #endif
 

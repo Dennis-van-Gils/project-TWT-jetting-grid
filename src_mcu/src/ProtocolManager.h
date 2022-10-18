@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    31-08-2022
+ * @date    18-10-2022
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -248,6 +248,8 @@ public:
 
   /**
    * @brief Clear the protocol program stored in memory.
+   *
+   * Operations takes less than 3 ms to complete.
    */
   void clear();
 
