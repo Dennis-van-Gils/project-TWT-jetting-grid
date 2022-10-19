@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    18-10-2022
+ * @date    19-10-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -44,7 +44,7 @@ void Line::pack_into(PackedLine &output) const {
 }
 
 void Line::print(Stream &stream) {
-  snprintf(buf, BUF_LEN, "%d [ms]\n", duration);
+  snprintf(buf, BUF_LEN, "%d ms\n", duration);
   stream.print(buf);
 
   for (auto &p : points) {
@@ -94,6 +94,7 @@ void ProtocolManager::clear() {
     packed_line->duration = 0;
     packed_line->masks.fill(0);
   }
+  set_name("cleared");
   _N_lines = 0;
   _pos = -1; // -1 indicates we're at start-up of program
 
@@ -133,22 +134,32 @@ void ProtocolManager::transfer_next_line_to_buffer() {
   }
 }
 
-void ProtocolManager::print(Stream &stream) {
+void ProtocolManager::print_program(Stream &stream) {
   Line line;
 
+  stream.println(_name);
+  stream.println(_N_lines);
+
+  /*
+  stream.write('\n');
   for (uint16_t i = 0; i < _N_lines; ++i) {
-    snprintf(buf, BUF_LEN, "*** Line %d | ", i);
+    snprintf(buf, BUF_LEN, "#%d\t", i);
     stream.print(buf);
     _program[i].unpack_into(line);
     line.print();
-    stream.write('\n');
   }
+  stream.write('\n');
+  */
 }
 
 void ProtocolManager::print_buffer(Stream &stream) {
-  snprintf(buf, BUF_LEN, "*** Line %d | ", _pos);
+  snprintf(buf, BUF_LEN, "#%d\t", _pos);
   stream.print(buf);
   line_buffer.print();
   stream.write('\n');
-  stream.write('\n');
+}
+
+void ProtocolManager::print_position(Stream &stream) {
+  snprintf(buf, BUF_LEN, "%d of %d\n", _pos, _N_lines - 1);
+  stream.print(buf);
 }

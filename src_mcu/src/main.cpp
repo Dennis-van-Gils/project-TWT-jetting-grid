@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    18-10-2022
+ * @date    19-10-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -200,32 +200,37 @@ uint8_t idx_valve;         // Frequently used valve index
 // new protocol program via a binary-command listener.
 bool loading_program = false;
 
-// -------------------------
-//  FSM: Idle
-// -------------------------
+/*------------------------------------------------------------------------------
+  FSM: Idle
+
+  Leaving any previously activated valves untouched
+------------------------------------------------------------------------------*/
+
+void fun_idle__ent();
+void fun_idle__upd();
+State state_idle(fun_idle__ent, fun_idle__upd);
+FiniteStateMachine fsm(state_idle);
 
 void fun_idle__ent() { alive_blinker_color = CRGB::Yellow; }
 
 void fun_idle__upd() {}
 
-/**
- * @brief Idle state, leaving any previously activated valves untouched
- */
-State state_idle(fun_idle__ent, fun_idle__upd);
+/*------------------------------------------------------------------------------
+  FSM: Single valve mode
+------------------------------------------------------------------------------*/
 
-FiniteStateMachine fsm(state_idle);
+// void fun_single_valve__upd() {}
 
-/*
-// -------------------------
-//  FSM: Single valve mode
-// -------------------------
+/*------------------------------------------------------------------------------
+  FSM: Run program
 
-void fun_single_valve__upd() {}
-*/
+  Run the protocol program, advancing line for line when it is time.
+  Will activate solenoid valves and will drive the LED matrix.
+------------------------------------------------------------------------------*/
 
-// -------------------------
-//  FSM: Run program
-// -------------------------
+void fun_run_program__ent();
+void fun_run_program__upd();
+State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 void fun_run_program__ent() {
   alive_blinker_color = CRGB::Green;
@@ -250,6 +255,9 @@ void fun_run_program__upd() {
 
     // Read in the next line
     protocol_mgr.transfer_next_line_to_buffer();
+    if (DEBUG) {
+      protocol_mgr.print_buffer(Serial);
+    }
 
     // Parse the line
     cp_mgr.clear_masks();
@@ -274,15 +282,15 @@ void fun_run_program__upd() {
   }
 }
 
-/**
- * @brief Run the protocol program, advancing line for line when it is time.
- * Will activate solenoid valves and will drive the LED matrix.
- */
-State state_run_program(fun_run_program__ent, fun_run_program__upd);
+/*------------------------------------------------------------------------------
+  FSM: Load program
 
-// -------------------------
-//  FSM: Load program
-// -------------------------
+  Load a new protocol program into memory
+------------------------------------------------------------------------------*/
+
+void fun_load_program__ent();
+void fun_load_program__upd();
+State state_load_program(fun_load_program__ent, fun_load_program__upd);
 
 void fun_load_program__ent() {
   // Make sure we open all valves to prevent excessive pressure at the pump
@@ -321,7 +329,7 @@ void fun_load_program__upd() {
       // Found just the EOL sentinel without further information on the line -->
       // This signals the end-of-program EOP.
       if (DEBUG) {
-        Serial.println("EOP");
+        Serial.println("Found EOP");
       }
 
       // Flush any remaining bytes in the incoming serial buffer for safety
@@ -367,14 +375,9 @@ void fun_load_program__upd() {
   }
 }
 
-/**
- * @brief Load a new protocol program into memory
- */
-State state_load_program(fun_load_program__ent, fun_load_program__upd);
-
-// -----------------------------------------------------------------------------
-//  setup
-// -----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
+  setup
+------------------------------------------------------------------------------*/
 
 void setup() {
   // To enable float support in `snprintf()` we must add the following
@@ -472,6 +475,8 @@ void setup() {
     line.points[idx_P].set_null(); // Add end sentinel
     protocol_mgr.add_line(line);
   }
+
+  protocol_mgr.set_name("Demo growing center square");
   // ---------------------------
 
   if (DEBUG) {
@@ -480,9 +485,9 @@ void setup() {
   }
 }
 
-// -----------------------------------------------------------------------------
-//  loop
-// -----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
+  loop
+------------------------------------------------------------------------------*/
 
 void loop() {
   char *str_cmd; // Incoming serial ASCII-command string
@@ -513,19 +518,22 @@ void loop() {
         } else if (strcmp(str_cmd, "load") == 0) {
           fsm.transitionTo(state_load_program);
 
-        } else if (strcmp(str_cmd, "b?") == 0) { // For debugging only
-          // Print current line buffer to serial
-          Serial.println("Line buffer contents");
-          Serial.println("--------------------");
+        } else if (strcmp(str_cmd, "pos?") == 0) {
+          // Print current protocol program position to serial
+          protocol_mgr.print_position();
+
+        } else if (strcmp(str_cmd, "b?") == 0) {
+          // Print current line buffer to serial, useful for debugging
+          Serial.println("Line buffer");
+          Serial.println("-----------");
           protocol_mgr.print_buffer();
 
-        } else if (strcmp(str_cmd, "p?") == 0) { // For debugging only
+        } else if (strcmp(str_cmd, "p?") == 0) {
           // Print current protocol program to serial
-          Serial.println("Protocol program contents");
-          Serial.println("-------------------------");
-          protocol_mgr.print();
+          protocol_mgr.print_program();
 
-        } else if (strcmp(str_cmd, "halt") == 0) { // For debugging only
+        } else if (strcmp(str_cmd, "halt") == 0) {
+          // Trigger a halt, useful for debugging
           halt(0, "Halted by user command.");
 
         } else if (strcmp(str_cmd, "?") == 0) {
@@ -573,8 +581,8 @@ void loop() {
     if (DEBUG) {
       // DEBUG info: Show warning when obtained interval is too large
       if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
-        //Serial.print("WARNING: Large DAQ DT ");
-        //Serial.println(readings.DAQ_obtained_DT);
+        // Serial.print("WARNING: Large DAQ DT ");
+        // Serial.println(readings.DAQ_obtained_DT);
       }
     }
   }

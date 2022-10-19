@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    18-10-2022
+ * @date    19-10-2022
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -285,11 +285,11 @@ public:
   void transfer_next_line_to_buffer();
 
   /**
-   * @brief Pretty print to full protocol program, useful for debugging.
+   * @brief Pretty print the protocol program.
    *
    * @param stream The stream to print to. Default: Serial.
    */
-  void print(Stream &stream = Serial);
+  void print_program(Stream &stream = Serial);
 
   /**
    * @brief Pretty print the current line buffer, useful for debugging.
@@ -315,10 +315,24 @@ public:
    */
   Line line_buffer;
 
+  /**
+   * @brief Pretty print the current position of the protocol program as
+   * "i of N".
+   *
+   * @param stream The stream to print to. Default: Serial.
+   */
+  void print_position(Stream &stream = Serial);
+
+  inline void set_name(const char *name) { strncpy(_name, name, 64); }
+  inline char *get_name() { return _name; }
+  inline uint16_t get_N_lines() { return _N_lines; }
+  inline int16_t get_position() { return _pos; }
+
 private:
-  Program _program;  // The protocol program
-  uint16_t _N_lines; // Total number of lines currently loaded into the program
-  int16_t _pos; // Playback position, where -1 indicates start of the program
+  Program _program;        // The protocol program
+  char _name[64] = {'\0'}; // Name of the protocol
+  uint16_t _N_lines;       // Total number of lines making up the program
+  int16_t _pos; // Playback position, where -1 indicates a fresh start
 };
 
 #endif
