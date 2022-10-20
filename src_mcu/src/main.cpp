@@ -214,7 +214,7 @@ State state_idle(fun_idle__ent, fun_idle__upd);
 FiniteStateMachine fsm(state_idle);
 
 void fun_idle__ent() {
-  Serial.println("State: idling...");
+  Serial.println("State: Idling...");
   alive_blinker_color = CRGB::Yellow;
 }
 
@@ -238,7 +238,7 @@ void fun_run_program__upd();
 State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 void fun_run_program__ent() {
-  Serial.println("State: running...");
+  Serial.println("State: Running protocol program...");
   alive_blinker_color = CRGB::Green;
 
   // Clear all valve leds
@@ -293,7 +293,7 @@ void fun_run_program__upd() {
 /*------------------------------------------------------------------------------
   FSM: Load program
 
-  Load a new protocol program into memory
+  Load a new protocol program into Arduino memory
 ------------------------------------------------------------------------------*/
 
 // Stage 0: Load in via ASCII the name of the protocol program.
@@ -308,9 +308,7 @@ void fun_load_program__upd();
 State state_load_program(fun_load_program__ent, fun_load_program__upd);
 
 void fun_load_program__ent() {
-  // Make sure we open all valves to prevent excessive pressure at the pump
-  // TODO: Handshake with Python to start flush and download
-  Serial.println("State: loading...");
+  Serial.println("State: Loading in protocol program...");
   alive_blinker_color = CRGB::Blue;
 
   immediately_open_all_valves();
@@ -328,7 +326,7 @@ void fun_load_program__upd() {
     if (sc.available()) {
       str_cmd = sc.getCommand();
       protocol_mgr.set_name(str_cmd);
-      Serial.println(protocol_mgr.get_name());
+      Serial.println(protocol_mgr.get_name()); // Echo the name back
       loading_stage++;
     }
   }
@@ -340,13 +338,13 @@ void fun_load_program__upd() {
       promised_N_lines = atoi(str_cmd);
 
       if (promised_N_lines <= PROTOCOL_MAX_LINES) {
-        Serial.println("Success");
+        Serial.println("Loading stage 1: Success");
         loading_stage++;
       } else {
         // Protocol program will not fit inside pre-allocated memory
         snprintf(buf, BUF_LEN,
-                 "Failed. Protocol program exceeds maximum number of lines: "
-                 "requested %d, maximum %d",
+                 "ERROR: Protocol program exceeds maximum number of lines. "
+                 "Requested was %d, but maximum is %d.",
                  promised_N_lines, PROTOCOL_MAX_LINES);
         Serial.println(buf);
         loading_program = false;
@@ -378,24 +376,17 @@ void fun_load_program__upd() {
 
         // Check if the number of received lines matches the expectation
         if (protocol_mgr.get_N_lines() == promised_N_lines) {
-          Serial.println("Success");
+          Serial.println("Loading stage 2: Success");
         } else {
           snprintf(buf, BUF_LEN,
-                   "Failed. Received incorrect number of lines: "
-                   "promised %d, received %d",
+                   "ERROR: Protocol program received incorrect number of "
+                   "lines. Promised was %d, but received %d.",
                    promised_N_lines, protocol_mgr.get_N_lines());
           Serial.println(buf);
           protocol_mgr.clear();
         }
 
-        // Flush any remaining bytes in the incoming serial buffer for safety
-        // TODO: Should not be necessary. Check.
-        /*
-        while (Serial.available()) {
-          Serial.read();
-        }
-        */
-
+        // Exit
         loading_program = false;
         fsm.transitionTo(state_idle);
         return;
@@ -426,7 +417,8 @@ void fun_load_program__upd() {
   // Time-out check
   const uint16_t LOADING_TIMEOUT = 4000; // [ms]
   if (fsm.timeInCurrentState() > LOADING_TIMEOUT) {
-    Serial.println("Loading timed out.");
+    // Exit
+    Serial.println("ERROR: Loading in protocol program timed out.");
     loading_program = false;
     fsm.transitionTo(state_idle);
   }
