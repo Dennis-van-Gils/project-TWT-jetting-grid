@@ -31,6 +31,7 @@
 // Serial port listener for receiving ASCII commands
 const uint8_t CMD_BUF_LEN = 64;  // Length of the ASCII command buffer
 char cmd_buf[CMD_BUF_LEN]{'\0'}; // The ASCII command buffer
+char *str_cmd;                   // Incoming serial ASCII-command string
 DvG_StreamCommand sc(Serial, cmd_buf, CMD_BUF_LEN);
 
 // Serial port listener for receiving binary data decoding a protocol program
@@ -44,7 +45,7 @@ const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
 char buf[BUF_LEN]{'\0'};     // Common character buffer for string formatting
 
 // Debugging flags
-const bool DEBUG = true;   // Print debug info over serial?
+const bool DEBUG = false;  // Print debug info over serial?
 uint32_t utick = micros(); // DEBUG timer
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
@@ -169,6 +170,7 @@ void immediately_open_all_valves() {
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS != 1
   cp_mgr.send_masks(); // Activate valves
 #endif
+  FastLED.show();
 }
 
 /*------------------------------------------------------------------------------
@@ -211,7 +213,10 @@ void fun_idle__upd();
 State state_idle(fun_idle__ent, fun_idle__upd);
 FiniteStateMachine fsm(state_idle);
 
-void fun_idle__ent() { alive_blinker_color = CRGB::Yellow; }
+void fun_idle__ent() {
+  Serial.println("State: idling...");
+  alive_blinker_color = CRGB::Yellow;
+}
 
 void fun_idle__upd() {}
 
@@ -233,7 +238,9 @@ void fun_run_program__upd();
 State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 void fun_run_program__ent() {
+  Serial.println("State: running...");
   alive_blinker_color = CRGB::Green;
+
   // Clear all valve leds
   for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
     leds[p2led(valve2p(idx_valve + 1))] = 0;
@@ -255,6 +262,7 @@ void fun_run_program__upd() {
 
     // Read in the next line
     protocol_mgr.transfer_next_line_to_buffer();
+    Serial.println(protocol_mgr.get_position());
     if (DEBUG) {
       protocol_mgr.print_buffer(Serial);
     }
@@ -288,6 +296,13 @@ void fun_run_program__upd() {
   Load a new protocol program into memory
 ------------------------------------------------------------------------------*/
 
+// Stage 0: Load in via ASCII the name of the protocol program.
+// Stage 1: Load in via ASCII the total number of protocol lines to be send.
+// Stage 2: Load in via binary the protocol program line-by-line until the
+//          end-of-program (EOP) sentinel is received. The EOP is signalled by
+//          receiving two end-of-line (EOL) sentinels directly after each other.
+uint8_t loading_stage = 0;
+
 void fun_load_program__ent();
 void fun_load_program__upd();
 State state_load_program(fun_load_program__ent, fun_load_program__upd);
@@ -295,81 +310,123 @@ State state_load_program(fun_load_program__ent, fun_load_program__upd);
 void fun_load_program__ent() {
   // Make sure we open all valves to prevent excessive pressure at the pump
   // TODO: Handshake with Python to start flush and download
+  Serial.println("State: loading...");
+  alive_blinker_color = CRGB::Blue;
 
-  /*
-  // Flush any remaining bytes in the incoming serial buffer for safety
-  while (Serial.available()) {
-    char c = Serial.read();
-  }
-  */
-  if (DEBUG) {
-    Serial.println("Downloading new protocol program...");
-  }
   immediately_open_all_valves();
   loading_program = true;
-  alive_blinker_color = CRGB::Blue;
+  loading_stage = 0;
   protocol_mgr.clear();
 }
 
 void fun_load_program__upd() {
+  static uint16_t promised_N_lines;
   Line line;
 
-  // Binary stream command availability status
-  int8_t bsc_available = bsc.available();
-
-  if (bsc_available == -1) {
-    halt(8, "Stream command buffer overrun in `load_program()`");
+  if (loading_stage == 0) {
+    // Load in via ASCII the name of the protocol program
+    if (sc.available()) {
+      str_cmd = sc.getCommand();
+      protocol_mgr.set_name(str_cmd);
+      Serial.println(protocol_mgr.get_name());
+      loading_stage++;
+    }
   }
 
-  if (bsc_available) {
-    // Incoming binary data length in bytes
-    uint16_t data_len = bsc.getCommandLength();
+  if (loading_stage == 1) {
+    // Load in via ASCII the total number of protocol lines to be send
+    if (sc.available()) {
+      str_cmd = sc.getCommand();
+      promised_N_lines = atoi(str_cmd);
 
-    if (data_len == 0) {
-      // Found just the EOL sentinel without further information on the line -->
-      // This signals the end-of-program EOP.
+      if (promised_N_lines <= PROTOCOL_MAX_LINES) {
+        Serial.println("Success");
+        loading_stage++;
+      } else {
+        // Protocol program will not fit inside pre-allocated memory
+        snprintf(buf, BUF_LEN,
+                 "Failed. Protocol program exceeds maximum number of lines: "
+                 "requested %d, maximum %d",
+                 promised_N_lines, PROTOCOL_MAX_LINES);
+        Serial.println(buf);
+        loading_program = false;
+        fsm.transitionTo(state_idle);
+        return;
+      }
+    }
+  }
+
+  if (loading_stage == 2) {
+    // Load in via binary the protocol program line-by-line
+
+    // Binary stream command availability status
+    int8_t bsc_available = bsc.available();
+    if (bsc_available == -1) {
+      halt(8, "Stream command buffer overrun in `load_program()`");
+    }
+
+    if (bsc_available) {
+      // Incoming binary data length in bytes
+      uint16_t data_len = bsc.getCommandLength();
+
+      if (data_len == 0) {
+        // Found just the EOL sentinel without further information on the line
+        // --> This signals the end-of-program EOP.
+        if (DEBUG) {
+          Serial.println("Found EOP");
+        }
+
+        // Check if the number of received lines matches the expectation
+        if (protocol_mgr.get_N_lines() == promised_N_lines) {
+          Serial.println("Success");
+        } else {
+          snprintf(buf, BUF_LEN,
+                   "Failed. Received incorrect number of lines: "
+                   "promised %d, received %d",
+                   promised_N_lines, protocol_mgr.get_N_lines());
+          Serial.println(buf);
+          protocol_mgr.clear();
+        }
+
+        // Flush any remaining bytes in the incoming serial buffer for safety
+        // TODO: Should not be necessary. Check.
+        /*
+        while (Serial.available()) {
+          Serial.read();
+        }
+        */
+
+        loading_program = false;
+        fsm.transitionTo(state_idle);
+        return;
+      }
+
+      // Try to parse the newly send line of the protocol program
+      // Expecting a binary stream as follows:
+      // 1 x 2 bytes: uint16_t time duration in [ms]
+      // N x 1 byte : byte-encoded PCS coordinate where
+      //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
+      line.duration = (uint16_t)bin_buf[0] << 8 | //
+                      (uint16_t)bin_buf[1];
+
+      uint16_t idx_P = 0; // Index of newly unpacked point
+      for (uint16_t idx = 2; idx < data_len; ++idx) {
+        line.points[idx_P].unpack_byte(bin_buf[idx]);
+        idx_P++;
+      }
+      line.points[idx_P].set_null(); // Add end sentinel
+
+      protocol_mgr.add_line(line);
       if (DEBUG) {
-        Serial.println("Found EOP");
+        line.print();
       }
-
-      // Flush any remaining bytes in the incoming serial buffer for safety
-      while (Serial.available()) {
-        Serial.read();
-      }
-
-      loading_program = false;
-      fsm.transitionTo(state_idle);
-      return;
-    }
-
-    // Try to parse the newly send line of the protocol program
-    // Expecting a binary stream as follows:
-    // 1 x 2 bytes: uint16_t time duration in [ms]
-    // N x 1 byte : byte-encoded PCS coordinate where
-    //              upper 4 bits = PCS.x, lower 4 bits = PCS.y
-    line.duration = (uint16_t)bin_buf[0] << 8 | //
-                    (uint16_t)bin_buf[1];
-
-    uint16_t idx_P = 0; // Index of newly unpacked point
-    for (uint16_t idx = 2; idx < data_len; ++idx) {
-      line.points[idx_P].unpack_byte(bin_buf[idx]);
-      idx_P++;
-    }
-    line.points[idx_P].set_null(); // Add end sentinel
-
-    // TODO: check for return value FALSE, signalling program can't fit in mem
-    protocol_mgr.add_line(line);
-
-    if (DEBUG) {
-      line.print();
     }
   }
 
-  // Time-out
-  if (fsm.timeInCurrentState() > 4000) {
-    if (DEBUG) {
-      Serial.println("Downloading protocol timed out. Going back to idle.");
-    }
+  // Time-out check
+  const uint16_t LOADING_TIMEOUT = 4000; // [ms]
+  if (fsm.timeInCurrentState() > LOADING_TIMEOUT) {
+    Serial.println("Loading timed out.");
     loading_program = false;
     fsm.transitionTo(state_idle);
   }
@@ -490,8 +547,6 @@ void setup() {
 ------------------------------------------------------------------------------*/
 
 void loop() {
-  char *str_cmd; // Incoming serial ASCII-command string
-
   EVERY_N_SECONDS(1) { // Slowed down, because of overhead otherwise
     Watchdog.reset();
   }
@@ -520,7 +575,9 @@ void loop() {
 
         } else if (strcmp(str_cmd, "pos?") == 0) {
           // Print current protocol program position to serial
-          protocol_mgr.print_position();
+          snprintf(buf, BUF_LEN, "%d of %d\n", protocol_mgr.get_position(),
+                   protocol_mgr.get_N_lines() - 1);
+          Serial.print(buf);
 
         } else if (strcmp(str_cmd, "b?") == 0) {
           // Print current line buffer to serial, useful for debugging
@@ -578,13 +635,16 @@ void loop() {
 
 #if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
   if (R_click_poll_EMA_collectively()) {
+    /*
     if (DEBUG) {
-      // DEBUG info: Show warning when obtained interval is too large
+      // DEBUG info: Show warning when obtained interval is too large.
+      // Not necessarily problematic though. The EMA will adjust for this.
       if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
-        // Serial.print("WARNING: Large DAQ DT ");
-        // Serial.println(readings.DAQ_obtained_DT);
+        Serial.print("WARNING: Large DAQ DT ");
+        Serial.println(readings.DAQ_obtained_DT);
       }
     }
+    */
   }
 #endif
 

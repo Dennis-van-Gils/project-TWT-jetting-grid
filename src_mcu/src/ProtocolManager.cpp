@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    19-10-2022
+ * @date    20-10-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -107,7 +107,7 @@ void ProtocolManager::clear() {
 }
 
 bool ProtocolManager::add_line(const Line &line) {
-  if (_N_lines == MAX_LINES) {
+  if (_N_lines == PROTOCOL_MAX_LINES) {
     return false;
   }
 
@@ -135,12 +135,11 @@ void ProtocolManager::transfer_next_line_to_buffer() {
 }
 
 void ProtocolManager::print_program(Stream &stream) {
-  Line line;
-
   stream.println(_name);
   stream.println(_N_lines);
 
   /*
+  Line line;
   stream.write('\n');
   for (uint16_t i = 0; i < _N_lines; ++i) {
     snprintf(buf, BUF_LEN, "#%d\t", i);
@@ -157,9 +156,4 @@ void ProtocolManager::print_buffer(Stream &stream) {
   stream.print(buf);
   line_buffer.print();
   stream.write('\n');
-}
-
-void ProtocolManager::print_position(Stream &stream) {
-  snprintf(buf, BUF_LEN, "%d of %d\n", _pos, _N_lines - 1);
-  stream.print(buf);
 }

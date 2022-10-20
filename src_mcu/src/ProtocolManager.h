@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    19-10-2022
+ * @date    20-10-2022
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -30,7 +30,7 @@ extern char buf[];
  * @brief The maximum number of protocol lines that a protocol program can
  * contain. Make it as large as free RAM allows.
  */
-const uint16_t MAX_LINES = 5000;
+const uint16_t PROTOCOL_MAX_LINES = 5000;
 
 /**
  * @brief The maximum number of PCS points that a single protocol line can
@@ -232,7 +232,7 @@ public:
  * valves and close the others and 2: to light up the appropiate LEDs of the
  * 16x16 LED matrix).
  */
-using Program = std::array<PackedLine, MAX_LINES>;
+using Program = std::array<PackedLine, PROTOCOL_MAX_LINES>;
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -314,14 +314,6 @@ public:
    * @endcode
    */
   Line line_buffer;
-
-  /**
-   * @brief Pretty print the current position of the protocol program as
-   * "i of N".
-   *
-   * @param stream The stream to print to. Default: Serial.
-   */
-  void print_position(Stream &stream = Serial);
 
   inline void set_name(const char *name) { strncpy(_name, name, 64); }
   inline char *get_name() { return _name; }
