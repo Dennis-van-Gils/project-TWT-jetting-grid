@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    19-10-2022
+ * @date    21-10-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -50,7 +50,7 @@ uint32_t utick = micros(); // DEBUG timer
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -587,6 +587,19 @@ void loop() {
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings
+
+#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 1
+          // Generate fake pressure data
+          float sin_value = 16.f + sin(2.f * PI * .1f * millis() / 1.e3f);
+          readings.pres_1_mA = sin_value;
+          readings.pres_2_mA = sin_value + .5;
+          readings.pres_3_mA = sin_value + 1.;
+          readings.pres_4_mA = sin_value + 1.5;
+          readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+          readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+          readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+          readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+#else
           readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
           readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
           readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
@@ -595,6 +608,7 @@ void loop() {
           readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
           readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
           readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+#endif
 
           // NOTE:
           //   Using `snprintf()` to print a large array of formatted values
