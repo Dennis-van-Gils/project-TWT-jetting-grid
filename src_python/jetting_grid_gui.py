@@ -7,14 +7,100 @@ Manages the graphical user interface
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "21-10-2022"
+__date__ = "24-10-2022"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda
 
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtCore import QDateTime
-from PyQt5 import QtWidgets as QtWid
+import os
+import sys
+
+# Constants
+UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
+CHART_HISTORY_TIME = 7200  # Maximum history length of charts [s]
+
+# Global flags
+DEBUG = False  # Show debug info in terminal?
+TRY_USING_OPENGL = True
+
+# Mechanism to support both PyQt and PySide
+# -----------------------------------------
+
+PYQT5 = "PyQt5"
+PYQT6 = "PyQt6"
+PYSIDE2 = "PySide2"
+PYSIDE6 = "PySide6"
+QT_LIB_ORDER = [PYQT5, PYSIDE2, PYSIDE6, PYQT6]
+QT_LIB = os.getenv("PYQTGRAPH_QT_LIB")
+
+# pylint: disable=import-error, no-name-in-module, c-extension-no-member
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        if lib in sys.modules:
+            QT_LIB = lib
+            break
+
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        try:
+            __import__(lib)
+            QT_LIB = lib
+            break
+        except ImportError:
+            pass
+
+if QT_LIB is None:
+    this_file = __file__.split(os.sep)[-1]
+    raise Exception(
+        f"{this_file} requires PyQt5, PyQt6, PySide2 or PySide6; "
+        "none of these packages could be imported."
+    )
+
+# fmt: off
+if QT_LIB == PYQT5:
+    from PyQt5 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
+    from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
+    from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
+elif QT_LIB == PYQT6:
+    from PyQt6 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
+    from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
+    from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
+elif QT_LIB == PYSIDE2:
+    from PySide2 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
+    from PySide2.QtCore import Slot                        # type: ignore
+    from PySide2.QtCore import Signal                      # type: ignore
+elif QT_LIB == PYSIDE6:
+    from PySide6 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
+    from PySide6.QtCore import Slot                        # type: ignore
+    from PySide6.QtCore import Signal                      # type: ignore
+# fmt: on
+
+QT_VERSION = (
+    QtCore.QT_VERSION_STR if QT_LIB in (PYQT5, PYQT6) else QtCore.__version__
+)
+
+# pylint: enable=import-error, no-name-in-module, c-extension-no-member
+# \end[Mechanism to support both PyQt and PySide]
+# -----------------------------------------------
+
 import pyqtgraph as pg
+
+print(f"{QT_LIB:9s} {QT_VERSION}")
+print(f"PyQtGraph {pg.__version__}")
+
+if TRY_USING_OPENGL:
+    try:
+        import OpenGL.GL as gl  # pylint: disable=unused-import
+        from OpenGL.version import __version__ as gl_version
+    except:
+        print("PyOpenGL  not found")
+        print("To install: `conda install pyopengl` or `pip install pyopengl`")
+    else:
+        print(f"PyOpenGL  {gl_version}")
+        pg.setConfigOptions(useOpenGL=True)
+        pg.setConfigOptions(antialias=True)
+        pg.setConfigOptions(enableExperimental=True)
+else:
+    print("PyOpenGL  disabled")
 
 import dvg_pyqt_controls as controls
 from dvg_debug_functions import dprint, tprint, print_fancy_traceback as pft
@@ -28,27 +114,6 @@ from dvg_pyqtgraph_threadsafe import (
 from dvg_devices.Arduino_protocol_serial import Arduino
 from jetting_grid_qdev import JettingGrid_qdev
 
-
-# Constants
-UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
-CHART_HISTORY_TIME = 7200  # Maximum history length of charts [s]
-
-# Show debug info in terminal? Warning: Slow! Do not leave on unintentionally.
-DEBUG = False
-
-# Try OpenGL support
-TRY_USING_OPENGL = True
-if TRY_USING_OPENGL:
-    try:
-        import OpenGL.GL as gl  # pylint: disable=unused-import
-    except:
-        print("OpenGL acceleration: Disabled")
-        print("To install: `conda install pyopengl` or `pip install pyopengl`")
-    else:
-        print("OpenGL acceleration: Enabled")
-        pg.setConfigOptions(useOpenGL=True)
-        pg.setConfigOptions(antialias=True)
-        pg.setConfigOptions(enableExperimental=True)
 
 # Default settings for graphs
 # pg.setConfigOptions(leftButtonPan=False)
@@ -436,15 +501,15 @@ class MainWindow(QtWid.QWidget):
     #   Handle controls
     # --------------------------------------------------------------------------
 
-    @QtCore.pyqtSlot()
+    @Slot()
     def update_wall_clock(self):
-        cur_date_time = QDateTime.currentDateTime()
+        cur_date_time = QtCore.QDateTime.currentDateTime()
         self.qlbl_cur_date_time.setText(
             f"{cur_date_time.toString('dd-MM-yyyy')}    "
             f"{cur_date_time.toString('HH:mm:ss')}"
         )
 
-    @QtCore.pyqtSlot()
+    @Slot()
     def update_GUI(self):
         # Shorthands
         ard_qdev = self.ard_qdev

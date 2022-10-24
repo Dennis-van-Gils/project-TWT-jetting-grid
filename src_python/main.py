@@ -5,16 +5,88 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "21-10-2022"
+__date__ = "24-10-2022"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except
 
+import os
 import sys
 import time
 
-from PyQt5 import QtCore
-from PyQt5 import QtWidgets as QtWid
-from PyQt5.QtCore import QDateTime
+# Constants
+DAQ_INTERVAL_MS = 100  # 100 [ms]
+
+# Global flags
+DEBUG = False  # Show debug info in terminal?
+
+# Mechanism to support both PyQt and PySide
+# -----------------------------------------
+
+PYQT5 = "PyQt5"
+PYQT6 = "PyQt6"
+PYSIDE2 = "PySide2"
+PYSIDE6 = "PySide6"
+QT_LIB_ORDER = [PYQT5, PYSIDE2, PYSIDE6, PYQT6]
+QT_LIB = os.getenv("PYQTGRAPH_QT_LIB")
+
+# Parse optional cli argument to enfore a QT_LIB
+# cli example: python benchmark.py pyside6
+if len(sys.argv) > 1:
+    arg1 = str(sys.argv[1]).upper()
+    for i, lib in enumerate(QT_LIB_ORDER):
+        if arg1 == lib.upper():
+            QT_LIB = lib
+            break
+
+# pylint: disable=import-error, no-name-in-module, c-extension-no-member
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        if lib in sys.modules:
+            QT_LIB = lib
+            break
+
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        try:
+            __import__(lib)
+            QT_LIB = lib
+            break
+        except ImportError:
+            pass
+
+if QT_LIB is None:
+    this_file = __file__.split(os.sep)[-1]
+    raise Exception(
+        f"{this_file} requires PyQt5, PyQt6, PySide2 or PySide6; "
+        "none of these packages could be imported."
+    )
+
+# fmt: off
+if QT_LIB == PYQT5:
+    from PyQt5 import QtCore, QtWidgets as QtWid           # type: ignore
+    from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
+    from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
+elif QT_LIB == PYQT6:
+    from PyQt6 import QtCore, QtWidgets as QtWid           # type: ignore
+    from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
+    from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
+elif QT_LIB == PYSIDE2:
+    from PySide2 import QtCore, QtWidgets as QtWid         # type: ignore
+    from PySide2.QtCore import Slot                        # type: ignore
+    from PySide2.QtCore import Signal                      # type: ignore
+elif QT_LIB == PYSIDE6:
+    from PySide6 import QtCore, QtWidgets as QtWid         # type: ignore
+    from PySide6.QtCore import Slot                        # type: ignore
+    from PySide6.QtCore import Signal                      # type: ignore
+# fmt: on
+
+QT_VERSION = (
+    QtCore.QT_VERSION_STR if QT_LIB in (PYQT5, PYQT6) else QtCore.__version__
+)
+
+# pylint: enable=import-error, no-name-in-module, c-extension-no-member
+# \end[Mechanism to support both PyQt and PySide]
+# -----------------------------------------------
 
 from dvg_pyqt_filelogger import FileLogger
 from dvg_debug_functions import dprint, print_fancy_traceback as pft
@@ -23,19 +95,13 @@ from dvg_devices.Arduino_protocol_serial import Arduino
 from jetting_grid_qdev import JettingGrid_qdev
 from jetting_grid_gui import MainWindow
 
-# Globals
-DAQ_INTERVAL_MS = 100  # 100 [ms]
-
-# Show debug info in terminal?
-DEBUG = False
-
 # ------------------------------------------------------------------------------
 #   current_date_time_strings
 # ------------------------------------------------------------------------------
 
 
 def current_date_time_strings():
-    cur_date_time = QDateTime.currentDateTime()
+    cur_date_time = QtCore.QDateTime.currentDateTime()
     return (
         cur_date_time.toString("dd-MM-yyyy"),  # Date
         cur_date_time.toString("HH:mm:ss"),  # Time
@@ -53,7 +119,7 @@ def stop_running():
     logger.close()
 
 
-@QtCore.pyqtSlot()
+@Slot()
 def notify_connection_lost():
     stop_running()
 
@@ -72,7 +138,7 @@ def notify_connection_lost():
         pass  # Leave the GUI open for read-only inspection by the user
 
 
-@QtCore.pyqtSlot()
+@Slot()
 def about_to_quit():
     print("\nAbout to quit")
     stop_running()
@@ -200,4 +266,7 @@ if __name__ == "__main__":
 
     # Start the main GUI event loop
     window.show()
-    sys.exit(app.exec_())
+    if QT_LIB in (PYQT5, PYSIDE2):
+        sys.exit(app.exec_())
+    else:
+        sys.exit(app.exec())
