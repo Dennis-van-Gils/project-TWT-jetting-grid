@@ -7,7 +7,7 @@ Manages multi-threaded communication with the Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "21-10-2022"
+__date__ = "24-10-2022"
 __version__ = "1.0"
 
 import numpy as np
@@ -58,7 +58,3 @@ class JettingGrid_qdev(QDeviceIO):
     #   Arduino communication functions
     # --------------------------------------------------------------------------
 
-    """
-    def reconnect_BME280_sensors(self):
-        self.send(self.dev.write, "r")
-    """

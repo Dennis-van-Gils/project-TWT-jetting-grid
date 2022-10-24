@@ -17,9 +17,6 @@ import sys
 # Constants
 UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
 CHART_HISTORY_TIME = 7200  # Maximum history length of charts [s]
-
-# Global flags
-DEBUG = False  # Show debug info in terminal?
 TRY_USING_OPENGL = True
 
 # Mechanism to support both PyQt and PySide
@@ -59,19 +56,19 @@ if QT_LIB is None:
 if QT_LIB == PYQT5:
     from PyQt5 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
-    from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
+    #from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYQT6:
     from PyQt6 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
-    from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
+    #from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYSIDE2:
     from PySide2 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide2.QtCore import Slot                        # type: ignore
-    from PySide2.QtCore import Signal                      # type: ignore
+    #from PySide2.QtCore import Signal                      # type: ignore
 elif QT_LIB == PYSIDE6:
     from PySide6 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
-    from PySide6.QtCore import Signal                      # type: ignore
+    #from PySide6.QtCore import Signal                      # type: ignore
 # fmt: on
 
 QT_VERSION = (
@@ -102,9 +99,9 @@ if TRY_USING_OPENGL:
 else:
     print("PyOpenGL  disabled")
 
-import dvg_pyqt_controls as controls
-from dvg_debug_functions import dprint, tprint, print_fancy_traceback as pft
+from dvg_debug_functions import tprint
 from dvg_pyqt_filelogger import FileLogger
+import dvg_pyqt_controls as controls
 from dvg_pyqtgraph_threadsafe import (
     HistoryChartCurve,
     LegendSelect,
@@ -202,6 +199,7 @@ class MainWindow(QtWid.QWidget):
         ard: Arduino,
         ard_qdev: JettingGrid_qdev,
         logger: FileLogger,
+        debug: bool = False,
         parent=None,
         **kwargs,
     ):
@@ -210,6 +208,7 @@ class MainWindow(QtWid.QWidget):
         self.ard = ard
         self.ard_qdev = ard_qdev
         self.logger = logger
+        self.debug = debug
 
         # Shorthands
         state = self.ard_qdev.state
@@ -530,7 +529,7 @@ class MainWindow(QtWid.QWidget):
         self.qlin_pres_3.setText(f"{state.pres_3_bar:.3f}")
         self.qlin_pres_4.setText(f"{state.pres_4_bar:.3f}")
 
-        if DEBUG:
+        if self.debug:
             tprint("update_charts")
 
         for curve in self.curves:

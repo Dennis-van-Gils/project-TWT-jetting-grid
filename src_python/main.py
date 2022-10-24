@@ -15,8 +15,6 @@ import time
 
 # Constants
 DAQ_INTERVAL_MS = 100  # 100 [ms]
-
-# Global flags
 DEBUG = False  # Show debug info in terminal?
 
 # Mechanism to support both PyQt and PySide
@@ -65,19 +63,19 @@ if QT_LIB is None:
 if QT_LIB == PYQT5:
     from PyQt5 import QtCore, QtWidgets as QtWid           # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
-    from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
+    #from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYQT6:
     from PyQt6 import QtCore, QtWidgets as QtWid           # type: ignore
     from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
-    from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
+    #from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYSIDE2:
     from PySide2 import QtCore, QtWidgets as QtWid         # type: ignore
     from PySide2.QtCore import Slot                        # type: ignore
-    from PySide2.QtCore import Signal                      # type: ignore
+    #from PySide2.QtCore import Signal                      # type: ignore
 elif QT_LIB == PYSIDE6:
     from PySide6 import QtCore, QtWidgets as QtWid         # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
-    from PySide6.QtCore import Signal                      # type: ignore
+    #from PySide6.QtCore import Signal                      # type: ignore
 # fmt: on
 
 QT_VERSION = (
@@ -88,8 +86,8 @@ QT_VERSION = (
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
-from dvg_pyqt_filelogger import FileLogger
 from dvg_debug_functions import dprint, print_fancy_traceback as pft
+from dvg_pyqt_filelogger import FileLogger
 
 from dvg_devices.Arduino_protocol_serial import Arduino
 from JettingGrid_qdev import JettingGrid_qdev
@@ -259,7 +257,7 @@ if __name__ == "__main__":
     QtCore.QThread.currentThread().setObjectName("MAIN")  # For DEBUG info
     app = QtWid.QApplication(sys.argv)
     app.aboutToQuit.connect(about_to_quit)
-    window = MainWindow(ard, ard_qdev, logger)
+    window = MainWindow(ard, ard_qdev, logger, DEBUG)
 
     # Start threads
     ard_qdev.start()
