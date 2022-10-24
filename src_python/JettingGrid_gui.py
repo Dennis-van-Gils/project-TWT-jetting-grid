@@ -112,7 +112,7 @@ from dvg_pyqtgraph_threadsafe import (
 )
 
 from dvg_devices.Arduino_protocol_serial import Arduino
-from jetting_grid_qdev import JettingGrid_qdev
+from JettingGrid_qdev import JettingGrid_qdev
 
 
 # Default settings for graphs

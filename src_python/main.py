@@ -92,8 +92,8 @@ from dvg_pyqt_filelogger import FileLogger
 from dvg_debug_functions import dprint, print_fancy_traceback as pft
 
 from dvg_devices.Arduino_protocol_serial import Arduino
-from jetting_grid_qdev import JettingGrid_qdev
-from jetting_grid_gui import MainWindow
+from JettingGrid_qdev import JettingGrid_qdev
+from JettingGrid_gui import MainWindow
 
 # ------------------------------------------------------------------------------
 #   current_date_time_strings
