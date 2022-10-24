@@ -50,7 +50,7 @@ uint32_t utick = micros(); // DEBUG timer
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
 
 /*------------------------------------------------------------------------------
   ProtocolManager
