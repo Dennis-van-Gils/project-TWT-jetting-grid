@@ -504,6 +504,7 @@ void setup() {
 
   protocol_mgr.clear();
 
+  /*
   // DEMO: Growing center square
   // ---------------------------
   Line line;
@@ -526,6 +527,22 @@ void setup() {
   }
 
   protocol_mgr.set_name("Demo growing center square");
+  // ---------------------------
+  */
+
+  // DEMO: Single valve run
+  // ---------------------------
+  Line line;
+
+  for (uint8_t idx_P = 0; idx_P < N_VALVES; idx_P++) {
+    line.points[idx_P] = valve2p(idx_P + 1);
+    line.duration = 200; // [ms]
+    protocol_mgr.add_line(line);
+  }
+  line.points[N_VALVES].set_null(); // Add end sentinel
+  protocol_mgr.add_line(line);
+
+  protocol_mgr.set_name("Demo single valve run");
   // ---------------------------
 
   if (DEBUG) {
