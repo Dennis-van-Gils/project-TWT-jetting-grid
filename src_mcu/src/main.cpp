@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    21-10-2022
+ * @date    23-11-2022
  *
  * @brief   Main control of the TWT jetting grid. See `constants.h` for a
  * detailed description.
@@ -51,6 +51,10 @@ uint32_t utick = micros(); // DEBUG timer
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
 #define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+
+// Safety pulses
+bool safety_pulse_toggle = false;
+bool safety_all_okay = false;
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -435,6 +439,10 @@ void setup() {
   // Watchdog timer
   Watchdog.enable(WATCHDOG_TIMEOUT);
 
+  // Safety pulses
+  pinMode(PIN_SAFETY_PULSES, OUTPUT);
+  digitalWrite(PIN_SAFETY_PULSES, LOW);
+
   // Onboard LED & LED matrix
   //
   // NOTE:
@@ -723,5 +731,12 @@ void loop() {
     FastLED.show(); // Takes 8003 µs per call
     // Serial.println("show");
     // Serial.println(micros() - utick);
+  }
+
+  if (safety_all_okay) {
+    EVERY_N_MILLIS(PERIOD_SAFETY_PULSES) {
+      safety_pulse_toggle = !safety_pulse_toggle;
+      digitalWrite(PIN_SAFETY_PULSES, safety_pulse_toggle);
+    }
   }
 }
