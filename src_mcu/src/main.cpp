@@ -2,10 +2,10 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    23-11-2022
+ * @date    28-11-2022
  *
- * @brief   Main control of the TWT jetting grid. See `constants.h` for a
- * detailed description.
+ * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
+ * `constants.h` for a detailed description.
  *
  * @copyright MIT License. See the LICENSE file for details.
  */
@@ -44,6 +44,11 @@ DvG_BinaryStreamCommand bsc(Serial, bin_buf, BIN_BUF_LEN, EOL, sizeof(EOL));
 const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
 char buf[BUF_LEN]{'\0'};     // Common character buffer for string formatting
 
+// This flag controls whether safety pulses should be send out to the safety
+// microcontroller, which is in turn in charge of the safety relay that enables
+// the jetting pump.
+bool safety__allow_jetting_pump_to_run = false;
+
 // Debugging flags
 const bool DEBUG = false;  // Print debug info over serial?
 uint32_t utick = micros(); // DEBUG timer
@@ -51,10 +56,6 @@ uint32_t utick = micros(); // DEBUG timer
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
 #define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
-
-// Safety pulses
-bool safety_pulse_toggle = false;
-bool safety_all_okay = false;
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -439,9 +440,9 @@ void setup() {
   // Watchdog timer
   Watchdog.enable(WATCHDOG_TIMEOUT);
 
-  // Safety pulses
-  pinMode(PIN_SAFETY_PULSES, OUTPUT);
-  digitalWrite(PIN_SAFETY_PULSES, LOW);
+  // Safety pulses to be send to the safety MCU
+  pinMode(PIN_SAFETY_PULSE_OUT, OUTPUT);
+  digitalWrite(PIN_SAFETY_PULSE_OUT, LOW);
 
   // Onboard LED & LED matrix
   //
@@ -606,6 +607,11 @@ void loop() {
           // Print current protocol program to serial
           protocol_mgr.print_program();
 
+        } else if (strcmp(str_cmd, "s") == 0) {
+          // DEBUG: Remove in release version
+          safety__allow_jetting_pump_to_run =
+              !safety__allow_jetting_pump_to_run;
+
         } else if (strcmp(str_cmd, "halt") == 0) {
           // Trigger a halt, useful for debugging
           halt(0, "Halted by user command.");
@@ -733,10 +739,15 @@ void loop() {
     // Serial.println(micros() - utick);
   }
 
-  if (safety_all_okay) {
-    EVERY_N_MILLIS(PERIOD_SAFETY_PULSES) {
-      safety_pulse_toggle = !safety_pulse_toggle;
-      digitalWrite(PIN_SAFETY_PULSES, safety_pulse_toggle);
+  if (safety__allow_jetting_pump_to_run) {
+    EVERY_N_MILLIS(PERIOD_SAFETY_PULSES / 2) {
+      // static uint32_t tick = millis();
+      // Serial.print("----> ");
+      // Serial.println(millis() - tick);
+      // tick = millis();
+      static bool toggler = false;
+      toggler = !toggler;
+      digitalWrite(PIN_SAFETY_PULSE_OUT, toggler);
     }
   }
 }
