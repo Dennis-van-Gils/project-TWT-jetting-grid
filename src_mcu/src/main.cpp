@@ -588,16 +588,23 @@ void loop() {
           Serial.println("Arduino, TWT jetting grid");
 
         } else if (strcmp(str_cmd, "on") == 0) {
+          // Play the program
           fsm.transitionTo(state_run_program);
 
         } else if (strcmp(str_cmd, "off") == 0) {
+          // Pause the program
           fsm.transitionTo(state_idle);
 
         } else if (strcmp(str_cmd, "load") == 0) {
+          // Load a new program
           fsm.transitionTo(state_load_program);
 
+        } else if (strcmp(str_cmd, "restart") == 0) {
+          // Restart the program
+          protocol_mgr.restart();
+
         } else if (strcmp(str_cmd, "pos?") == 0) {
-          // Print current protocol program position to serial
+          // Print current program position to serial
           snprintf(buf, BUF_LEN, "%d of %d\n", protocol_mgr.get_position(),
                    protocol_mgr.get_N_lines() - 1);
           Serial.print(buf);
@@ -609,7 +616,7 @@ void loop() {
           protocol_mgr.print_buffer();
 
         } else if (strcmp(str_cmd, "p?") == 0) {
-          // Print current protocol program to serial
+          // Print current program to serial
           protocol_mgr.print_program();
 
         } else if (strcmp(str_cmd, "override_safety") == 0) {
