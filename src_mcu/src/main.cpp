@@ -45,9 +45,14 @@ const uint8_t BUF_LEN = 128; // Common character buffer for string formatting
 char buf[BUF_LEN]{'\0'};     // Common character buffer for string formatting
 
 // This flag controls whether safety pulses should be send out to the safety
-// microcontroller, which is in turn in charge of the safety relay that enables
-// the jetting pump.
+// microcontroller, which in turn will engage the safety relay that enables the
+// jetting pump. This flag is autonomously set to `false` when none of the
+// valves are currently open. If any valve is open the flag is set to `true`.
+// This safety procedure can be overriden by flag `override_pump_safety`.
 bool safety__allow_jetting_pump_to_run = false;
+
+// WARNING: Safety override to always allow the jetting pump to run.
+bool override_pump_safety = false;
 
 // Debugging flags
 const bool DEBUG = false;  // Print debug info over serial?
@@ -607,10 +612,16 @@ void loop() {
           // Print current protocol program to serial
           protocol_mgr.print_program();
 
-        } else if (strcmp(str_cmd, "s") == 0) {
-          // DEBUG: Remove in release version
-          safety__allow_jetting_pump_to_run =
-              !safety__allow_jetting_pump_to_run;
+        } else if (strcmp(str_cmd, "override_safety") == 0) {
+          // WARNING: Will force the jetting pump to enabled, regardless of
+          // whether any valves are actually open or not. This function should
+          // be used for troubleshooting only.
+          override_pump_safety = true;
+
+        } else if (strcmp(str_cmd, "restore_safety") == 0) {
+          // Revert back from the "override_safety" command and restore the
+          // regular safety procedure to enable the jetting pump.
+          override_pump_safety = false;
 
         } else if (strcmp(str_cmd, "halt") == 0) {
           // Trigger a halt, useful for debugging
@@ -737,6 +748,21 @@ void loop() {
     FastLED.show(); // Takes 8003 µs per call
     // Serial.println("show");
     // Serial.println(micros() - utick);
+  }
+
+  // ---------------------------------------------------------------------------
+  //   Safety pulses
+  // ---------------------------------------------------------------------------
+
+  if (cp_mgr.all_masks_are_zero()) {
+    // Don't allow the jetting pump to run when all valves are closed
+    safety__allow_jetting_pump_to_run = false;
+  } else {
+    safety__allow_jetting_pump_to_run = true;
+  }
+
+  if (override_pump_safety) {
+    safety__allow_jetting_pump_to_run = true;
   }
 
   if (safety__allow_jetting_pump_to_run) {
