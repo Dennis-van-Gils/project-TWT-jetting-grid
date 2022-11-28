@@ -2,7 +2,7 @@
  * @file    CentipedeManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    30-08-2022
+ * @date    28-11-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -37,6 +37,14 @@ void CentipedeManager::add_to_masks(CP_Address cp_addr) {
     halt(7, buf);
   }
   _masks[cp_addr.port] |= (1U << cp_addr.bit);
+}
+
+bool CentipedeManager::all_masks_are_zero() {
+  bool all_zero = true;
+  for (uint8_t port = 0; port < N_CP_PORTS; port++) {
+    all_zero &= (_masks[port] == 0);
+  }
+  return all_zero;
 }
 
 void CentipedeManager::report_masks(Stream &mySerial) {

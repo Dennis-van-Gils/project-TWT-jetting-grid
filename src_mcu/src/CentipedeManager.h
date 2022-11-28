@@ -2,10 +2,11 @@
  * @file    CentipedeManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    30-08-2022
+ * @date    28-11-2022
  *
- * @brief   Manage the output channels of a Centipede object by storing and
- * keeping track of the bitmasks per port.
+ * @brief   Manage the output channels of both Centipede boards used by the
+ * jetting grid of the Twente Water Tunnel. This class will store and keep track
+ * of the bitmasks per port. Each port corresponds to a MCP23017 I/O expander.
  *
  * @copyright MIT License. See the LICENSE file for details.
  */
@@ -97,6 +98,13 @@ public:
    * @return The stored bitmask values
    */
   inline CP_Masks get_masks() { return _masks; }
+
+  /**
+   * @brief Check if all masks are zero.
+   *
+   * @return True if all masks are zero
+   */
+  bool all_masks_are_zero();
 
   /**
    * @brief Print the stored bitmasks to the serial stream.
