@@ -2,7 +2,7 @@
  * @file    constants.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    23-11-2022
+ * @date    28-11-2022
  *
  * @brief   Constants of the TWT jetting grid.
  *
@@ -313,18 +313,32 @@ inline float mA2bar(float mA, const Omega_Calib calib) {
 }
 
 /*------------------------------------------------------------------------------
+  Safety pulses
+------------------------------------------------------------------------------*/
+
+/*
+There are two microcontroller (MCU) boards used in the TWT jetting grid. The
+main MCU (Adafruit M4 Feather Express) is responsible for driving the solenoid
+valves and LED matrix and communicates via USB to the Python main program
+running on a PC. The second MCU (Adafruit Feather M0 Basic Proto) acts as a
+safety controller, governing the relay that allows turning the jetting pump on
+and off via terminal X1 of its frequency inverter.
+
+The main MCU should send a digital 'safety' pulse at least once every N ms over
+to the safety MCU as indication that the main MCU is still operating all right.
+As long as the safety MCU receives pulses within the set time period, the
+'pump on' relay will be engaged.
+*/
+
+const uint8_t PIN_SAFETY_PULSE_OUT = 12;
+const uint16_t PERIOD_SAFETY_PULSES = 60; // [ms]
+
+/*------------------------------------------------------------------------------
   Watchdog
 ------------------------------------------------------------------------------*/
 
 // The microcontroller will auto-reboot when it fails to get a
 // `Watchdog.reset()` within this time period [ms]
 const uint16_t WATCHDOG_TIMEOUT = 8000;
-
-/*------------------------------------------------------------------------------
-  Safety pulses
-------------------------------------------------------------------------------*/
-
-const uint8_t PIN_SAFETY_PULSES = 12;
-const uint16_t PERIOD_SAFETY_PULSES = 25; // [ms]
 
 #endif
