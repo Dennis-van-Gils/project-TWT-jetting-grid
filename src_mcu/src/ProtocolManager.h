@@ -104,10 +104,8 @@ public:
 
   /**
    * @brief Pretty print the PCS point as "(x, y)", useful for debugging.
-   *
-   * @param stream The stream to print to. Default: Serial.
    */
-  void print(Stream &stream = Serial);
+  void print();
 
   // Public members
   int8_t x; // x-coordinate
@@ -167,10 +165,8 @@ public:
 
   /**
    * @brief Pretty print the list of PCS points.
-   *
-   * @param stream The stream to print to. Default: Serial.
    */
-  void print(Stream &stream = Serial);
+  void print();
 
   // Public members
   uint16_t duration;  // Time duration in [ms]
@@ -296,17 +292,13 @@ public:
 
   /**
    * @brief Pretty print the protocol program.
-   *
-   * @param stream The stream to print to. Default: Serial.
    */
-  void print_program(Stream &stream = Serial);
+  void print_program();
 
   /**
    * @brief Pretty print the current line buffer, useful for debugging.
-   *
-   * @param stream The stream to print to. Default: Serial.
    */
-  void print_buffer(Stream &stream = Serial);
+  void print_buffer();
 
   inline void set_name(const char *name) { strncpy(_name, name, 64); }
   inline char *get_name() { return _name; }

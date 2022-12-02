@@ -265,7 +265,7 @@ void fun_run_program__upd() {
     // Recolor the LEDs of previously active valves from red to blue
     for (auto &p : protocol_mgr.line_buffer.points) {
       if (p.is_null()) {
-        break;
+        break; // Reached the end sentinel
       }
       leds[p2led(p)] = CRGB::Blue;
     }
@@ -274,7 +274,7 @@ void fun_run_program__upd() {
     protocol_mgr.goto_next_line();
     Serial.println(protocol_mgr.get_position());
     if (DEBUG) {
-      protocol_mgr.print_buffer(Serial);
+      protocol_mgr.print_buffer();
     }
 
     // Parse the line

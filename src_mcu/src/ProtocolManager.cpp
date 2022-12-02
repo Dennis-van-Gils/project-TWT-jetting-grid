@@ -14,9 +14,9 @@
   P "Point in the Protocol Coordinate System (PCS)"
 ------------------------------------------------------------------------------*/
 
-void P::print(Stream &stream) {
+void P::print() {
   snprintf(buf, BUF_LEN, "(%d, %d)", x, y);
-  stream.print(buf);
+  Serial.print(buf);
 }
 
 /*------------------------------------------------------------------------------
@@ -43,17 +43,17 @@ void Line::pack_into(PackedLine &output) const {
   }
 }
 
-void Line::print(Stream &stream) {
+void Line::print() {
   snprintf(buf, BUF_LEN, "%d ms\n", duration);
-  stream.print(buf);
+  Serial.print(buf);
 
   for (auto &p : points) {
     if (p.is_null()) {
       break; // Reached the end sentinel
     }
-    p.print(stream);
+    p.print();
   }
-  stream.write('\n');
+  Serial.write('\n');
 }
 
 /*------------------------------------------------------------------------------
@@ -145,26 +145,26 @@ void ProtocolManager::goto_prev_line() {
   _program[_pos].unpack_into(line_buffer);
 }
 
-void ProtocolManager::print_program(Stream &stream) {
-  stream.println(_name);
-  stream.println(_N_lines);
+void ProtocolManager::print_program() {
+  Serial.println(_name);
+  Serial.println(_N_lines);
 
   /*
   Line line;
-  stream.write('\n');
+  Serial.write('\n');
   for (uint16_t i = 0; i < _N_lines; ++i) {
     snprintf(buf, BUF_LEN, "#%d\t", i);
-    stream.print(buf);
+    Serial.print(buf);
     _program[i].unpack_into(line);
     line.print();
   }
-  stream.write('\n');
+  Serial.write('\n');
   */
 }
 
-void ProtocolManager::print_buffer(Stream &stream) {
+void ProtocolManager::print_buffer() {
   snprintf(buf, BUF_LEN, "#%d\t", _pos);
-  stream.print(buf);
+  Serial.print(buf);
   line_buffer.print();
-  stream.write('\n');
+  Serial.write('\n');
 }
