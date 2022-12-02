@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    28-11-2022
+ * @date    02-12-2022
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -55,12 +55,12 @@ bool safety__allow_jetting_pump_to_run = false;
 bool override_pump_safety = false;
 
 // Debugging flags
-const bool DEBUG = false;  // Print debug info over serial?
+const bool DEBUG = true;   // Print debug info over serial?
 uint32_t utick = micros(); // DEBUG timer
 
 // DEBUG: Allows developing code on a bare Arduino without sensors & actuators
 // attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 0
+#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
 
 /*------------------------------------------------------------------------------
   ProtocolManager
@@ -271,7 +271,7 @@ void fun_run_program__upd() {
     }
 
     // Read in the next line
-    protocol_mgr.transfer_next_line_to_buffer();
+    protocol_mgr.goto_next_line();
     Serial.println(protocol_mgr.get_position());
     if (DEBUG) {
       protocol_mgr.print_buffer(Serial);
@@ -519,8 +519,8 @@ void setup() {
   protocol_mgr.clear();
 
   /*
-  // DEMO: Growing center square
-  // ---------------------------
+  // DEMO protocol program: Growing center square
+  // --------------------------------------------
   Line line;
 
   for (uint8_t rung = 0; rung < 7; rung++) {
@@ -540,24 +540,23 @@ void setup() {
     protocol_mgr.add_line(line);
   }
 
-  protocol_mgr.set_name("Demo growing center square");
-  // ---------------------------
+  protocol_mgr.set_name("Demo: Growing center square");
+  // --------------------------------------------
   */
 
-  // DEMO: Single valve run
-  // ---------------------------
+  // DEMO protocol program: Loop over each single valve
+  // --------------------------------------------------
   Line line;
 
-  for (uint8_t idx_P = 0; idx_P < N_VALVES; idx_P++) {
-    line.points[idx_P] = valve2p(idx_P + 1);
+  for (idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
     line.duration = 200; // [ms]
+    line.points[0] = valve2p(idx_valve);
+    line.points[1].set_null(); // Add end sentinel
     protocol_mgr.add_line(line);
   }
-  line.points[N_VALVES].set_null(); // Add end sentinel
-  protocol_mgr.add_line(line);
 
-  protocol_mgr.set_name("Demo single valve run");
-  // ---------------------------
+  protocol_mgr.set_name("Demo: Loop over each single valve");
+  // --------------------------------------------------
 
   if (DEBUG) {
     Serial.print("Free mem @ loop : ");

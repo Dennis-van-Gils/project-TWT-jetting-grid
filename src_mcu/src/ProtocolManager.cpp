@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    20-10-2022
+ * @date    02-12-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -67,7 +67,7 @@ void PackedLine::unpack_into(Line &output) const {
   // Unpack array of PCS points from bitmasks
   for (uint8_t row = 0; row < NUMEL_PCS_AXIS; ++row) {
     if (masks[row]) {
-      // There is a mask > 0, so there must be at least one coordinate to unpack
+      // There is a mask > 0, so there must be at least one PCS point to unpack
       p.y = PCS_Y_MAX - row;
       for (uint8_t bit = 0; bit < NUMEL_PCS_AXIS; ++bit) {
         if ((masks[row] >> (bit)) & 0x01) {
@@ -96,7 +96,7 @@ void ProtocolManager::clear() {
   }
   set_name("cleared");
   _N_lines = 0;
-  _pos = -1; // -1 indicates we're at start-up of program
+  _pos = 0;
 
   // For safety, we fill the current line buffer such that all valves will be
   // opened up
@@ -122,16 +122,27 @@ bool ProtocolManager::add_line(const uint16_t duration,
   return add_line(line);
 }
 
-void ProtocolManager::transfer_next_line_to_buffer() {
-  // Note: A freshly loaded program starts at `_pos == -1`. Once running, we
-  // loop around `_N_lines` to 0 again.
-  if (_N_lines > 0) { // If not, then we don't have a program loaded in
+void ProtocolManager::goto_line(uint16_t line_no) {
+  _pos = max(line_no, _N_lines);
+  _program[_pos].unpack_into(line_buffer);
+}
+
+void ProtocolManager::goto_next_line() {
+  if (_pos == _N_lines - 1) {
+    _pos = 0;
+  } else {
     _pos++;
-    if (_pos == _N_lines) {
-      _pos = 0;
-    }
-    _program[_pos].unpack_into(line_buffer);
   }
+  _program[_pos].unpack_into(line_buffer);
+}
+
+void ProtocolManager::goto_prev_line() {
+  if (_pos == 0) {
+    _pos = _N_lines - 1;
+  } else {
+    _pos--;
+  }
+  _program[_pos].unpack_into(line_buffer);
 }
 
 void ProtocolManager::print_program(Stream &stream) {

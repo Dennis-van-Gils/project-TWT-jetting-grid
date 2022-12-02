@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    20-10-2022
+ * @date    02-12-2022
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -77,12 +77,12 @@ public:
   }
 
   /**
-   * @brief Pack the PCS coordinate into a single byte.
+   * @brief Pack the PCS point into a single byte.
    *
    * The upper 4 bits decode the PCS x-coordinate.
    * The lower 4 bits decode the PCS y-coordinate.
    *
-   * @return The byte-encoded PCS coordinate
+   * @return The byte-encoded PCS point
    */
   inline uint8_t pack_into_byte() {
     return (uint8_t)((x - PCS_X_MIN) << 4) | //
@@ -90,12 +90,12 @@ public:
   }
 
   /**
-   * @brief Unpack the packed PCS coordinate and store it.
+   * @brief Unpack the packed PCS point and store it.
    *
    * The upper 4 bits decode the PCS x-coordinate.
    * The lower 4 bits decode the PCS y-coordinate.
    *
-   * @param c The byte-encoded PCS coordinate
+   * @param c The byte-encoded PCS point
    */
   inline void unpack_byte(uint8_t c) {
     x = (c >> 4) + PCS_X_MIN;
@@ -103,7 +103,7 @@ public:
   }
 
   /**
-   * @brief Pretty print the PCS coordinate as "(x, y)", useful for debugging.
+   * @brief Pretty print the PCS point as "(x, y)", useful for debugging.
    *
    * @param stream The stream to print to. Default: Serial.
    */
@@ -247,24 +247,25 @@ public:
   ProtocolManager();
 
   /**
-   * @brief Clear the protocol program stored in memory.
+   * @brief Clear the protocol program.
    *
-   * Operations takes less than 3 ms to complete.
+   * Operation takes less than 3 ms to complete.
    */
   void clear();
 
   /**
-   * @brief Reset the playback position of the protocol program back to start.
+   * @brief Set the playback position of the protocol program to the start.
    */
-  inline void restart() { _pos = -1; }
+  inline void restart() { _pos = 0; }
 
   /**
-   * @return True when the end of the protocol has been reached, false otherwise
+   * @return True when the end of the protocol program has been reached, false
+   * otherwise.
    */
   inline bool reached_end() { return (_pos == (_N_lines - 1)); }
 
   /**
-   * @brief Adds a new Line to the protocol program.
+   * @brief Add a new Line to the protocol program.
    *
    * @param duration Time duration in ms
    * @param points List of PCS points of which the corresponding valves will be
@@ -276,13 +277,22 @@ public:
   bool add_line(const Line &line);
 
   /**
-   * @brief Retrieves the next available Line from the stored protocol
-   * program and puts the information in the public member @p line_buffer.
-   *
-   * Warning: The member @p line_buffer will be overwritten with new data
-   * when a new call to @p transfer_next_line_to_buffer() is made.
+   * @brief Go to Line number @p line_no of the protocol program and
+   * put its PCS points and time duration in member @p line_buffer.
    */
-  void transfer_next_line_to_buffer();
+  void goto_line(uint16_t line_no);
+
+  /**
+   * @brief Go to the next Line of the protocol program and
+   * put its PCS points and time duration in member @p line_buffer.
+   */
+  void goto_next_line();
+
+  /**
+   * @brief Go to the previous Line of the protocol program and
+   * put its PCS points and time duration in member @p line_buffer.
+   */
+  void goto_prev_line();
 
   /**
    * @brief Pretty print the protocol program.
@@ -298,9 +308,13 @@ public:
    */
   void print_buffer(Stream &stream = Serial);
 
+  inline void set_name(const char *name) { strncpy(_name, name, 64); }
+  inline char *get_name() { return _name; }
+  inline uint16_t get_N_lines() { return _N_lines; }
+  inline int16_t get_position() { return _pos; }
+
   /**
-   * @brief Buffer containing the @p Line as retreived by method
-   * @p transfer_next_line_to_buffer().
+   * @brief Buffer containing the current @p Line to be activated.
    *
    * One can go through each PCS point of the Line object as follows:
    *
@@ -315,16 +329,11 @@ public:
    */
   Line line_buffer;
 
-  inline void set_name(const char *name) { strncpy(_name, name, 64); }
-  inline char *get_name() { return _name; }
-  inline uint16_t get_N_lines() { return _N_lines; }
-  inline int16_t get_position() { return _pos; }
-
 private:
-  Program _program;        // The protocol program
-  char _name[64] = {'\0'}; // Name of the protocol
-  uint16_t _N_lines;       // Total number of lines making up the program
-  int16_t _pos; // Playback position, where -1 indicates a fresh start
+  Program _program;        // The protocol program currently loaded into memory
+  char _name[64] = {'\0'}; // Name of the protocol program
+  uint16_t _N_lines;       // Total number of lines in the protocol program
+  uint16_t _pos;           // Playback position; current line number
 };
 
 #endif
