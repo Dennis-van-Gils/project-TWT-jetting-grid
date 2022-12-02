@@ -724,18 +724,22 @@ void loop() {
   //   Safety pulses
   // ---------------------------------------------------------------------------
 
-  if (cp_mgr.all_masks_are_zero()) {
-    // Don't allow the jetting pump to run when all valves are closed
-    safety__allow_jetting_pump_to_run = false;
-  } else {
-    safety__allow_jetting_pump_to_run = true;
-  }
-
   if (override_pump_safety) {
+    // WARNING! SAFETY OVERRIDE! FOR DEBUGGING ONLY!
     safety__allow_jetting_pump_to_run = true;
+
+  } else {
+    // Final safety check in effect:
+    // Don't allow the jetting pump to run when none of the valves are open
+    if (cp_mgr.all_masks_are_zero()) {
+      safety__allow_jetting_pump_to_run = false;
+    } else {
+      safety__allow_jetting_pump_to_run = true;
+    }
   }
 
   if (safety__allow_jetting_pump_to_run) {
+    // Send out safety pulses to the safety MCU
     EVERY_N_MILLIS(PERIOD_SAFETY_PULSES / 2) {
       // static uint32_t tick = millis();
       // Serial.print("----> ");
