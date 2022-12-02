@@ -55,18 +55,10 @@ bool safety__allow_jetting_pump_to_run = false;
 bool override_pump_safety = false;
 
 // Debugging flags
-const bool DEBUG = true;   // Print debug info over serial?
-uint32_t utick = micros(); // DEBUG timer
-
-// DEBUG: Allows developing code on a bare Arduino without sensors & actuators
-// attached
-#define DEVELOPER_MODE_WITHOUT_PERIPHERALS 1
-
-/*------------------------------------------------------------------------------
-  ProtocolManager
-------------------------------------------------------------------------------*/
-
-ProtocolManager protocol_mgr;
+uint32_t utick = micros();        // DEBUG timer
+const bool DEBUG = true;          // Print debug info over serial?
+const bool NO_PERIPHERALS = true; // Allows developing code on a bare Arduino
+                                  // without sensors & actuators attached
 
 /*------------------------------------------------------------------------------
   Readings
@@ -108,6 +100,12 @@ CRGB alive_blinker_color = CRGB::Green;
 CRGB onboard_led[1]; // Onboard NeoPixel of the Adafruit Feather M4 board
 CRGB leds[N_LEDS];   // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
 uint16_t idx_led;    // Frequently used LED index
+
+/*------------------------------------------------------------------------------
+  ProtocolManager
+------------------------------------------------------------------------------*/
+
+ProtocolManager protocol_mgr(&cp_mgr);
 
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R Click boards for reading out the OMEGA pressure sensors
@@ -167,23 +165,6 @@ bool R_click_poll_EMA_collectively() {
 }
 
 /*------------------------------------------------------------------------------
-  immediately_open_all_valves
-------------------------------------------------------------------------------*/
-
-void immediately_open_all_valves() {
-  cp_mgr.clear_masks();
-  for (uint8_t idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
-    cp_mgr.add_to_masks(valve2cp(idx_valve + 1));
-    leds[p2led(valve2p(idx_valve + 1))] = CRGB::Red;
-  }
-
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
-  cp_mgr.send_masks(); // Activate valves
-#endif
-  FastLED.show();
-}
-
-/*------------------------------------------------------------------------------
   set_LED_matrix_fixed_grid_nodes
 ------------------------------------------------------------------------------*/
 
@@ -204,9 +185,8 @@ void set_LED_matrix_fixed_grid_nodes() {
   Finite state machine
 ------------------------------------------------------------------------------*/
 
-uint32_t now;              // Timestamp [ms]
-uint32_t tick_program = 0; // Timestamp [ms] of last run protocol line
-uint8_t idx_valve;         // Frequently used valve index
+uint32_t now;      // Timestamp [ms]
+uint8_t idx_valve; // Frequently used valve index
 
 // Switches the ASCII-command listener momentarily off to allow for loading in a
 // new protocol program via a binary-command listener.
@@ -231,12 +211,6 @@ void fun_idle__ent() {
 void fun_idle__upd() {}
 
 /*------------------------------------------------------------------------------
-  FSM: Single valve mode
-------------------------------------------------------------------------------*/
-
-// void fun_single_valve__upd() {}
-
-/*------------------------------------------------------------------------------
   FSM: Run program
 
   Run the protocol program, advancing line for line when it is time.
@@ -252,53 +226,13 @@ void fun_run_program__ent() {
   alive_blinker_color = CRGB::Green;
 
   // Clear all valve leds
+  // DEBUG: Necessary?
   for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
     leds[p2led(valve2p(idx_valve + 1))] = 0;
   }
 }
 
-void fun_run_program__upd() {
-  now = millis();
-  if (now - tick_program >= protocol_mgr.line_buffer.duration) {
-    // It is time to advance to the next line in the protocol program
-
-    // Recolor the LEDs of previously active valves from red to blue
-    for (auto &p : protocol_mgr.line_buffer.points) {
-      if (p.is_null()) {
-        break; // Reached the end sentinel
-      }
-      leds[p2led(p)] = CRGB::Blue;
-    }
-
-    // Read in the next line
-    protocol_mgr.goto_next_line();
-    Serial.println(protocol_mgr.get_position());
-    if (DEBUG) {
-      protocol_mgr.print_buffer();
-    }
-
-    // Parse the line
-    cp_mgr.clear_masks();
-    for (auto &p : protocol_mgr.line_buffer.points) {
-      if (p.is_null()) {
-        break; // Reached the end sentinel
-      }
-
-      // Add valve to be opened to the Centipede masks
-      idx_valve = p2valve(p);
-      cp_mgr.add_to_masks(valve2cp(idx_valve));
-
-      // Color all active valve LEDs in red
-      leds[p2led(p)] = CRGB::Red;
-    }
-
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
-    cp_mgr.send_masks(); // Activate valves
-#endif
-
-    tick_program = now;
-  }
-}
+void fun_run_program__upd() { protocol_mgr.update(); }
 
 /*------------------------------------------------------------------------------
   FSM: Load program
@@ -312,18 +246,21 @@ void fun_run_program__upd() {
 //          end-of-program (EOP) sentinel is received. The EOP is signalled by
 //          receiving two end-of-line (EOL) sentinels directly after each other.
 uint8_t loading_stage = 0;
+bool loading_successful = false;
 
 void fun_load_program__ent();
 void fun_load_program__upd();
-State state_load_program(fun_load_program__ent, fun_load_program__upd);
+void fun_load_program__ext();
+State state_load_program(fun_load_program__ent, fun_load_program__upd,
+                         fun_load_program__ext);
 
 void fun_load_program__ent() {
   Serial.println("State: Loading in protocol program...");
   alive_blinker_color = CRGB::Blue;
 
-  immediately_open_all_valves();
   loading_program = true;
   loading_stage = 0;
+  loading_successful = false;
   protocol_mgr.clear();
 }
 
@@ -393,11 +330,11 @@ void fun_load_program__upd() {
                    "lines. Promised was %d, but received %d.",
                    promised_N_lines, protocol_mgr.get_N_lines());
           Serial.println(buf);
-          protocol_mgr.clear();
         }
 
-        // Exit
+        // Succesful exit
         loading_program = false;
+        loading_successful = true;
         fsm.transitionTo(state_idle);
         return;
       }
@@ -427,10 +364,29 @@ void fun_load_program__upd() {
   // Time-out check
   const uint16_t LOADING_TIMEOUT = 4000; // [ms]
   if (fsm.timeInCurrentState() > LOADING_TIMEOUT) {
-    // Exit
     Serial.println("ERROR: Loading in protocol program timed out.");
     loading_program = false;
     fsm.transitionTo(state_idle);
+  }
+}
+
+void fun_load_program__ext() {
+  if (loading_successful) {
+    protocol_mgr.goto_start();
+    protocol_mgr.activate_line();
+  } else {
+    // Unsuccesful load --> Create a safe protocol program where all valves are
+    // always open.
+    protocol_mgr.clear();
+    protocol_mgr.set_name("All valves open");
+
+    Line line;
+    line.duration = 1000; // [ms]
+    for (idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
+      line.points[idx_valve - 1] = valve2p(idx_valve);
+    }
+    line.points[N_VALVES].set_null(); // Add end sentinel
+    protocol_mgr.add_line(line);
   }
 }
 
@@ -441,9 +397,6 @@ void fun_load_program__upd() {
 void setup() {
   // To enable float support in `snprintf()` we must add the following
   asm(".global _printf_float");
-
-  // Watchdog timer
-  Watchdog.enable(WATCHDOG_TIMEOUT);
 
   // Safety pulses to be send to the safety MCU
   pinMode(PIN_SAFETY_PULSE_OUT, OUTPUT);
@@ -503,9 +456,9 @@ void setup() {
 
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
-  cp_mgr.begin();
-#endif
+  if (!NO_PERIPHERALS) {
+    cp_mgr.begin();
+  }
 
   // Finished setup, so prepare LED matrix for regular operation
   FastLED.clearData();
@@ -516,12 +469,13 @@ void setup() {
   // Protocol manager
   // ---------------------
 
+  Line line;
   protocol_mgr.clear();
 
   /*
   // DEMO protocol program: Growing center square
   // --------------------------------------------
-  Line line;
+  protocol_mgr.set_name("Demo: Growing center square");
 
   for (uint8_t rung = 0; rung < 7; rung++) {
     uint8_t idx_P = 0;
@@ -539,14 +493,12 @@ void setup() {
     line.points[idx_P].set_null(); // Add end sentinel
     protocol_mgr.add_line(line);
   }
-
-  protocol_mgr.set_name("Demo: Growing center square");
   // --------------------------------------------
   */
 
   // DEMO protocol program: Loop over each single valve
   // --------------------------------------------------
-  Line line;
+  protocol_mgr.set_name("Demo: Loop over each single valve");
 
   for (idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
     line.duration = 200; // [ms]
@@ -554,14 +506,20 @@ void setup() {
     line.points[1].set_null(); // Add end sentinel
     protocol_mgr.add_line(line);
   }
-
-  protocol_mgr.set_name("Demo: Loop over each single valve");
   // --------------------------------------------------
 
   if (DEBUG) {
     Serial.print("Free mem @ loop : ");
     Serial.println(freeMemory());
   }
+
+  // Start Watchdog timer
+  Watchdog.enable(WATCHDOG_TIMEOUT);
+
+  // DEBUG: Necessary?
+  protocol_mgr.goto_start();
+  // protocol_mgr.activate_line(); // Perhaps good idea to not activate @ start
+  // to lessen wear on the first valve that will otherwise be always opened up
 }
 
 /*------------------------------------------------------------------------------
@@ -599,8 +557,14 @@ void loop() {
           fsm.transitionTo(state_load_program);
 
         } else if (strcmp(str_cmd, "restart") == 0) {
-          // Restart the program
-          protocol_mgr.restart();
+          // Go to the start of the protocol program
+          protocol_mgr.goto_start();
+          protocol_mgr.activate_line();
+
+        } else if (strncmp(str_cmd, "goto", 4) == 0) {
+          // Go to the specified line of the protocol program
+          protocol_mgr.goto_line(parseIntInString(str_cmd, 4));
+          protocol_mgr.activate_line();
 
         } else if (strcmp(str_cmd, "pos?") == 0) {
           // Print current program position to serial
@@ -636,27 +600,27 @@ void loop() {
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report pressure readings
 
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
-          readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
-          readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
-          readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
-          readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
-          readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-          readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-          readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-          readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
-#else
-          // Generate fake pressure data
-          float sin_value = 16.f + sin(2.f * PI * .1f * millis() / 1.e3f);
-          readings.pres_1_mA = sin_value;
-          readings.pres_2_mA = sin_value + .5;
-          readings.pres_3_mA = sin_value + 1.;
-          readings.pres_4_mA = sin_value + 1.5;
-          readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-          readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-          readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-          readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
-#endif
+          if (!NO_PERIPHERALS) {
+            readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
+            readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
+            readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
+            readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
+            readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+            readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+            readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+            readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+          } else {
+            // Generate fake pressure data
+            float sin_value = 16.f + sin(2.f * PI * .1f * millis() / 1.e3f);
+            readings.pres_1_mA = sin_value;
+            readings.pres_2_mA = sin_value + .5;
+            readings.pres_3_mA = sin_value + 1.;
+            readings.pres_4_mA = sin_value + 1.5;
+            readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+            readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+            readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+            readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+          }
 
           // NOTE:
           //   Using `snprintf()` to print a large array of formatted values
@@ -687,20 +651,20 @@ void loop() {
   //   Update R click readings
   // ---------------------------------------------------------------------------
 
-#if DEVELOPER_MODE_WITHOUT_PERIPHERALS == 0
-  if (R_click_poll_EMA_collectively()) {
-    /*
-    if (DEBUG) {
-      // DEBUG info: Show warning when obtained interval is too large.
-      // Not necessarily problematic though. The EMA will adjust for this.
-      if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
-        Serial.print("WARNING: Large DAQ DT ");
-        Serial.println(readings.DAQ_obtained_DT);
+  if (!NO_PERIPHERALS) {
+    if (R_click_poll_EMA_collectively()) {
+      /*
+      if (DEBUG) {
+        // DEBUG info: Show warning when obtained interval is too large.
+        // Not necessarily problematic though. The EMA will adjust for this.
+        if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
+          Serial.print("WARNING: Large DAQ DT ");
+          Serial.println(readings.DAQ_obtained_DT);
+        }
       }
+      */
     }
-    */
   }
-#endif
 
   // Fade out all purely blue LEDs over time, i.e. previously active valves.
   // Keep in front of any other LED color assignments.

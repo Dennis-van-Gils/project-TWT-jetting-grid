@@ -86,7 +86,10 @@ void PackedLine::unpack_into(Line &output) const {
   ProtocolManager
 ------------------------------------------------------------------------------*/
 
-ProtocolManager::ProtocolManager() { clear(); }
+ProtocolManager::ProtocolManager(CentipedeManager *cp_mgr) {
+  _cp_mgr = cp_mgr;
+  clear();
+}
 
 void ProtocolManager::clear() {
   for (auto packed_line = _program.begin(); packed_line != _program.end();
@@ -97,13 +100,6 @@ void ProtocolManager::clear() {
   set_name("cleared");
   _N_lines = 0;
   _pos = 0;
-
-  // For safety, we fill the current line buffer such that all valves will be
-  // opened up
-  line_buffer.duration = 1000;
-  for (uint8_t idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
-    line_buffer.points[idx_valve] = valve2p(idx_valve + 1);
-  }
 }
 
 bool ProtocolManager::add_line(const Line &line) {
@@ -123,26 +119,80 @@ bool ProtocolManager::add_line(const uint16_t duration,
 }
 
 void ProtocolManager::goto_line(uint16_t line_no) {
-  _pos = max(line_no, _N_lines);
-  _program[_pos].unpack_into(line_buffer);
+  if (_N_lines > 0) {
+    _pos = min(line_no, _N_lines - 1);
+    _program[_pos].unpack_into(_line_buffer);
+  }
 }
 
+void ProtocolManager::goto_start() { goto_line(0); }
+
 void ProtocolManager::goto_next_line() {
-  if (_pos == _N_lines - 1) {
-    _pos = 0;
-  } else {
-    _pos++;
+  if (_N_lines > 0) {
+    if (_pos == _N_lines - 1) {
+      _pos = 0;
+    } else {
+      _pos++;
+    }
+    goto_line(_pos);
   }
-  _program[_pos].unpack_into(line_buffer);
 }
 
 void ProtocolManager::goto_prev_line() {
-  if (_pos == 0) {
-    _pos = _N_lines - 1;
-  } else {
-    _pos--;
+  if (_N_lines > 0) {
+    if (_pos == 0) {
+      _pos = _N_lines - 1;
+    } else {
+      _pos--;
+    }
+    goto_line(_pos);
   }
-  _program[_pos].unpack_into(line_buffer);
+}
+
+void ProtocolManager::activate_line() {
+  _tick = millis();
+
+  // Recolor the LEDs of previously active valves from red to blue
+  for (auto &p : _last_activated_line.points) {
+    if (p.is_null()) {
+      break; // Reached the end sentinel
+    }
+    leds[p2led(p)] = CRGB::Blue;
+  }
+
+  // Backup the current line buffer
+  _last_activated_line.duration = _line_buffer.duration;
+  _last_activated_line.points = _line_buffer.points;
+
+  // Parse the line
+  _cp_mgr->clear_masks();
+  for (auto &p : _line_buffer.points) {
+    if (p.is_null()) {
+      break; // Reached the end sentinel
+    }
+
+    // Add valve to be opened to the Centipede masks
+    _cp_mgr->add_to_masks(valve2cp(p2valve(p)));
+
+    // Color all active valve LEDs in red
+    leds[p2led(p)] = CRGB::Red;
+  }
+
+  if (!NO_PERIPHERALS) {
+    _cp_mgr->send_masks(); // Activate valves
+  }
+
+  Serial.println(_pos);
+  if (DEBUG) {
+    print_buffer();
+  }
+}
+
+void ProtocolManager::update() {
+  if (millis() - _tick >= _last_activated_line.duration) {
+    goto_next_line();
+    activate_line();
+  }
 }
 
 void ProtocolManager::print_program() {
@@ -165,6 +215,6 @@ void ProtocolManager::print_program() {
 void ProtocolManager::print_buffer() {
   snprintf(buf, BUF_LEN, "#%d\t", _pos);
   Serial.print(buf);
-  line_buffer.print();
+  _line_buffer.print();
   Serial.write('\n');
 }

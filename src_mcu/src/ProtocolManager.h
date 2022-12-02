@@ -18,13 +18,20 @@
 #ifndef PROTOCOL_MANAGER_H_
 #define PROTOCOL_MANAGER_H_
 
+#include "CentipedeManager.h"
+#include "FastLED.h"
 #include "constants.h"
+
 #include <Arduino.h>
 #include <array>
 
-// Common character buffer for string formatting, see `main.cpp`
-extern const uint8_t BUF_LEN;
-extern char buf[];
+// See `main.cpp`
+extern const uint8_t BUF_LEN; // Common character buffer for string formatting
+extern char buf[];            // Common character buffer for string formatting
+extern CRGB leds[256];        // LED matrix
+extern const bool DEBUG;      // Print debug info over serial?
+extern const bool NO_PERIPHERALS; // Allows developing code on a bare Arduino
+                                  // without sensors & actuators attached
 
 /**
  * @brief The maximum number of protocol lines that a protocol program can
@@ -240,7 +247,7 @@ using Program = std::array<PackedLine, PROTOCOL_MAX_LINES>;
  */
 class ProtocolManager {
 public:
-  ProtocolManager();
+  ProtocolManager(CentipedeManager *cp_mgr);
 
   /**
    * @brief Clear the protocol program.
@@ -248,17 +255,6 @@ public:
    * Operation takes less than 3 ms to complete.
    */
   void clear();
-
-  /**
-   * @brief Set the playback position of the protocol program to the start.
-   */
-  inline void restart() { _pos = 0; }
-
-  /**
-   * @return True when the end of the protocol program has been reached, false
-   * otherwise.
-   */
-  inline bool reached_end() { return (_pos == (_N_lines - 1)); }
 
   /**
    * @brief Add a new Line to the protocol program.
@@ -274,21 +270,42 @@ public:
 
   /**
    * @brief Go to Line number @p line_no of the protocol program and
-   * put its PCS points and time duration in member @p line_buffer.
+   * put its PCS points and time duration in member @p _line_buffer.
    */
   void goto_line(uint16_t line_no);
 
   /**
+   * @brief Go to the start of the protocol program and
+   * put its PCS points and time duration in member @p _line_buffer.
+   */
+  void goto_start();
+
+  /**
    * @brief Go to the next Line of the protocol program and
-   * put its PCS points and time duration in member @p line_buffer.
+   * put its PCS points and time duration in member @p _line_buffer.
    */
   void goto_next_line();
 
   /**
    * @brief Go to the previous Line of the protocol program and
-   * put its PCS points and time duration in member @p line_buffer.
+   * put its PCS points and time duration in member @p _line_buffer.
    */
   void goto_prev_line();
+
+  /**
+   * @brief Instantly activate the solenoid valves and color the LED matrix
+   * accordingly, based on the current @p _line_buffer contents.
+   */
+  void activate_line();
+
+  /**
+   * @brief Run the timer of the protocol program.
+   *
+   * It will automatically activate the solenoid valves and color the LED matrix
+   * accordingly, going line for line through the protocol program on its
+   * specified time track.
+   */
+  void update();
 
   /**
    * @brief Pretty print the protocol program.
@@ -305,13 +322,21 @@ public:
   inline uint16_t get_N_lines() { return _N_lines; }
   inline int16_t get_position() { return _pos; }
 
+private:
+  Program _program;          // Protocol program currently loaded into memory
+  char _name[64] = {'\0'};   // Name of the protocol program
+  uint16_t _N_lines;         // Total number of lines in the protocol program
+  uint16_t _pos;             // Playback position; current line number
+  uint32_t _tick = 0;        // Timestamp [ms] of last activated protocol line
+  Line _last_activated_line; // The Line data that was last activated
+
   /**
    * @brief Buffer containing the current @p Line to be activated.
    *
    * One can go through each PCS point of the Line object as follows:
    *
    * @code{.cpp}
-   * for (auto &p : protocol_mgr.line_buffer.points) {
+   * for (auto &p : _line_buffer.points) {
    *   if (p.is_null()) {
    *     break; // Reached the end sentinel
    *   }
@@ -319,13 +344,9 @@ public:
    * }
    * @endcode
    */
-  Line line_buffer;
+  Line _line_buffer;
 
-private:
-  Program _program;        // The protocol program currently loaded into memory
-  char _name[64] = {'\0'}; // Name of the protocol program
-  uint16_t _N_lines;       // Total number of lines in the protocol program
-  uint16_t _pos;           // Playback position; current line number
+  CentipedeManager *_cp_mgr;
 };
 
 #endif
