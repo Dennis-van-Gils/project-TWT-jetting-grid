@@ -66,7 +66,7 @@ bool override_pump_safety = false;
 
 // Debugging flags
 uint32_t utick = micros();        // DEBUG timer
-const bool DEBUG = true;          // Print debug info over serial?
+const bool DEBUG = false;         // Print debug info over serial?
 const bool NO_PERIPHERALS = true; // Allows developing code on a bare Arduino
                                   // without sensors & actuators attached
 
@@ -178,8 +178,11 @@ bool R_click_poll_EMA_collectively() {
   set_LED_matrix_data_fixed_grid
 ------------------------------------------------------------------------------*/
 
+/**
+ * @brief Set LED colors at PCS points without a valve to yellow and set the PCS
+ * center point to off-white.
+ */
 void set_LED_matrix_data_fixed_grid() {
-  // Set LED colors at PCS points without a valve to yellow
   for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
     for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
       if ((x + y) % 2 == 0) {
@@ -187,7 +190,6 @@ void set_LED_matrix_data_fixed_grid() {
       }
     }
   }
-  // Set LED color at PCS center point to off-white
   leds[p2led(P{0, 0})] = CRGB::DarkSalmon;
 }
 
