@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    02-12-2022
+ * @date    03-12-2022
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -269,34 +269,37 @@ public:
   bool add_line(const Line &line);
 
   /**
+   * @brief Prime the start of the protocol program such that `update()` will
+   * start the program directly at line position 0 wihout any delay.
+   *
+   * Note: Calling this method will /not/ activate any solenoid valves just yet.
+   * `update()` must be called subsequently to trigger activation of line 0.
+   */
+  void prime_start();
+
+  /**
    * @brief Go to Line number @p line_no of the protocol program and
-   * put its PCS points and time duration in member @p _line_buffer.
+   * immediately activate the solenoid valves and color the LED matrix.
    */
   void goto_line(uint16_t line_no);
 
   /**
-   * @brief Go to the start of the protocol program and
-   * put its PCS points and time duration in member @p _line_buffer.
-   */
-  void goto_start();
-
-  /**
    * @brief Go to the next Line of the protocol program and
-   * put its PCS points and time duration in member @p _line_buffer.
+   * immediately activate the solenoid valves and color the LED matrix.
    */
   void goto_next_line();
 
   /**
    * @brief Go to the previous Line of the protocol program and
-   * put its PCS points and time duration in member @p _line_buffer.
+   * immediately activate the solenoid valves and color the LED matrix.
    */
   void goto_prev_line();
 
   /**
-   * @brief Instantly activate the solenoid valves and color the LED matrix
-   * accordingly, based on the current @p _line_buffer contents.
+   * @brief Immediately activate the solenoid valves and color the LED matrix,
+   * based on the current @p _line_buffer contents.
    */
-  void activate_line();
+  void activate_buffer();
 
   /**
    * @brief Run the timer of the protocol program.

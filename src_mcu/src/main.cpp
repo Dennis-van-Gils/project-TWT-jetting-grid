@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    02-12-2022
+ * @date    03-12-2022
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -371,10 +371,7 @@ void fun_load_program__upd() {
 }
 
 void fun_load_program__ext() {
-  if (loading_successful) {
-    protocol_mgr.goto_start();
-    protocol_mgr.activate_line();
-  } else {
+  if (!loading_successful) {
     // Unsuccesful load --> Create a safe protocol program where all valves are
     // always open.
     protocol_mgr.clear();
@@ -388,6 +385,11 @@ void fun_load_program__ext() {
     line.points[N_VALVES].set_null(); // Add end sentinel
     protocol_mgr.add_line(line);
   }
+
+  // Crucial to have the protocol program start at line 0. No valves will be
+  // activated just yet. That will happen with the first call to
+  // `protocol_mgr.update()`.
+  protocol_mgr.prime_start();
 }
 
 /*------------------------------------------------------------------------------
@@ -516,10 +518,10 @@ void setup() {
   // Start Watchdog timer
   Watchdog.enable(WATCHDOG_TIMEOUT);
 
-  // DEBUG: Necessary?
-  protocol_mgr.goto_start();
-  // protocol_mgr.activate_line(); // Perhaps good idea to not activate @ start
-  // to lessen wear on the first valve that will otherwise be always opened up
+  // Crucial to have the protocol program start at line 0. No valves will be
+  // activated just yet. That will happen with the first call to
+  // `protocol_mgr.update()`.
+  protocol_mgr.prime_start();
 }
 
 /*------------------------------------------------------------------------------
@@ -556,15 +558,20 @@ void loop() {
           // Load a new program
           fsm.transitionTo(state_load_program);
 
-        } else if (strcmp(str_cmd, "restart") == 0) {
-          // Go to the start of the protocol program
-          protocol_mgr.goto_start();
-          protocol_mgr.activate_line();
+        } else if (strcmp(str_cmd, ",") == 0) {
+          // Go to the previous line of the protocol program and immediately
+          // activate the solenoid valves and color the LED matrix.
+          protocol_mgr.goto_prev_line();
+
+        } else if (strcmp(str_cmd, ".") == 0) {
+          // Go to the next line of the protocol program and immediately
+          // activate the solenoid valves and color the LED matrix.
+          protocol_mgr.goto_next_line();
 
         } else if (strncmp(str_cmd, "goto", 4) == 0) {
-          // Go to the specified line of the protocol program
+          // Go to the specified line of the protocol program and immediately
+          // activate the solenoid valves and color the LED matrix.
           protocol_mgr.goto_line(parseIntInString(str_cmd, 4));
-          protocol_mgr.activate_line();
 
         } else if (strcmp(str_cmd, "pos?") == 0) {
           // Print current program position to serial
@@ -574,8 +581,6 @@ void loop() {
 
         } else if (strcmp(str_cmd, "b?") == 0) {
           // Print current line buffer to serial, useful for debugging
-          Serial.println("Line buffer");
-          Serial.println("-----------");
           protocol_mgr.print_buffer();
 
         } else if (strcmp(str_cmd, "p?") == 0) {

@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    02-12-2022
+ * @date    03-12-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -118,14 +118,22 @@ bool ProtocolManager::add_line(const uint16_t duration,
   return add_line(line);
 }
 
+void ProtocolManager::prime_start() {
+  _last_activated_line.duration = 0; // [ms]
+  if (_N_lines > 0) {
+    _pos = _N_lines - 1;
+  } else {
+    _pos = 0;
+  }
+}
+
 void ProtocolManager::goto_line(uint16_t line_no) {
   if (_N_lines > 0) {
     _pos = min(line_no, _N_lines - 1);
     _program[_pos].unpack_into(_line_buffer);
   }
+  activate_buffer();
 }
-
-void ProtocolManager::goto_start() { goto_line(0); }
 
 void ProtocolManager::goto_next_line() {
   if (_N_lines > 0) {
@@ -149,7 +157,7 @@ void ProtocolManager::goto_prev_line() {
   }
 }
 
-void ProtocolManager::activate_line() {
+void ProtocolManager::activate_buffer() {
   _tick = millis();
 
   // Recolor the LEDs of previously active valves from red to blue
@@ -179,7 +187,7 @@ void ProtocolManager::activate_line() {
   }
 
   if (!NO_PERIPHERALS) {
-    _cp_mgr->send_masks(); // Activate valves
+    _cp_mgr->send_masks(); // Activate the valves
   }
 
   Serial.println(_pos);
@@ -191,7 +199,6 @@ void ProtocolManager::activate_line() {
 void ProtocolManager::update() {
   if (millis() - _tick >= _last_activated_line.duration) {
     goto_next_line();
-    activate_line();
   }
 }
 
