@@ -7,12 +7,22 @@
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
  *
+ * This firmware is written with safety in mind:
+ * 1) Out-of-bounds array operations are caught gracefully by displaying 'HALT'
+ *    on the LED matrix and printing an error to the Serial console. The jetting
+ *    pump will be disabled.
+ * 2) When no solenoid valves are open the jetting pump will be disabled.
+ * 3) Only when the MCU is running okay and at least a single solenoid valve is
+ *    open, will safety pulses be send to the safety MCU, enabling the jetting
+ *    pump.
+ *
  * @copyright MIT License. See the LICENSE file for details.
  */
 
 #include "CentipedeManager.h"
 #include "ProtocolManager.h"
 #include "constants.h"
+#include "protocol_program_presets.h"
 #include "translations.h"
 
 #include "Adafruit_SleepyDog.h"
@@ -165,10 +175,10 @@ bool R_click_poll_EMA_collectively() {
 }
 
 /*------------------------------------------------------------------------------
-  set_LED_matrix_fixed_grid_nodes
+  set_LED_matrix_data_fixed_grid
 ------------------------------------------------------------------------------*/
 
-void set_LED_matrix_fixed_grid_nodes() {
+void set_LED_matrix_data_fixed_grid() {
   // Set LED colors at PCS points without a valve to yellow
   for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
     for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
@@ -419,7 +429,7 @@ void setup() {
   // FastLED.setCorrection(TypicalSMD5050);
   FastLED.setBrightness(30);
   fill_solid(onboard_led, 1, CRGB::Blue);
-  fill_rainbow(leds, N_LEDS, 0, 1);
+  fill_rainbow(leds, N_LEDS, 0, 1); // Show rainbow during setup
   FastLED.show();
 
   Serial.begin(9600);
@@ -429,7 +439,8 @@ void setup() {
     Serial.println(freeMemory());
   }
 
-  // Build reverse look-up table
+  // Build reverse look-up table to be able to translate valve indices to PCS
+  // points using function `valve2p()`
   init_valve2p();
 
   // R Click
@@ -462,53 +473,13 @@ void setup() {
     cp_mgr.begin();
   }
 
-  // Finished setup, so prepare LED matrix for regular operation
+  // Load protocol program preset
+  load_protocol_program_preset_0();
+
+  // Reached the end of setup, so now show the fixed grid in the LED matrix
   FastLED.clearData();
-  set_LED_matrix_fixed_grid_nodes();
+  set_LED_matrix_data_fixed_grid();
   FastLED.show();
-
-  // ---------------------
-  // Protocol manager
-  // ---------------------
-
-  Line line;
-  protocol_mgr.clear();
-
-  /*
-  // DEMO protocol program: Growing center square
-  // --------------------------------------------
-  protocol_mgr.set_name("Demo: Growing center square");
-
-  for (uint8_t rung = 0; rung < 7; rung++) {
-    uint8_t idx_P = 0;
-    for (int8_t x = -7; x < 8; ++x) {
-      for (int8_t y = -7; y < 8; ++y) {
-        if ((x + y) & 1) {
-          if (abs(x) + abs(y) == rung * 2 + 1) {
-            line.points[idx_P].set(x, y);
-            line.duration = 200; // [ms]
-            idx_P++;
-          }
-        }
-      }
-    }
-    line.points[idx_P].set_null(); // Add end sentinel
-    protocol_mgr.add_line(line);
-  }
-  // --------------------------------------------
-  */
-
-  // DEMO protocol program: Loop over each single valve
-  // --------------------------------------------------
-  protocol_mgr.set_name("Demo: Loop over each single valve");
-
-  for (idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
-    line.duration = 200; // [ms]
-    line.points[0] = valve2p(idx_valve);
-    line.points[1].set_null(); // Add end sentinel
-    protocol_mgr.add_line(line);
-  }
-  // --------------------------------------------------
 
   if (DEBUG) {
     Serial.print("Free mem @ loop : ");
@@ -517,11 +488,6 @@ void setup() {
 
   // Start Watchdog timer
   Watchdog.enable(WATCHDOG_TIMEOUT);
-
-  // Crucial to have the protocol program start at line 0. No valves will be
-  // activated just yet. That will happen with the first call to
-  // `protocol_mgr.update()`.
-  protocol_mgr.prime_start();
 }
 
 /*------------------------------------------------------------------------------
@@ -555,8 +521,16 @@ void loop() {
           fsm.transitionTo(state_idle);
 
         } else if (strcmp(str_cmd, "load") == 0) {
-          // Load a new program
+          // Load a new program via an incoming Serial stream send by the PC
           fsm.transitionTo(state_load_program);
+
+        } else if (strcmp(str_cmd, "preset0") == 0) {
+          // Load a preset program
+          load_protocol_program_preset_0();
+
+        } else if (strcmp(str_cmd, "preset1") == 0) {
+          // Load a preset program
+          load_protocol_program_preset_1();
 
         } else if (strcmp(str_cmd, ",") == 0) {
           // Go to the previous line of the protocol program and immediately
