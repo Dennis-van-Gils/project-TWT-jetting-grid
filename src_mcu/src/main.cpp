@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    03-12-2022
+ * @date    13-12-2022
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -65,10 +65,10 @@ bool safety__allow_jetting_pump_to_run = false;
 bool override_pump_safety = false;
 
 // Debugging flags
-uint32_t utick = micros();        // DEBUG timer
-const bool DEBUG = false;         // Print debug info over serial?
-const bool NO_PERIPHERALS = true; // Allows developing code on a bare Arduino
-                                  // without sensors & actuators attached
+uint32_t utick = micros();         // DEBUG timer
+const bool DEBUG = false;          // Print debug info over serial?
+const bool NO_PERIPHERALS = false; // Allows developing code on a bare Arduino
+                                   // without sensors & actuators attached
 
 /*------------------------------------------------------------------------------
   Readings
@@ -533,6 +533,10 @@ void loop() {
         } else if (strcmp(str_cmd, "preset1") == 0) {
           // Load a preset program
           load_protocol_program_preset_1();
+
+        } else if (strcmp(str_cmd, "preset2") == 0) {
+          // Load a preset program
+          load_protocol_program_preset_2();
 
         } else if (strcmp(str_cmd, ",") == 0) {
           // Go to the previous line of the protocol program and immediately

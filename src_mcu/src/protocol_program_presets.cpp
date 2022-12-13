@@ -2,7 +2,7 @@
  * @file    protocol_program_presets.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    03-12-2022
+ * @date    13-12-2022
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -47,5 +47,20 @@ void load_protocol_program_preset_1() {
     protocol_mgr.add_line(line);
   }
 
+  protocol_mgr.prime_start();
+}
+
+void load_protocol_program_preset_2() {
+  Line line;
+  protocol_mgr.clear();
+  protocol_mgr.set_name("Preset: Loop over each single valve");
+
+  for (uint8_t idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
+    line.points[idx_valve - 1] = valve2p(idx_valve);
+  }
+
+  line.duration = 200;              // [ms]
+  line.points[N_VALVES].set_null(); // Add end sentinel
+  protocol_mgr.add_line(line);
   protocol_mgr.prime_start();
 }
