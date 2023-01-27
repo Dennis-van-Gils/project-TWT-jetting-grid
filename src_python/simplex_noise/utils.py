@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint:disable = pointless-string-statement, invalid-name, missing-function-docstring
-"""
-conda create -n simplex python=3.10
-conda activate simplex
-pip install -r requirements.txt
-"""
+# pylint: disable=invalid-name, missing-function-docstring
 
 from time import perf_counter
 
@@ -14,53 +9,6 @@ from scipy import optimize
 from numba import njit, prange
 
 import matplotlib
-from matplotlib import pyplot as plt
-from matplotlib import animation
-
-from opensimplex_loops import looping_animated_2D_image
-
-"""
-import linecache
-import os
-import tracemalloc
-
-
-def tracemalloc_report(snapshot, key_type="lineno", limit=10):
-    # Based on:
-    # https://python.readthedocs.io/en/stable/library/tracemalloc.html#pretty-top
-    snapshot = snapshot.filter_traces(
-        (
-            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
-            tracemalloc.Filter(False, "<unknown>"),
-        )
-    )
-    top_stats = snapshot.statistics(key_type)
-
-    print("\nTracemalloc top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        # replace "/path/to/module/file.py" with "module/file.py"
-        filename = os.sep.join(frame.filename.split(os.sep)[-2:])
-        print(
-            "#%s: %s:%s: %.1f MiB"
-            % (index, filename, frame.lineno, stat.size / 1024 / 1024)
-        )
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            print("    %s\n" % line)
-        else:
-            print("")
-
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        print("%s other: %.1f MiB" % (len(other), size / 1024 / 1024))
-    total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f MiB" % (total / 1024 / 1024))
-
-
-tracemalloc.start()
-"""
 
 
 def move_figure(f, x, y):
@@ -270,98 +218,3 @@ def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
 
     print(f"done in {(perf_counter() - tick):.2f} s")
     return arr_BW, transp
-
-
-# ------------------------------------------------------------------------------
-#  Main
-# ------------------------------------------------------------------------------
-
-N_FRAMES = 200  # Number of time frames
-N_PIXELS = 1000  # Number of pixels on a single axis
-
-# Generate noise
-img_stack = looping_animated_2D_image(
-    N_frames=N_FRAMES,
-    N_pixels_x=N_PIXELS,
-    t_step=0.1,
-    x_step=0.01,
-    seed=1,
-    dtype=np.float32,
-)
-
-img_stack_2 = looping_animated_2D_image(
-    N_frames=N_FRAMES,
-    N_pixels_x=N_PIXELS,
-    t_step=0.1,
-    x_step=0.005,
-    seed=13,
-    dtype=np.float32,
-)
-
-# Add A & B into A
-for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable
-    np.add(img_stack[i], img_stack_2[i], out=img_stack[i])
-
-# Rescale noise
-rescale(img_stack, symmetrically=False)
-
-# Map into binary and calculate transparency
-# img_stack_BW, alpha = binary_map(img_stack)
-# img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.6)
-img_stack_BW, alpha = binary_map_with_tuning_newton(
-    img_stack, tuning_transp=0.6
-)
-
-# ------------------------------------------------------------------------------
-#  Plot
-# ------------------------------------------------------------------------------
-
-fig_1 = plt.figure()
-ax = plt.axes()
-img = plt.imshow(
-    img_stack[0],
-    cmap="gray",
-    vmin=0,
-    vmax=1,
-    interpolation="none",
-)
-frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
-
-
-def init_anim():
-    img.set_data(img_stack[0])
-    frame_text.set_text("")
-    return img, frame_text
-
-
-def anim(j):
-    img.set_data(img_stack_BW[j])
-    frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-    return img, frame_text
-
-
-ani = animation.FuncAnimation(
-    fig_1,
-    anim,
-    frames=N_FRAMES,
-    interval=40,
-    init_func=init_anim,  # blit=True,
-)
-
-# plt.grid(False)
-# plt.axis("off")
-move_figure(fig_1, 0, 0)
-
-fig_2 = plt.figure(2)
-plt.plot(alpha)
-plt.xlim(0, N_FRAMES)
-plt.title("transparency")
-plt.xlabel("frame #")
-plt.ylabel("alpha [0 - 1]")
-move_figure(fig_2, 720, 0)
-
-"""
-tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
-"""
-
-plt.show()
