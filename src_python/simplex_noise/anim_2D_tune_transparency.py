@@ -276,8 +276,8 @@ def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
 #  Main
 # ------------------------------------------------------------------------------
 
-N_PIXELS = 1000  # Number of pixels on a single axis
 N_FRAMES = 200  # Number of time frames
+N_PIXELS = 1000  # Number of pixels on a single axis
 
 # Generate noise
 img_stack = looping_animated_2D_image(
