@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=invalid-name, missing-function-docstring
+# pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter
 
@@ -167,3 +167,34 @@ def binary_map_tune_transparency(arr: np.ndarray, tuning_transp=0.5):
 
     print(f"done in {(perf_counter() - tick):.2f} s")
     return arr_BW, transp
+
+
+# ------------------------------------------------------------------------------
+#  PROTOCOL COORDINATE SYSTEM (PCS)
+# ------------------------------------------------------------------------------
+"""
+  The jetting nozzles are laid out in a square grid, aka the protocol coordinate
+  system (PCS).
+
+  ●: Indicates a valve & nozzle
+  -: Indicates no nozzle & valve exists
+
+      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
+     ┌─────────────────────────────────────────────┐
+   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+     └─────────────────────────────────────────────┘
+"""

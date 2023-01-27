@@ -47,7 +47,7 @@ class stack_config:
 # ------------------------------------------------------------------------------
 
 N_FRAMES = 200
-N_PIXELS = 1000
+N_PIXELS = 1024
 TRANSPARENCY = 0.5
 
 cfg_A = stack_config(t_step=0.1, x_step=0.01, seed=1)
@@ -86,6 +86,32 @@ else:
     stack_BW, alpha = binary_map(stack_A)
 
 # ------------------------------------------------------------------------------
+#  Remap noise map to PCS coordinates
+# ------------------------------------------------------------------------------
+
+# WORK IN PROGRESS
+
+# Holds the binary states of the valves inside the PCS grid
+PCS_map = np.zeros([N_FRAMES, 15, 15], dtype=bool)
+
+# map_nan = np.empty([N_FRAMES, 15, 15])
+# map_nan[:] = np.nan
+
+# Holds the pixel locations inside the noise image stack corresponding to the
+# valve locations
+px_x = np.arange(63, 1024 - 63, 64)
+px_y = np.arange(63, 1024 - 63, 64)
+grid_x, grid_y = np.meshgrid(px_x, px_y)
+
+grid_x_lin = np.reshape(grid_x, -1)
+grid_y_lin = np.reshape(grid_y, -1)
+grid_x_lin = grid_x_lin[1::2]
+grid_y_lin = grid_y_lin[1::2]
+
+for frame in range(N_FRAMES):
+    PCS_map[frame, :] = stack_BW[frame, grid_y, grid_x] == 1
+
+# ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
 
@@ -99,6 +125,15 @@ img = plt.imshow(
     interpolation="none",
 )
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
+
+plt.plot(
+    grid_x_lin,
+    grid_y_lin,
+    marker="o",
+    color="r",
+    linestyle="none",
+    markersize=5,
+)
 
 
 def init_anim():
