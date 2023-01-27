@@ -2,34 +2,22 @@
 # -*- coding: utf-8 -*-
 # pylint:disable = pointless-string-statement, invalid-name, missing-function-docstring
 """
-conda create -n simplex python=3.9
+conda create -n simplex python=3.10
 conda activate simplex
-pip install ipython numpy numba matplotlib opensimplex==0.4.3
-
-# Additionally
-pip install pylint black dvg-devices
+pip install -r requirements.txt
 """
 
 from time import perf_counter
 
-import opensimplex
 import numpy as np
+from scipy import optimize
+from numba import njit, prange
+
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import animation
-from scipy import optimize
 
-try:
-    from numba import njit, prange
-except ImportError:
-    prange = range
-
-    def njit(*args, **kwargs):
-        def wrapper(func):
-            return func
-
-        return wrapper
-
+from opensimplex_loops import looping_animated_2D_image
 
 """
 import linecache
@@ -173,7 +161,6 @@ def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
 
 
 @njit(
-    "float64(float64, float32[:, :], float64)",
     cache=True,
     parallel=True,
     nogil=True,
@@ -292,7 +279,7 @@ def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
 N_PIXELS = 1000  # Number of pixels on a single axis
 N_FRAMES = 200  # Number of time frames
 
-img_stack = opensimplex.looping_animated_2D_image(
+img_stack = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
     t_step=0.1,
@@ -302,7 +289,7 @@ img_stack = opensimplex.looping_animated_2D_image(
     verbose=True,
 )
 
-img_stack_2 = opensimplex.looping_animated_2D_image(
+img_stack_2 = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
     t_step=0.1,

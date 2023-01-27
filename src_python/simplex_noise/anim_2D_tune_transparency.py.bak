@@ -280,13 +280,13 @@ N_PIXELS = 1000  # Number of pixels on a single axis
 N_FRAMES = 200  # Number of time frames
 
 # Generate noise
+"""
 img_stack = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
     t_step=0.1,
     x_step=0.01,
     seed=1,
-    dtype=np.float32,
 )
 
 img_stack_2 = looping_animated_2D_image(
@@ -295,8 +295,27 @@ img_stack_2 = looping_animated_2D_image(
     t_step=0.1,
     x_step=0.005,
     seed=13,
-    dtype=np.float32,
 )
+"""
+
+img_stack = looping_animated_2D_image(
+    N_frames=N_FRAMES,
+    N_pixels_x=N_PIXELS,
+    t_step=0.1,
+    x_step=0.01,
+    seed=1,
+    verbose=True,
+)
+
+img_stack_2 = looping_animated_2D_image(
+    N_frames=N_FRAMES,
+    N_pixels_x=N_PIXELS,
+    t_step=0.1,
+    x_step=0.005,
+    seed=13,
+    verbose=True,
+)
+# """
 
 # Add A & B into A
 for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable

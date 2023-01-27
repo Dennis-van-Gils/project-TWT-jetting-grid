@@ -1,0 +1,7 @@
+numpy
+numba
+numba-progress
+matplotlib
+
+opensimplex~=0.4
+opensimplex-loops
