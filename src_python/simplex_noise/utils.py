@@ -15,7 +15,7 @@ def move_figure(f, x, y):
     """Move figure's upper left corner to pixel (x, y)"""
     backend = matplotlib.get_backend()
     if backend == "TkAgg":
-        f.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
+        f.canvas.manager.window.wm_geometry(f"+{x}+{y}")
     elif backend == "WXAgg":
         f.canvas.manager.window.SetPosition((x, y))
     else:
@@ -25,11 +25,22 @@ def move_figure(f, x, y):
 
 
 # ------------------------------------------------------------------------------
-#  rescale
+#  add_stack_B_to_A
 # ------------------------------------------------------------------------------
 
 
-def rescale(arr: np.ndarray, symmetrically: bool = True):
+def add_stack_B_to_A(stack_A: np.ndarray, stack_B: np.ndarray):
+    """Add B to A"""
+    for i in prange(np.size(stack_A, 0)):  # pylint: disable=not-an-iterable
+        np.add(stack_A[i], stack_B[i], out=stack_A[i])
+
+
+# ------------------------------------------------------------------------------
+#  rescale_stack
+# ------------------------------------------------------------------------------
+
+
+def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
     """Rescale noise to [0, 1]
     NOTE: In-place operation on argument `arr`
     """
@@ -76,9 +87,7 @@ def _binary_map(
     transp: np.ndarray,
     threshold: float,
 ):
-    """
-    NOTE: In-place operation on arguments `arr_BW` and `transp`
-    """
+    """NOTE: In-place operation on arguments `arr_BW` and `transp`"""
 
     for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
         # Calculate transparency
@@ -104,7 +113,7 @@ def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
 
 
 # ------------------------------------------------------------------------------
-#  binary_map_with_tuning_newton
+#  binary_map_tune_transparency
 # ------------------------------------------------------------------------------
 
 
@@ -113,19 +122,18 @@ def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
     parallel=True,
     nogil=True,
 )
-def f(x, arr_in, target):
+def newton_fun(x, arr_in, target):
     white_pxs = np.where(arr_in > x)
     return target - len(white_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
 
 
-def _binary_map_with_tuning_newton(
+def _binary_map_tune_transparency(
     arr: np.ndarray,
     arr_BW: np.ndarray,
     transp: np.ndarray,
     wanted_transp: float,
 ):
-    """
-    Using Newton's method to tune transparency:
+    """Using Newton's method to tune transparency:
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
     NOTE: In-place operation on arguments `arr_BW` and `transp`
     """
@@ -135,7 +143,7 @@ def _binary_map_with_tuning_newton(
         # Tune transparency
         # print(i)
         threshold = optimize.newton(
-            f,
+            newton_fun,
             1 - wanted_transp,
             args=(arr[i], wanted_transp),
             maxiter=20,
@@ -149,72 +157,13 @@ def _binary_map_with_tuning_newton(
         arr_BW[i][white_pxs] = 1
 
 
-def binary_map_with_tuning_newton(arr: np.ndarray, tuning_transp=0.5):
-    print(f"{'Binary mapping and newton...':30s}", end="")
+def binary_map_tune_transparency(arr: np.ndarray, tuning_transp=0.5):
+    print(f"{'Binary mapping and tuning transparency...':30s}", end="")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)
     transp = np.zeros(arr.shape[0])
-    _binary_map_with_tuning_newton(arr, arr_BW, transp, tuning_transp)
-
-    print(f"done in {(perf_counter() - tick):.2f} s")
-    return arr_BW, transp
-
-
-# ------------------------------------------------------------------------------
-#  binary_map_with_tuning
-# ------------------------------------------------------------------------------
-
-
-@njit(
-    parallel=True,
-)
-def _binary_map_with_tuning(
-    arr: np.ndarray,
-    arr_BW: np.ndarray,
-    transp: np.ndarray,
-    wanted_transp: float,
-):
-    """
-    NOTE: In-place operation on arguments `arr_BW` and `transp`
-    TODO: Add `reached max-iteration` warning with escape
-    """
-
-    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
-        # Tune transparency
-        error = 1
-        threshold = 1 - wanted_transp
-        # print(i)
-        while abs(error) > 0.02:
-            white_pxs = np.where(arr[i] > threshold)
-            transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
-            error = transp[i] - wanted_transp
-            # print(error)
-            """
-            if abs(error) > 0.2:
-                threshold += 0.01 if error > 0 else -0.01
-            elif abs(error) > 0.1:
-                threshold += 0.005 if error > 0 else -0.005
-            elif abs(error) > 0.5:
-                threshold += 0.0025 if error > 0 else -0.0025
-            else:
-                threshold += 0.001 if error > 0 else -0.001
-            """
-            threshold += 0.005 if error > 0 else -0.005
-
-        # Binary map
-        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
-        for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
-            arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
-
-
-def binary_map_with_tuning(arr: np.ndarray, tuning_transp=0.5):
-    print(f"{'Binary mapping and tuning...':30s}", end="")
-    tick = perf_counter()
-
-    arr_BW = np.zeros(arr.shape, dtype=bool)
-    transp = np.zeros(arr.shape[0])
-    _binary_map_with_tuning(arr, arr_BW, transp, tuning_transp)
+    _binary_map_tune_transparency(arr, arr_BW, transp, tuning_transp)
 
     print(f"done in {(perf_counter() - tick):.2f} s")
     return arr_BW, transp

@@ -19,10 +19,10 @@ from matplotlib import animation
 from opensimplex_loops import looping_animated_2D_image
 from utils import (
     move_figure,
-    rescale,
+    add_stack_B_to_A,
+    rescale_stack,
     binary_map,
-    binary_map_with_tuning,
-    binary_map_with_tuning_newton,
+    binary_map_tune_transparency,
 )
 
 
@@ -34,45 +34,56 @@ if REPORT_MALLOC:
 
     tracemalloc.start()
 
+
+class stack_config:
+    def __init__(self, t_step, x_step, seed):
+        self.t_step = t_step
+        self.x_step = x_step
+        self.seed = seed
+
+
 # ------------------------------------------------------------------------------
 #  Main
 # ------------------------------------------------------------------------------
 
 N_FRAMES = 200
 N_PIXELS = 1000
+TRANSPARENCY = 0.5
+
+cfg_A = stack_config(t_step=0.1, x_step=0.01, seed=1)
+cfg_B = stack_config(t_step=0.1, x_step=0.005, seed=13)
 
 # Generate noise
-img_stack = looping_animated_2D_image(
+stack_A = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
-    t_step=0.1,
-    x_step=0.01,
-    seed=1,
+    t_step=cfg_A.t_step,
+    x_step=cfg_A.x_step,
+    seed=cfg_A.seed,
     dtype=np.float32,
 )
 
-img_stack_2 = looping_animated_2D_image(
+stack_B = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
-    t_step=0.1,
-    x_step=0.005,
-    seed=13,
+    t_step=cfg_B.t_step,
+    x_step=cfg_B.x_step,
+    seed=cfg_B.seed,
     dtype=np.float32,
 )
 
-# Add A & B into A
-for i in prange(N_FRAMES):  # pylint: disable=not-an-iterable
-    np.add(img_stack[i], img_stack_2[i], out=img_stack[i])
 
-# Rescale noise
-rescale(img_stack, symmetrically=False)
+add_stack_B_to_A(stack_A, stack_B)
 
-# Map into binary and calculate transparency
-# img_stack_BW, alpha = binary_map(img_stack)
-# img_stack_BW, alpha = binary_map_with_tuning(img_stack, tuning_transp=0.5)
-img_stack_BW, alpha = binary_map_with_tuning_newton(
-    img_stack, tuning_transp=0.5
-)
+rescale_stack(stack_A, symmetrically=False)
+
+# Map into binary and calculate/tune transparency
+if 1:
+    stack_BW, alpha = binary_map_tune_transparency(
+        stack_A, tuning_transp=TRANSPARENCY
+    )
+else:
+    stack_BW, alpha = binary_map(stack_A)
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -81,7 +92,7 @@ img_stack_BW, alpha = binary_map_with_tuning_newton(
 fig_1 = plt.figure()
 ax = plt.axes()
 img = plt.imshow(
-    img_stack[0],
+    stack_A[0],
     cmap="gray",
     vmin=0,
     vmax=1,
@@ -91,13 +102,13 @@ frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 
 def init_anim():
-    img.set_data(img_stack[0])
+    img.set_data(stack_A[0])
     frame_text.set_text("")
     return img, frame_text
 
 
 def anim(j):
-    img.set_data(img_stack_BW[j])
+    img.set_data(stack_BW[j])
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
     return img, frame_text
 
