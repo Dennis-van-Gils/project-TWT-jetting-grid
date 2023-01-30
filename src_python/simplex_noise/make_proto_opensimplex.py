@@ -46,14 +46,31 @@ class stack_config:
 #  Main
 # ------------------------------------------------------------------------------
 
+# Constants taken from `src_mcu\src\constants.h`
+# ----------------------------------------------
+# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
+PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
+PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
+NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
+N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
+
+# Specific to this Python file
+# ----------------------------
+PCS_PIXEL_DIST = 64  # Pixel distance between the integer PCS coordinates
+
+# OpenSimplex noise parameters
+# ----------------------------
 N_FRAMES = 200
-N_PIXELS = 1024
+N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 TRANSPARENCY = 0.5
+
+# Generate image stacks holding OpenSimplex noise
+# -----------------------------------------------
 
 cfg_A = stack_config(t_step=0.1, x_step=0.01, seed=1)
 cfg_B = stack_config(t_step=0.1, x_step=0.005, seed=13)
 
-# Generate noise
 stack_A = looping_animated_2D_image(
     N_frames=N_FRAMES,
     N_pixels_x=N_PIXELS,
@@ -86,30 +103,56 @@ else:
     stack_BW, alpha = binary_map(stack_A)
 
 # ------------------------------------------------------------------------------
-#  Remap noise map to PCS coordinates
+#  PROTOCOL COORDINATE SYSTEM (PCS)
 # ------------------------------------------------------------------------------
+"""
+  The jetting nozzles are laid out in a square grid, aka the protocol coordinate
+  system (PCS).
 
+  ●: Indicates a valve & nozzle
+  -: Indicates no nozzle & valve exists
+
+      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
+     ┌─────────────────────────────────────────────┐
+   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+     └─────────────────────────────────────────────┘
+"""
 # WORK IN PROGRESS
 
-# Holds the binary states of the valves inside the PCS grid
-PCS_map = np.zeros([N_FRAMES, 15, 15], dtype=bool)
+# Create a map holding the pixel locations inside the noise image corresponding
+# to the valve locations. The index of below arrays does /not/ indicate the
+# valve number as laid out in the lab, but instead is simply linearly going from
+# left-to-right, repeating top-to-bottom.
+_pxs = np.arange(
+    PCS_PIXEL_DIST - 1, N_PIXELS - (PCS_PIXEL_DIST - 1), PCS_PIXEL_DIST
+)
+_grid_x, _grid_y = np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
+# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
+# locations that actually correspond to a valve.
+valve_map_px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
+valve_map_px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 
-# map_nan = np.empty([N_FRAMES, 15, 15])
-# map_nan[:] = np.nan
-
-# Holds the pixel locations inside the noise image stack corresponding to the
-# valve locations
-px_x = np.arange(63, 1024 - 63, 64)
-px_y = np.arange(63, 1024 - 63, 64)
-grid_x, grid_y = np.meshgrid(px_x, px_y)
-
-grid_x_lin = np.reshape(grid_x, -1)
-grid_y_lin = np.reshape(grid_y, -1)
-grid_x_lin = grid_x_lin[1::2]
-grid_y_lin = grid_y_lin[1::2]
+# Create a stack holding the binary states of the valves
+stack_valves = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
 
 for frame in range(N_FRAMES):
-    PCS_map[frame, :] = stack_BW[frame, grid_y, grid_x] == 1
+    stack_valves[frame, :] = (
+        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 1
+    )
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -126,9 +169,10 @@ img = plt.imshow(
 )
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
+# Plot the valve locations
 plt.plot(
-    grid_x_lin,
-    grid_y_lin,
+    valve_map_px_x,
+    valve_map_px_y,
     marker="o",
     color="r",
     linestyle="none",
