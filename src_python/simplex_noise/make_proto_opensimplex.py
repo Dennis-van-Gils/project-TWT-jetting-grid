@@ -61,7 +61,7 @@ PCS_PIXEL_DIST = 64  # Pixel distance between the integer PCS coordinates
 
 # OpenSimplex noise parameters
 # ----------------------------
-N_FRAMES = 200
+N_FRAMES = 2000
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 TRANSPARENCY = 0.5
 
@@ -149,10 +149,21 @@ valve_map_px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 # Create a stack holding the binary states of the valves
 stack_valves = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
 
+# Create a stack to show only the opened valves for plotting purposes
+valve_display_px_x = np.empty((N_FRAMES, N_VALVES))
+valve_display_px_x[:] = np.nan
+valve_display_px_y = np.empty((N_FRAMES, N_VALVES))
+valve_display_px_y[:] = np.nan
+
 for frame in range(N_FRAMES):
     stack_valves[frame, :] = (
-        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 1
+        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 0
     )
+
+    for valve in range(N_VALVES):
+        if stack_valves[frame, valve]:
+            valve_display_px_x[frame, valve] = valve_map_px_x[valve]
+            valve_display_px_y[frame, valve] = valve_map_px_y[valve]
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -160,39 +171,43 @@ for frame in range(N_FRAMES):
 
 fig_1 = plt.figure()
 ax = plt.axes()
-img = plt.imshow(
+frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
+
+# Plot the noise map
+hax_noise = ax.imshow(
     stack_A[0],
     cmap="gray",
     vmin=0,
     vmax=1,
     interpolation="none",
 )
-frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the valve locations
-plt.plot(
-    valve_map_px_x,
-    valve_map_px_y,
+(hax_valves,) = ax.plot(
+    valve_display_px_x[0, :],
+    valve_display_px_y[0, :],
     marker="o",
-    color="r",
+    color="deeppink",
     linestyle="none",
     markersize=5,
 )
 
 
 def init_anim():
-    img.set_data(stack_A[0])
     frame_text.set_text("")
-    return img, frame_text
+    hax_noise.set_data(stack_A[0])
+    hax_valves.set_data(valve_display_px_x[0, :], valve_display_px_y[0, :])
+    return hax_noise, frame_text
 
 
 def anim(j):
-    img.set_data(stack_BW[j])
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-    return img, frame_text
+    hax_noise.set_data(stack_BW[j])
+    hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
+    return hax_noise, frame_text
 
 
-ani = animation.FuncAnimation(
+anim = animation.FuncAnimation(
     fig_1,
     anim,
     frames=N_FRAMES,
@@ -216,3 +231,85 @@ if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
 
 plt.show()
+
+# Export images to disk?
+if 0:
+    from PIL import Image
+
+    def fig2data(fig):
+        """
+        @brief Convert a Matplotlib figure to a 4D numpy array with RGBA channels and return it
+        @param fig a matplotlib figure
+        @return a numpy 3D array of RGBA values
+        """
+        # draw the renderer
+        fig.canvas.draw()
+
+        # Get the RGBA buffer from the figure
+        w, h = fig.canvas.get_width_height()
+        buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+        buf.shape = (w, h, 4)
+
+        # canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
+        buf = np.roll(buf, 3, axis=2)
+        return buf
+
+    def fig2img(fig):
+        """
+        @brief Convert a Matplotlib figure to a PIL Image in RGBA format and return it
+        @param fig a matplotlib figure
+        @return a Python Imaging Library ( PIL ) image
+        """
+        # put the figure pixmap into a numpy array
+        buf = fig2data(fig)
+        w, h, d = buf.shape
+        return Image.frombuffer("RGBA", (w, h), buf.tobytes())
+
+    fig_1 = plt.figure(figsize=(10, 10))
+    ax = plt.axes()
+    ax.text(0, 1.02, "", transform=ax.transAxes)
+
+    # Plot the noise map
+    hax_noise = ax.imshow(
+        stack_BW[0],
+        cmap="gray",
+        vmin=0,
+        vmax=1,
+        interpolation="none",
+    )
+
+    # Plot the valve locations
+    (hax_valves,) = ax.plot(
+        valve_display_px_x[0, :],
+        valve_display_px_y[0, :],
+        marker="o",
+        color="deeppink",
+        linestyle="none",
+        markersize=5,
+    )
+
+    pil_imgs = []
+    for j in range(N_FRAMES):
+        frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
+        hax_noise.set_data(stack_BW[j])
+        hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
+
+        pil_img = fig2img(fig_1)
+        pil_imgs.append(pil_img)
+
+    pil_imgs[0].save(
+        "output.gif",
+        save_all=True,
+        append_images=pil_imgs[1:],
+        duration=40,
+        loop=0,
+    )
+
+if 0:
+    anim.save(
+        "output.gif",
+        dpi=120,
+        writer="imagemagick",
+        fps=20,
+        progress_callback=lambda i, n: print(f"{i} of {N_FRAMES}"),
+    )
