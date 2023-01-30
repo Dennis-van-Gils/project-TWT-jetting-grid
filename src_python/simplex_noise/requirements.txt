@@ -2,6 +2,8 @@ numpy
 numba
 numba-progress
 matplotlib
+scipy
+numba-scipy
 
 opensimplex~=0.4
 opensimplex-loops

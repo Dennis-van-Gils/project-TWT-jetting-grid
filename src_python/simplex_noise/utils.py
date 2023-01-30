@@ -47,7 +47,7 @@ def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
     # NOTE: Can't seem to get @jit or @njit to work. Fails on `out` parameter of
     # ufuncs `np.divide()` and `np.add()`. Also, `prange` will not go parallel.
 
-    print(f"{'Rescaling noise...':30s}", end="")
+    print(f"{'Rescaling noise...':32s}", end="")
     tick = perf_counter()
 
     in_min = np.min(arr)
@@ -101,7 +101,7 @@ def _binary_map(
 
 
 def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
-    print(f"{'Binary mapping...':30s}", end="")
+    print(f"{'Binary mapping...':32s}", end="")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)
@@ -158,7 +158,7 @@ def _binary_map_tune_transparency(
 
 
 def binary_map_tune_transparency(arr: np.ndarray, tuning_transp=0.5):
-    print(f"{'Binary mapping and tuning transparency...':30s}", end="")
+    print(f"{'BW map & transparency tuning...':32s}", end="")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)

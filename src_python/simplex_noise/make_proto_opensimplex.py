@@ -61,7 +61,7 @@ PCS_PIXEL_DIST = 64  # Pixel distance between the integer PCS coordinates
 
 # OpenSimplex noise parameters
 # ----------------------------
-N_FRAMES = 2000
+N_FRAMES = 200
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 TRANSPARENCY = 0.5
 
@@ -91,6 +91,7 @@ stack_B = looping_animated_2D_image(
 
 
 add_stack_B_to_A(stack_A, stack_B)
+del stack_B
 
 rescale_stack(stack_A, symmetrically=False)
 
@@ -101,6 +102,7 @@ if 1:
     )
 else:
     stack_BW, alpha = binary_map(stack_A)
+del stack_A
 
 # ------------------------------------------------------------------------------
 #  PROTOCOL COORDINATE SYSTEM (PCS)
@@ -174,13 +176,15 @@ ax = plt.axes()
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
+"""
 hax_noise = ax.imshow(
-    stack_A[0],
+    stack_BW[0],
     cmap="gray",
     vmin=0,
     vmax=1,
     interpolation="none",
 )
+"""
 
 # Plot the valve locations
 (hax_valves,) = ax.plot(
@@ -192,19 +196,21 @@ hax_noise = ax.imshow(
     markersize=5,
 )
 
+ax.set_aspect("equal", adjustable="box")
+
 
 def init_anim():
     frame_text.set_text("")
-    hax_noise.set_data(stack_A[0])
+    # hax_noise.set_data(stack_BW[0])
     hax_valves.set_data(valve_display_px_x[0, :], valve_display_px_y[0, :])
-    return hax_noise, frame_text
+    return hax_valves, frame_text
 
 
 def anim(j):
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-    hax_noise.set_data(stack_BW[j])
+    # hax_noise.set_data(stack_BW[j])
     hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
-    return hax_noise, frame_text
+    return hax_valves, frame_text
 
 
 anim = animation.FuncAnimation(
