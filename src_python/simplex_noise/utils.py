@@ -7,6 +7,7 @@ from time import perf_counter
 import numpy as np
 from scipy import optimize
 from numba import njit, prange
+from tqdm import trange
 
 import matplotlib
 
@@ -47,7 +48,7 @@ def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
     # NOTE: Can't seem to get @jit or @njit to work. Fails on `out` parameter of
     # ufuncs `np.divide()` and `np.add()`. Also, `prange` will not go parallel.
 
-    print(f"{'Rescaling noise...':32s}", end="")
+    print("Rescaling noise...")
     tick = perf_counter()
 
     in_min = np.min(arr)
@@ -55,21 +56,21 @@ def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
 
     if symmetrically:
         f_norm = max([abs(in_min), abs(in_max)]) * 2
-        for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
+        for i in trange(arr.shape[0]):  # pylint: disable=not-an-iterable
             np.divide(arr[i], f_norm, out=arr[i])
             np.add(arr[i], 0.5, out=arr[i])
     else:
         f_norm = in_max - in_min
-        for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
+        for i in trange(arr.shape[0]):  # pylint: disable=not-an-iterable
             np.subtract(arr[i], in_min, out=arr[i])
             np.divide(arr[i], f_norm, out=arr[i])
 
     out_min = np.min(arr)
     out_max = np.max(arr)
 
-    print(f"done in {(perf_counter() - tick):.2f} s")
-    print(f"  from [{in_min:+.3f}, {in_max:+.3f}]")
-    print(f"  to   [{out_min:+.3f}, {out_max:+.3f}]")
+    print(f"from [{in_min:+.3f}, {in_max:+.3f}]")
+    print(f"to   [{out_min:+.3f}, {out_max:+.3f}]")
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
 
 
 # ------------------------------------------------------------------------------
@@ -101,14 +102,14 @@ def _binary_map(
 
 
 def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
-    print(f"{'Binary mapping...':32s}", end="")
+    print("BW map...")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)
     transp = np.zeros(arr.shape[0])
     _binary_map(arr, arr_BW, transp, BW_threshold)
 
-    print(f"done in {(perf_counter() - tick):.2f} s")
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
     return arr_BW, transp
 
 
@@ -139,9 +140,8 @@ def _binary_map_tune_transparency(
     """
     # NOTE: Can't `njit` on `optimize.newton()`
 
-    for i in range(arr.shape[0]):
+    for i in trange(arr.shape[0]):
         # Tune transparency
-        # print(i)
         threshold = optimize.newton(
             newton_fun,
             1 - wanted_transp,
@@ -158,12 +158,12 @@ def _binary_map_tune_transparency(
 
 
 def binary_map_tune_transparency(arr: np.ndarray, tuning_transp=0.5):
-    print(f"{'BW map & transparency tuning...':32s}", end="")
+    print("BW map & transparency tuning...")
     tick = perf_counter()
 
     arr_BW = np.zeros(arr.shape, dtype=bool)
     transp = np.zeros(arr.shape[0])
     _binary_map_tune_transparency(arr, arr_BW, transp, tuning_transp)
 
-    print(f"done in {(perf_counter() - tick):.2f} s")
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
     return arr_BW, transp

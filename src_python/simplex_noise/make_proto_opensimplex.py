@@ -58,7 +58,7 @@ N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 
 # Specific to this Python file
 # ----------------------------
-PCS_PIXEL_DIST = 16  # Pixel distance between the integer PCS coordinates
+PCS_PIXEL_DIST = 32  # 32, Pixel distance between the integer PCS coordinates
 
 # OpenSimplex noise parameters
 # ----------------------------
@@ -66,8 +66,8 @@ N_FRAMES = 2000
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 TRANSPARENCY = 0.5
 
-FEATURE_SIZE_A = 25  # 100
-FEATURE_SIZE_B = 50  # 200
+FEATURE_SIZE_A = 50  # 50
+FEATURE_SIZE_B = 100  # 100
 PLOT_NOISE = False
 
 # Generate image stacks holding OpenSimplex noise
@@ -84,6 +84,7 @@ stack_A = looping_animated_2D_image(
     seed=cfg_A.seed,
     dtype=np.float32,
 )
+print("")
 
 stack_B = looping_animated_2D_image(
     N_frames=N_FRAMES,
@@ -93,7 +94,7 @@ stack_B = looping_animated_2D_image(
     seed=cfg_B.seed,
     dtype=np.float32,
 )
-
+print("")
 
 add_stack_B_to_A(stack_A, stack_B)
 del stack_B
@@ -280,7 +281,7 @@ if 1:
     ax.set_xlim(0, N_PIXELS)
     ax.set_ylim(0, N_PIXELS)
 
-    print(f"{'Generating gif frames...':32s}")
+    print("Generating gif frames...")
     tick = perf_counter()
     pil_imgs = []
 
@@ -293,7 +294,7 @@ if 1:
         pil_img = fig2img(fig_1)
         pil_imgs.append(pil_img)
 
-    print(f"done in {(perf_counter() - tick):.2f} s")
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
 
     pil_imgs[0].save(
         "output.gif",
