@@ -8,10 +8,10 @@ pip install -r requirements.txt
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
 
-import os
+from time import perf_counter
 
 import numpy as np
-from numba import njit, prange
+from tqdm import trange
 
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -24,6 +24,7 @@ from utils import (
     binary_map,
     binary_map_tune_transparency,
 )
+from utils_pillow import fig2img, fig2img_alt
 
 
 # DEBUG info: Report on memory allocation?
@@ -57,19 +58,23 @@ N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 
 # Specific to this Python file
 # ----------------------------
-PCS_PIXEL_DIST = 64  # Pixel distance between the integer PCS coordinates
+PCS_PIXEL_DIST = 16  # Pixel distance between the integer PCS coordinates
 
 # OpenSimplex noise parameters
 # ----------------------------
-N_FRAMES = 200
+N_FRAMES = 2000
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 TRANSPARENCY = 0.5
+
+FEATURE_SIZE_A = 25  # 100
+FEATURE_SIZE_B = 50  # 200
+PLOT_NOISE = False
 
 # Generate image stacks holding OpenSimplex noise
 # -----------------------------------------------
 
-cfg_A = stack_config(t_step=0.1, x_step=0.01, seed=1)
-cfg_B = stack_config(t_step=0.1, x_step=0.005, seed=13)
+cfg_A = stack_config(t_step=0.1, x_step=1 / FEATURE_SIZE_A, seed=1)
+cfg_B = stack_config(t_step=0.1, x_step=1 / FEATURE_SIZE_B, seed=13)
 
 stack_A = looping_animated_2D_image(
     N_frames=N_FRAMES,
@@ -176,15 +181,15 @@ ax = plt.axes()
 frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
-"""
-hax_noise = ax.imshow(
-    stack_BW[0],
-    cmap="gray",
-    vmin=0,
-    vmax=1,
-    interpolation="none",
-)
-"""
+if PLOT_NOISE:
+    hax_noise = ax.imshow(
+        stack_BW[0],
+        cmap="gray",
+        vmin=0,
+        vmax=1,
+        interpolation="none",
+        origin="lower",
+    )
 
 # Plot the valve locations
 (hax_valves,) = ax.plot(
@@ -197,18 +202,22 @@ hax_noise = ax.imshow(
 )
 
 ax.set_aspect("equal", adjustable="box")
+ax.set_xlim(0, N_PIXELS)
+ax.set_ylim(0, N_PIXELS)
 
 
 def init_anim():
     frame_text.set_text("")
-    # hax_noise.set_data(stack_BW[0])
+    if PLOT_NOISE:
+        hax_noise.set_data(stack_BW[0])
     hax_valves.set_data(valve_display_px_x[0, :], valve_display_px_y[0, :])
     return hax_valves, frame_text
 
 
 def anim(j):
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-    # hax_noise.set_data(stack_BW[j])
+    if PLOT_NOISE:
+        hax_noise.set_data(stack_BW[j])
     hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
     return hax_valves, frame_text
 
@@ -217,7 +226,7 @@ anim = animation.FuncAnimation(
     fig_1,
     anim,
     frames=N_FRAMES,
-    interval=40,
+    interval=50,  # [ms] == 1000/FPS
     init_func=init_anim,  # blit=True,
 )
 
@@ -236,53 +245,26 @@ move_figure(fig_2, 720, 0)
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
 
-plt.show()
+# plt.show()
 
 # Export images to disk?
-if 0:
+if 1:
     from PIL import Image
 
-    def fig2data(fig):
-        """
-        @brief Convert a Matplotlib figure to a 4D numpy array with RGBA channels and return it
-        @param fig a matplotlib figure
-        @return a numpy 3D array of RGBA values
-        """
-        # draw the renderer
-        fig.canvas.draw()
-
-        # Get the RGBA buffer from the figure
-        w, h = fig.canvas.get_width_height()
-        buf = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
-        buf.shape = (w, h, 4)
-
-        # canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
-        buf = np.roll(buf, 3, axis=2)
-        return buf
-
-    def fig2img(fig):
-        """
-        @brief Convert a Matplotlib figure to a PIL Image in RGBA format and return it
-        @param fig a matplotlib figure
-        @return a Python Imaging Library ( PIL ) image
-        """
-        # put the figure pixmap into a numpy array
-        buf = fig2data(fig)
-        w, h, d = buf.shape
-        return Image.frombuffer("RGBA", (w, h), buf.tobytes())
-
-    fig_1 = plt.figure(figsize=(10, 10))
+    fig_1 = plt.figure(figsize=(5, 5))  # figsize * 100 = pixels
     ax = plt.axes()
-    ax.text(0, 1.02, "", transform=ax.transAxes)
+    frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
     # Plot the noise map
-    hax_noise = ax.imshow(
-        stack_BW[0],
-        cmap="gray",
-        vmin=0,
-        vmax=1,
-        interpolation="none",
-    )
+    if PLOT_NOISE:
+        hax_noise = ax.imshow(
+            stack_BW[0],
+            cmap="gray",
+            vmin=0,
+            vmax=1,
+            interpolation="none",
+            origin="lower",
+        )
 
     # Plot the valve locations
     (hax_valves,) = ax.plot(
@@ -294,28 +276,43 @@ if 0:
         markersize=5,
     )
 
+    ax.set_aspect("equal", adjustable="box")
+    ax.set_xlim(0, N_PIXELS)
+    ax.set_ylim(0, N_PIXELS)
+
+    print(f"{'Generating gif frames...':32s}")
+    tick = perf_counter()
     pil_imgs = []
-    for j in range(N_FRAMES):
-        frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-        hax_noise.set_data(stack_BW[j])
+
+    for j in trange(N_FRAMES):
+        frame_text.set_text(f"frame {j:03d}")
+        if PLOT_NOISE:
+            hax_noise.set_data(stack_BW[j])
         hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
 
         pil_img = fig2img(fig_1)
         pil_imgs.append(pil_img)
 
+    print(f"done in {(perf_counter() - tick):.2f} s")
+
     pil_imgs[0].save(
         "output.gif",
         save_all=True,
         append_images=pil_imgs[1:],
-        duration=40,
+        duration=50,  # [ms] == 1000/FPS
+        optimize=True,
         loop=0,
     )
 
-if 0:
+"""
+    # NOTE: Don't use below image export mechanism. It is extremely memory
+    # hungry & slow.
+
     anim.save(
         "output.gif",
         dpi=120,
         writer="imagemagick",
         fps=20,
-        progress_callback=lambda i, n: print(f"{i} of {N_FRAMES}"),
+        progress_callback=lambda i, n: print(f"{i + 1} of {N_FRAMES}"),
     )
+"""
