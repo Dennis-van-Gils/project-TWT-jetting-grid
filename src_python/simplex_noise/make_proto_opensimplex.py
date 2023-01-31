@@ -146,7 +146,6 @@ else:
   -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
      └─────────────────────────────────────────────┘
 """
-# WORK IN PROGRESS
 
 # Create a map holding the pixel locations inside the noise image corresponding
 # to the valve locations. The index of below arrays does /not/ indicate the
@@ -170,6 +169,7 @@ valve_display_px_x[:] = np.nan
 valve_display_px_y = np.empty((N_FRAMES, N_VALVES))
 valve_display_px_y[:] = np.nan
 
+# Populate stacks
 for frame in range(N_FRAMES):
     stack_valves[frame, :] = (
         stack_BW[frame, valve_map_px_y, valve_map_px_x] == 0
@@ -257,8 +257,6 @@ if REPORT_MALLOC:
 
 # Export images to disk?
 if 1:
-    from PIL import Image
-
     fig_1 = plt.figure(figsize=(5, 5))  # figsize * 100 = pixels
     ax = plt.axes()
     frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
