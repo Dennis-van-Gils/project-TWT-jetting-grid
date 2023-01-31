@@ -5,5 +5,10 @@ matplotlib
 scipy
 numba-scipy
 
-opensimplex~=0.4
+# OpenSimplex noise
 opensimplex-loops
+
+# Dev
+pylint
+black
+ipython
