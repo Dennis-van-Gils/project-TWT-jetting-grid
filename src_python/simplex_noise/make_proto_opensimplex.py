@@ -24,7 +24,7 @@ from utils import (
     binary_map,
     binary_map_tune_transparency,
 )
-from utils_pillow import fig2img, fig2img_alt
+from utils_pillow import fig2img_RGB, fig2img_RGBA
 
 
 # DEBUG info: Report on memory allocation?
@@ -68,7 +68,9 @@ TRANSPARENCY = 0.5
 
 FEATURE_SIZE_A = 50  # 50
 FEATURE_SIZE_B = 100  # 100
-PLOT_NOISE = False
+
+PLOT_NOISE = True
+PLOT_NOISE_AS_GRAY = False  # True: grayscale, False: B&W
 
 # Generate image stacks holding OpenSimplex noise
 # -----------------------------------------------
@@ -108,7 +110,12 @@ if 1:
     )
 else:
     stack_BW, alpha = binary_map(stack_A)
-del stack_A
+
+if PLOT_NOISE_AS_GRAY:
+    stack_to_plot = stack_A
+else:
+    stack_to_plot = stack_BW
+    del stack_A
 
 # ------------------------------------------------------------------------------
 #  PROTOCOL COORDINATE SYSTEM (PCS)
@@ -184,7 +191,7 @@ frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 # Plot the noise map
 if PLOT_NOISE:
     hax_noise = ax.imshow(
-        stack_BW[0],
+        stack_to_plot[0],
         cmap="gray",
         vmin=0,
         vmax=1,
@@ -210,7 +217,7 @@ ax.set_ylim(0, N_PIXELS)
 def init_anim():
     frame_text.set_text("")
     if PLOT_NOISE:
-        hax_noise.set_data(stack_BW[0])
+        hax_noise.set_data(stack_to_plot[0])
     hax_valves.set_data(valve_display_px_x[0, :], valve_display_px_y[0, :])
     return hax_valves, frame_text
 
@@ -218,7 +225,7 @@ def init_anim():
 def anim(j):
     frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
     if PLOT_NOISE:
-        hax_noise.set_data(stack_BW[j])
+        hax_noise.set_data(stack_to_plot[j])
     hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
     return hax_valves, frame_text
 
@@ -259,7 +266,7 @@ if 1:
     # Plot the noise map
     if PLOT_NOISE:
         hax_noise = ax.imshow(
-            stack_BW[0],
+            stack_to_plot[0],
             cmap="gray",
             vmin=0,
             vmax=1,
@@ -288,10 +295,10 @@ if 1:
     for j in trange(N_FRAMES):
         frame_text.set_text(f"frame {j:03d}")
         if PLOT_NOISE:
-            hax_noise.set_data(stack_BW[j])
+            hax_noise.set_data(stack_to_plot[j])
         hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
 
-        pil_img = fig2img(fig_1)
+        pil_img = fig2img_RGB(fig_1)
         pil_imgs.append(pil_img)
 
     print(f"done in {(perf_counter() - tick):.2f} s\n")
@@ -301,7 +308,6 @@ if 1:
         save_all=True,
         append_images=pil_imgs[1:],
         duration=50,  # [ms] == 1000/FPS
-        optimize=True,
         loop=0,
     )
 

@@ -3,6 +3,7 @@
 
 # Specific to this library
 port*.txt
+output.gif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
