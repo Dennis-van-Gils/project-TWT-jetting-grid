@@ -4,6 +4,7 @@
 conda create -n simplex python=3.10
 conda activate simplex
 pip install -r requirements.txt
+ipython make_proto_opensimplex.py
 """
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
@@ -21,8 +22,7 @@ from utils import (
     move_figure,
     add_stack_B_to_A,
     rescale_stack,
-    binary_map,
-    binary_map_tune_transparency,
+    binarize_stack,
 )
 from utils_pillow import fig2img_RGB, fig2img_RGBA
 
@@ -35,90 +35,34 @@ if REPORT_MALLOC:
 
     tracemalloc.start()
 
+# ------------------------------------------------------------------------------
+#  proto_config
+# ------------------------------------------------------------------------------
 
-class stack_config:
-    def __init__(self, t_step, x_step, seed):
+
+class proto_config:
+    def __init__(
+        self,
+        N_frames: int,
+        N_pixels: int,
+        t_step: float,
+        feature_size: int,
+        seed: int,
+    ):
+        self.N_frames = N_frames
+        self.N_pixels = N_pixels
         self.t_step = t_step
-        self.x_step = x_step
+        self.feature_size = feature_size
         self.seed = seed
+
+        # Derived
+        np.seterr(divide="ignore")
+        self.x_step = np.divide(1, feature_size)
+        np.seterr(divide="warn")
 
 
 # ------------------------------------------------------------------------------
 #  Main
-# ------------------------------------------------------------------------------
-
-# Constants taken from `src_mcu\src\constants.h`
-# ----------------------------------------------
-# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
-# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
-PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
-PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
-NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
-N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
-
-# Specific to this Python file
-# ----------------------------
-PCS_PIXEL_DIST = 32  # 32, Pixel distance between the integer PCS coordinates
-
-# OpenSimplex noise parameters
-# ----------------------------
-N_FRAMES = 2000
-N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
-TRANSPARENCY = 0.5
-
-FEATURE_SIZE_A = 50  # 50
-FEATURE_SIZE_B = 100  # 100
-
-PLOT_NOISE = True
-PLOT_NOISE_AS_GRAY = False  # True: grayscale, False: B&W
-
-# Generate image stacks holding OpenSimplex noise
-# -----------------------------------------------
-
-cfg_A = stack_config(t_step=0.1, x_step=1 / FEATURE_SIZE_A, seed=1)
-cfg_B = stack_config(t_step=0.1, x_step=1 / FEATURE_SIZE_B, seed=13)
-
-stack_A = looping_animated_2D_image(
-    N_frames=N_FRAMES,
-    N_pixels_x=N_PIXELS,
-    t_step=cfg_A.t_step,
-    x_step=cfg_A.x_step,
-    seed=cfg_A.seed,
-    dtype=np.float32,
-)
-print("")
-
-stack_B = looping_animated_2D_image(
-    N_frames=N_FRAMES,
-    N_pixels_x=N_PIXELS,
-    t_step=cfg_B.t_step,
-    x_step=cfg_B.x_step,
-    seed=cfg_B.seed,
-    dtype=np.float32,
-)
-print("")
-
-add_stack_B_to_A(stack_A, stack_B)
-del stack_B
-
-rescale_stack(stack_A, symmetrically=False)
-
-# Map into binary and calculate/tune transparency
-if 1:
-    stack_BW, alpha = binary_map_tune_transparency(
-        stack_A, tuning_transp=TRANSPARENCY
-    )
-else:
-    stack_BW, alpha = binary_map(stack_A)
-
-if PLOT_NOISE_AS_GRAY:
-    stack_to_plot = stack_A
-else:
-    stack_to_plot = stack_BW
-    del stack_A
-
-# ------------------------------------------------------------------------------
-#  PROTOCOL COORDINATE SYSTEM (PCS)
 # ------------------------------------------------------------------------------
 """
   The jetting nozzles are laid out in a square grid, aka the protocol coordinate
@@ -147,6 +91,95 @@ else:
      └─────────────────────────────────────────────┘
 """
 
+# Constants taken from `src_mcu\src\constants.h`
+# ----------------------------------------------
+# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
+PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
+PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
+NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
+N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
+
+
+# General constants
+# -----------------
+PCS_PIXEL_DIST = 32  # 32, Pixel distance between the integer PCS coordinates
+
+PLOT_NOISE = True
+PLOT_NOISE_AS_GRAY = False  # True: grayscale, False: B&W
+
+# Protocol parameters
+# -------------------
+N_FRAMES = 2000
+N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
+
+# [0-1] Threshold level to convert grayscale noise to binary BW map.
+BW_THRESHOLD = 0.5
+
+# Interpret `BW_THRESHOLD` instead as a wanted transparency to solve for?
+TUNE_TRANSPARENCY = True
+
+T_STEP_A = 0.1
+T_STEP_B = 0.1
+
+FEATURE_SIZE_A = 50  # 50
+FEATURE_SIZE_B = 100  # 100, 0 indicates to not use stack B
+
+SEED_A = 1
+SEED_B = 13
+
+
+# Generate image stacks holding OpenSimplex noise
+# -----------------------------------------------
+cfg_A = proto_config(N_FRAMES, N_PIXELS, T_STEP_A, FEATURE_SIZE_A, SEED_A)
+cfg_B = proto_config(N_FRAMES, N_PIXELS, T_STEP_B, FEATURE_SIZE_B, SEED_B)
+
+stack_A = looping_animated_2D_image(
+    N_frames=cfg_A.N_frames,
+    N_pixels_x=cfg_A.N_pixels,
+    t_step=cfg_A.t_step,
+    x_step=cfg_A.x_step,
+    seed=cfg_A.seed,
+    dtype=np.float32,
+)
+print("")
+
+if FEATURE_SIZE_B > 0:
+    stack_B = looping_animated_2D_image(
+        N_frames=cfg_B.N_frames,
+        N_pixels_x=cfg_B.N_pixels,
+        t_step=cfg_B.t_step,
+        x_step=cfg_B.x_step,
+        seed=cfg_B.seed,
+        dtype=np.float32,
+    )
+    print("")
+
+    add_stack_B_to_A(stack_A, stack_B)
+    del stack_B
+
+rescale_stack(stack_A, symmetrically=False)
+
+# Transform grayscale noise into binary BW map and calculate/tune transparency
+stack_BW, alpha = binarize_stack(stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY)
+
+# Determine which stack to plot
+if PLOT_NOISE_AS_GRAY:
+    stack_to_plot = stack_A
+else:
+    stack_to_plot = stack_BW
+    del stack_A
+
+# Invert the colors. It is more intuitive to watch the turned on valves as black
+# on a white background, than it is reversed. This is opposite to a masking
+# layer in Photoshop, where a white region indicates True. Here, black indicates
+# True.
+stack_to_plot = 1 - stack_to_plot
+
+# ------------------------------------------------------------------------------
+#  PROTOCOL COORDINATE SYSTEM (PCS)
+# ------------------------------------------------------------------------------
+
 # Create a map holding the pixel locations inside the noise image corresponding
 # to the valve locations. The index of below arrays does /not/ indicate the
 # valve number as laid out in the lab, but instead is simply linearly going from
@@ -172,7 +205,7 @@ valve_display_px_y[:] = np.nan
 # Populate stacks
 for frame in range(N_FRAMES):
     stack_valves[frame, :] = (
-        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 0
+        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 1
     )
 
     for valve in range(N_VALVES):

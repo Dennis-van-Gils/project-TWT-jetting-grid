@@ -3,6 +3,7 @@
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter
+from typing import Tuple
 
 import numpy as np
 from scipy import optimize
@@ -74,47 +75,7 @@ def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
 
 
 # ------------------------------------------------------------------------------
-#  binary_map
-# ------------------------------------------------------------------------------
-
-
-@njit(
-    cache=True,
-    parallel=True,
-)
-def _binary_map(
-    arr: np.ndarray,
-    arr_BW: np.ndarray,
-    transp: np.ndarray,
-    threshold: float,
-):
-    """NOTE: In-place operation on arguments `arr_BW` and `transp`"""
-
-    for i in prange(arr.shape[0]):  # pylint: disable=not-an-iterable
-        # Calculate transparency
-        white_pxs = np.where(arr[i] > threshold)
-        transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
-
-        # Binary map
-        # Below is the Numba equivalent of: arr_BW[i][white_pxs] = 1
-        for j in prange(white_pxs[0].size):  # pylint: disable=not-an-iterable
-            arr_BW[i, white_pxs[0][j], white_pxs[1][j]] = 1
-
-
-def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
-    print("BW map...")
-    tick = perf_counter()
-
-    arr_BW = np.zeros(arr.shape, dtype=bool)
-    transp = np.zeros(arr.shape[0])
-    _binary_map(arr, arr_BW, transp, BW_threshold)
-
-    print(f"done in {(perf_counter() - tick):.2f} s\n")
-    return arr_BW, transp
-
-
-# ------------------------------------------------------------------------------
-#  binary_map_tune_transparency
+#  binarize_stack
 # ------------------------------------------------------------------------------
 
 
@@ -123,47 +84,103 @@ def binary_map(arr: np.ndarray, BW_threshold: float = 0.5):
     parallel=True,
     nogil=True,
 )
-def newton_fun(x, arr_in, target):
-    white_pxs = np.where(arr_in > x)
-    return target - len(white_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
-
-
-def _binary_map_tune_transparency(
-    arr: np.ndarray,
-    arr_BW: np.ndarray,
-    transp: np.ndarray,
-    wanted_transp: float,
+def _binarize_stack_using_threshold(
+    stack_in: np.ndarray,
+    threshold: float,
+    stack_BW: np.ndarray,
+    alpha: np.ndarray,
 ):
-    """Using Newton's method to tune transparency:
+    """NOTE: In-place operation on arguments `stack_BW` and `alpha`"""
+    for i in prange(stack_in.shape[0]):  # pylint: disable=not-an-iterable
+        true_pxs = np.where(stack_in[i] > threshold)
+        alpha[i] = len(true_pxs[0]) / stack_in.shape[1] / stack_in.shape[2]
+        # Below is the Numba equivalent of: stack_BW[i][true_pxs] = 1
+        for j in prange(true_pxs[0].size):  # pylint: disable=not-an-iterable
+            stack_BW[i, true_pxs[0][j], true_pxs[1][j]] = 1
+
+
+@njit(
+    cache=True,
+    parallel=True,
+    nogil=True,
+)
+def newton_fun(x, arr_in, target):
+    true_pxs = np.where(arr_in > x)
+    return target - len(true_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
+
+
+def _binarize_stack_using_newton(
+    stack_in: np.ndarray,
+    wanted_transparency: float,
+    stack_BW: np.ndarray,
+    alpha: np.ndarray,
+):
+    """Using Newton's method to solve for the given transparency:
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
-    NOTE: In-place operation on arguments `arr_BW` and `transp`
+    NOTE: In-place operation on arguments `stack_BW` and `alpha`
     """
     # NOTE: Can't `njit` on `optimize.newton()`
 
-    for i in trange(arr.shape[0]):
-        # Tune transparency
+    for i in trange(stack_in.shape[0]):
+        # Solve for transparency
         threshold = optimize.newton(
             newton_fun,
-            1 - wanted_transp,
-            args=(arr[i], wanted_transp),
+            1 - wanted_transparency,
+            args=(stack_in[i], wanted_transparency),
             maxiter=20,
             tol=0.02,
         )
 
-        white_pxs = np.where(arr[i] > threshold)
-        transp[i] = len(white_pxs[0]) / arr.shape[1] / arr.shape[2]
-
-        # Binary map
-        arr_BW[i][white_pxs] = 1
+        true_pxs = np.where(stack_in[i] > threshold)
+        alpha[i] = len(true_pxs[0]) / stack_in.shape[1] / stack_in.shape[2]
+        stack_BW[i][true_pxs] = 1
 
 
-def binary_map_tune_transparency(arr: np.ndarray, tuning_transp=0.5):
-    print("BW map & transparency tuning...")
+def binarize_stack(
+    stack_in: np.ndarray, BW_threshold: float, tune_transparency: bool
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Binarize each frame of the image stack.
+
+    Two methods are possible:
+    1) When `tune_transparency` == False, a simple threshold value as given by
+       `BW_threshold` is applied. Pixels with a value above this threshold are
+       set to True, otherwise False.
+    2) When `tune_transparency` == True, a Newton solver is employed per frame
+       to solve for the needed threshold level to achieve a near constant
+       transparency over all frames. The given `BW_threshold` value gets now
+       interpretted as the transparency value to solve for.
+
+    Transparency is defined as the number of `True` pixels over the total number
+    of pixels in the frame.
+
+    Args:
+        stack_in (numpy.ndarray):
+            2D image stack [time, y-pixel, x-pixel] containing float values.
+
+        BW_threshold (float):
+            Either the simple threshold value or the transparency value [0 - 1]
+            to solve for, see above.
+
+        tune_transparency (bool):
+            See above.
+
+    Returns: (Tuple)
+        stack_BW (numpy.ndarray):
+            2D image stack [time, y-pixel, x-pixel] containing boolean values.
+
+        alpha (numpy.ndarray):
+            1D array containing the effective transparency of each frame.
+    """
     tick = perf_counter()
+    stack_BW = np.zeros(stack_in.shape, dtype=bool)
+    alpha = np.zeros(stack_in.shape[0])
 
-    arr_BW = np.zeros(arr.shape, dtype=bool)
-    transp = np.zeros(arr.shape[0])
-    _binary_map_tune_transparency(arr, arr_BW, transp, tuning_transp)
+    if tune_transparency:
+        print("Binarizing noise and tuning transparency...")
+        _binarize_stack_using_newton(stack_in, BW_threshold, stack_BW, alpha)
+    else:
+        print("Binarizing noise...")
+        _binarize_stack_using_threshold(stack_in, BW_threshold, stack_BW, alpha)
 
     print(f"done in {(perf_counter() - tick):.2f} s\n")
-    return arr_BW, transp
+    return stack_BW, alpha
