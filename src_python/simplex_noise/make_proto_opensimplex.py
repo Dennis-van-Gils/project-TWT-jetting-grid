@@ -1,10 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-conda create -n simplex python=3.10
-conda activate simplex
-pip install -r requirements.txt
-ipython make_proto_opensimplex.py
+Installation:
+    conda create -n simplex python=3.10
+    conda activate simplex
+    pip install -r requirements.txt
+    ipython make_proto_opensimplex.py
+
+Protocol coordinate system (PCS):
+  The jetting nozzles are laid out in a square grid, aka the protocol coordinate
+  system.
+
+  ●: Indicates a valve & nozzle
+  -: Indicates no nozzle & valve exists
+
+      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
+     ┌─────────────────────────────────────────────┐
+   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
+  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
+     └─────────────────────────────────────────────┘
 """
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
@@ -36,11 +63,11 @@ if REPORT_MALLOC:
     tracemalloc.start()
 
 # ------------------------------------------------------------------------------
-#  proto_config
+#  ProtoConfig
 # ------------------------------------------------------------------------------
 
 
-class proto_config:
+class ProtoConfig:
     def __init__(
         self,
         N_frames: int,
@@ -64,32 +91,6 @@ class proto_config:
 # ------------------------------------------------------------------------------
 #  Main
 # ------------------------------------------------------------------------------
-"""
-  The jetting nozzles are laid out in a square grid, aka the protocol coordinate
-  system (PCS).
-
-  ●: Indicates a valve & nozzle
-  -: Indicates no nozzle & valve exists
-
-      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
-     ┌─────────────────────────────────────────────┐
-   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-     └─────────────────────────────────────────────┘
-"""
 
 # Constants taken from `src_mcu\src\constants.h`
 # ----------------------------------------------
@@ -99,7 +100,6 @@ PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
 PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
 NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
 N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
-
 
 # General constants
 # -----------------
@@ -134,12 +134,14 @@ FEATURE_SIZE_B = 100  # 100, 0 indicates to not use stack B
 SEED_A = 1
 SEED_B = 13
 
+# ------------------------------------------------------------------------------
+#  Calculate OpenSimplex noise
+# ------------------------------------------------------------------------------
+
+cfg_A = ProtoConfig(N_FRAMES, N_PIXELS, T_STEP_A, FEATURE_SIZE_A, SEED_A)
+cfg_B = ProtoConfig(N_FRAMES, N_PIXELS, T_STEP_B, FEATURE_SIZE_B, SEED_B)
 
 # Generate image stacks holding OpenSimplex noise
-# -----------------------------------------------
-cfg_A = proto_config(N_FRAMES, N_PIXELS, T_STEP_A, FEATURE_SIZE_A, SEED_A)
-cfg_B = proto_config(N_FRAMES, N_PIXELS, T_STEP_B, FEATURE_SIZE_B, SEED_B)
-
 img_stack_A = looping_animated_2D_image(
     N_frames=cfg_A.N_frames,
     N_pixels_x=cfg_A.N_pixels,
@@ -185,13 +187,13 @@ else:
 img_stack_plot = 1 - img_stack_plot
 
 # ------------------------------------------------------------------------------
-#  PROTOCOL COORDINATE SYSTEM (PCS)
+#  Valve transformations
 # ------------------------------------------------------------------------------
+# NOTE: The valve index of below arrays does /not/ indicate the valve number as
+# laid out in the lab, but instead is simply linearly increasing.
 
 # Create a map holding the pixel locations inside the noise image corresponding
-# to the valve locations. The index of below arrays does /not/ indicate the
-# valve number as laid out in the lab, but instead is simply linearly going from
-# left-to-right, repeating top-to-bottom.
+# to each valve location
 _pxs = np.arange(
     PCS_PIXEL_DIST - 1, N_PIXELS - (PCS_PIXEL_DIST - 1), PCS_PIXEL_DIST
 )
@@ -201,10 +203,22 @@ _grid_x, _grid_y = np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
 valve2px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
 valve2px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 
-# Create a stack holding the binary states of the valves
+# Create a map holding the PCS coordinates of each valve
+_coords = np.arange(PCS_X_MIN, PCS_X_MAX + 1)
+_grid_x, _grid_y = np.meshgrid(_coords, _coords)  # shape: (15, 15), (15, 15)
+# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
+# locations that actually correspond to a valve.
+valve2pcs_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
+valve2pcs_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
+
+# ------------------------------------------------------------------------------
+#  Determine the state of each valve
+# ------------------------------------------------------------------------------
+
+# Create a stack holding the boolean states of all valves
 valves_stack = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
 
-# Create a stack to show only the opened valves for plotting purposes
+# Create a stack for plotting only the opened valves
 valves_plot_px_x = np.empty((N_FRAMES, N_VALVES))
 valves_plot_px_x[:] = np.nan
 valves_plot_px_y = np.empty((N_FRAMES, N_VALVES))
