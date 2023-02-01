@@ -140,7 +140,7 @@ SEED_B = 13
 cfg_A = proto_config(N_FRAMES, N_PIXELS, T_STEP_A, FEATURE_SIZE_A, SEED_A)
 cfg_B = proto_config(N_FRAMES, N_PIXELS, T_STEP_B, FEATURE_SIZE_B, SEED_B)
 
-stack_A = looping_animated_2D_image(
+img_stack_A = looping_animated_2D_image(
     N_frames=cfg_A.N_frames,
     N_pixels_x=cfg_A.N_pixels,
     t_step=cfg_A.t_step,
@@ -151,7 +151,7 @@ stack_A = looping_animated_2D_image(
 print("")
 
 if FEATURE_SIZE_B > 0:
-    stack_B = looping_animated_2D_image(
+    img_stack_B = looping_animated_2D_image(
         N_frames=cfg_B.N_frames,
         N_pixels_x=cfg_B.N_pixels,
         t_step=cfg_B.t_step,
@@ -161,26 +161,28 @@ if FEATURE_SIZE_B > 0:
     )
     print("")
 
-    add_stack_B_to_A(stack_A, stack_B)
-    del stack_B
+    add_stack_B_to_A(img_stack_A, img_stack_B)
+    del img_stack_B
 
-rescale_stack(stack_A, symmetrically=False)
+rescale_stack(img_stack_A, symmetrically=False)
 
 # Transform grayscale noise into binary BW map and calculate/tune transparency
-stack_BW, alpha = binarize_stack(stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY)
+img_stack_BW, alpha = binarize_stack(
+    img_stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY
+)
 
 # Determine which stack to plot
 if SHOW_NOISE_AS_GRAY:
-    stack_to_plot = stack_A
+    img_stack_plot = img_stack_A
 else:
-    stack_to_plot = stack_BW
-    del stack_A
+    img_stack_plot = img_stack_BW
+    del img_stack_A
 
 # Invert the colors. It is more intuitive to watch the turned on valves as black
 # on a white background, than it is reversed. This is opposite to a masking
 # layer in Photoshop, where a white region indicates True. Here, black indicates
 # True.
-stack_to_plot = 1 - stack_to_plot
+img_stack_plot = 1 - img_stack_plot
 
 # ------------------------------------------------------------------------------
 #  PROTOCOL COORDINATE SYSTEM (PCS)
@@ -196,28 +198,26 @@ _pxs = np.arange(
 _grid_x, _grid_y = np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
 # `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
 # locations that actually correspond to a valve.
-valve_map_px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
-valve_map_px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
+valve2px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
+valve2px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 
 # Create a stack holding the binary states of the valves
-stack_valves = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
+valves_stack = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
 
 # Create a stack to show only the opened valves for plotting purposes
-valve_display_px_x = np.empty((N_FRAMES, N_VALVES))
-valve_display_px_x[:] = np.nan
-valve_display_px_y = np.empty((N_FRAMES, N_VALVES))
-valve_display_px_y[:] = np.nan
+valves_plot_px_x = np.empty((N_FRAMES, N_VALVES))
+valves_plot_px_x[:] = np.nan
+valves_plot_px_y = np.empty((N_FRAMES, N_VALVES))
+valves_plot_px_y[:] = np.nan
 
 # Populate stacks
 for frame in range(N_FRAMES):
-    stack_valves[frame, :] = (
-        stack_BW[frame, valve_map_px_y, valve_map_px_x] == 1
-    )
+    valves_stack[frame, :] = img_stack_BW[frame, valve2px_y, valve2px_x] == 1
 
     for valve in range(N_VALVES):
-        if stack_valves[frame, valve]:
-            valve_display_px_x[frame, valve] = valve_map_px_x[valve]
-            valve_display_px_y[frame, valve] = valve_map_px_y[valve]
+        if valves_stack[frame, valve]:
+            valves_plot_px_x[frame, valve] = valve2px_x[valve]
+            valves_plot_px_y[frame, valve] = valve2px_y[valve]
 
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
@@ -233,7 +233,7 @@ ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 # Plot the noise map
 if SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
-        stack_to_plot[0],
+        img_stack_plot[0],
         cmap="gray",
         vmin=0,
         vmax=1,
@@ -243,8 +243,8 @@ if SHOW_NOISE_IN_PLOT:
 
 # Plot the valve locations
 (hax_valves,) = ax.plot(
-    valve_display_px_x[0, :],
-    valve_display_px_y[0, :],
+    valves_plot_px_x[0, :],
+    valves_plot_px_y[0, :],
     marker="o",
     color="deeppink",
     linestyle="none",
@@ -261,8 +261,8 @@ ax.set_ylim(0, N_PIXELS)
 def animate_fig_1(j):
     ax_text.set_text(f"frame {j:03d}")
     if SHOW_NOISE_IN_PLOT:
-        hax_noise.set_data(stack_to_plot[j])
-    hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
+        hax_noise.set_data(img_stack_plot[j])
+    hax_valves.set_data(valves_plot_px_x[j, :], valves_plot_px_y[j, :])
 
 
 fig_2 = plt.figure(2)
