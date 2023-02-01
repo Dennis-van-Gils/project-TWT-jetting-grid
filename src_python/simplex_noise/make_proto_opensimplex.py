@@ -45,6 +45,8 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 from matplotlib.ticker import MultipleLocator
 
+plt.rcParams["figure.figsize"] = [5, 4]
+
 from opensimplex_loops import looping_animated_2D_image
 from utils import (
     move_figure,
@@ -110,14 +112,14 @@ N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 PCS_PIXEL_DIST = 32
 
 # fmt: off
-PLOT_TO_SCREEN = 0          # Plot to screen, or save to disk instead?
+PLOT_TO_SCREEN = 1          # Plot to screen, or save to disk instead?
 SHOW_NOISE_IN_PLOT = 1      # 0: Only show the valves
 SHOW_NOISE_AS_GRAY = 0      # 0: B&W, 1: grayscale
 # fmt: on
 
 # Protocol parameters
 # -------------------
-N_FRAMES = 2000
+N_FRAMES = 200
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 
 # [0-1] Threshold level to convert grayscale noise to binary BW map.
@@ -290,11 +292,20 @@ def animate_fig_1(j):
 
 
 fig_2 = plt.figure(2)
+fig_2.set_tight_layout(True)
 plt.plot(alpha)
 plt.xlim(0, N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
+
+fig_3 = plt.figure(3)
+fig_3.set_tight_layout(True)
+plt.plot(valves_stack[:, 0])
+plt.xlim(0, N_FRAMES)
+plt.title("valve 0")
+plt.xlabel("frame #")
+plt.ylabel("state [0 - 1]")
 
 if PLOT_TO_SCREEN:
     # No export to disk
@@ -307,7 +318,8 @@ if PLOT_TO_SCREEN:
     )
 
     move_figure(fig_1, 0, 0)
-    move_figure(fig_2, 720, 0)
+    move_figure(fig_2, 500, 0)
+    move_figure(fig_3, 500 + 500, 0)
     plt.show()
 
 else:
