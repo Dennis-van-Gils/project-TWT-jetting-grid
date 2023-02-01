@@ -43,6 +43,7 @@ from tqdm import trange
 
 from matplotlib import pyplot as plt
 from matplotlib import animation
+from matplotlib.ticker import MultipleLocator
 
 from opensimplex_loops import looping_animated_2D_image
 from utils import (
@@ -109,9 +110,9 @@ N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 PCS_PIXEL_DIST = 32
 
 # fmt: off
-PLOT_TO_SCREEN = True       # Plot to screen, or save to disk instead?
-SHOW_NOISE_IN_PLOT = True   # False: Only show the valves
-SHOW_NOISE_AS_GRAY = False  # False: B&W, True: grayscale
+PLOT_TO_SCREEN = 0          # Plot to screen, or save to disk instead?
+SHOW_NOISE_IN_PLOT = 1      # 0: Only show the valves
+SHOW_NOISE_AS_GRAY = 0      # 0: B&W, 1: grayscale
 # fmt: on
 
 # Protocol parameters
@@ -219,10 +220,10 @@ valve2pcs_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 valves_stack = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
 
 # Create a stack for plotting only the opened valves
-valves_plot_px_x = np.empty((N_FRAMES, N_VALVES))
-valves_plot_px_x[:] = np.nan
-valves_plot_px_y = np.empty((N_FRAMES, N_VALVES))
-valves_plot_px_y[:] = np.nan
+valves_plot_pcs_x = np.empty((N_FRAMES, N_VALVES))
+valves_plot_pcs_x[:] = np.nan
+valves_plot_pcs_y = np.empty((N_FRAMES, N_VALVES))
+valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
 for frame in range(N_FRAMES):
@@ -230,8 +231,8 @@ for frame in range(N_FRAMES):
 
     for valve in range(N_VALVES):
         if valves_stack[frame, valve]:
-            valves_plot_px_x[frame, valve] = valve2px_x[valve]
-            valves_plot_px_y[frame, valve] = valve2px_y[valve]
+            valves_plot_pcs_x[frame, valve] = valve2pcs_x[valve]
+            valves_plot_pcs_y[frame, valve] = valve2pcs_y[valve]
 
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
@@ -253,30 +254,39 @@ if SHOW_NOISE_IN_PLOT:
         vmax=1,
         interpolation="none",
         origin="lower",
+        extent=[
+            PCS_X_MIN - 1,
+            PCS_X_MAX + 1,
+            PCS_X_MIN - 1,
+            PCS_X_MAX + 1,
+        ],
     )
 
 # Plot the valve locations
 (hax_valves,) = ax.plot(
-    valves_plot_px_x[0, :],
-    valves_plot_px_y[0, :],
+    valves_plot_pcs_x[0, :],
+    valves_plot_pcs_y[0, :],
     marker="o",
     color="deeppink",
     linestyle="none",
     markersize=5,
 )
 
+# major_locator = MultipleLocator(1)
+# ax.xaxis.set_major_locator(major_locator) # Slows down drawing a lot!
+# ax.yaxis.set_major_locator(major_locator) # Slows down drawing a lot!
 ax.set_aspect("equal", adjustable="box")
-ax.set_xlim(0, N_PIXELS)
-ax.set_ylim(0, N_PIXELS)
-# ax.grid(False)
+ax.set_xlim(PCS_X_MIN - 1, PCS_X_MAX + 1)
+ax.set_ylim(PCS_X_MIN - 1, PCS_X_MAX + 1)
+ax.grid(which="major")
 # ax.axis("off")
 
 
 def animate_fig_1(j):
-    ax_text.set_text(f"frame {j:03d}")
+    ax_text.set_text(f"frame {j:04d}")
     if SHOW_NOISE_IN_PLOT:
         hax_noise.set_data(img_stack_plot[j])
-    hax_valves.set_data(valves_plot_px_x[j, :], valves_plot_px_y[j, :])
+    hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
 
 
 fig_2 = plt.figure(2)
