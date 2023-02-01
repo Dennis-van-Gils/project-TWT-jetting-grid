@@ -66,6 +66,52 @@ if REPORT_MALLOC:
     tracemalloc.start()
 
 # ------------------------------------------------------------------------------
+#  Main
+# ------------------------------------------------------------------------------
+
+# Constants taken from `src_mcu\src\constants.h`
+# ----------------------------------------------
+# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
+PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
+PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
+NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
+N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
+
+# General constants
+# -----------------
+# Pixel distance between the integer PCS coordinates.
+# Too large -> memory intense. Too small -> poor quality.
+# 32 is a good value. Leave it.
+PCS_PIXEL_DIST = 32
+
+# fmt: off
+PLOT_TO_SCREEN = 1          # Plot to screen, or save to disk instead?
+SHOW_NOISE_IN_PLOT = 1      # 0: Only show the valves
+SHOW_NOISE_AS_GRAY = 0      # 0: B&W, 1: grayscale
+# fmt: on
+
+# Protocol parameters
+# -------------------
+N_FRAMES = 2000
+N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
+
+# [0-1] Threshold level to convert grayscale noise to binary BW map.
+BW_THRESHOLD = 0.5
+
+# Interpret `BW_THRESHOLD` instead as a wanted transparency to solve for?
+TUNE_TRANSPARENCY = True
+
+T_STEP_A = 0.1
+T_STEP_B = 0.1
+
+FEATURE_SIZE_A = 50  # 50
+FEATURE_SIZE_B = 100  # 100, 0 indicates to not use stack B
+
+SEED_A = 1
+SEED_B = 13
+
+# ------------------------------------------------------------------------------
 #  ProtoConfig
 # ------------------------------------------------------------------------------
 
@@ -87,55 +133,9 @@ class ProtoConfig:
 
         # Derived
         np.seterr(divide="ignore")
-        self.x_step = np.divide(1, feature_size)
+        self.x_step = np.divide(1, feature_size * PCS_PIXEL_DIST / 32)
         np.seterr(divide="warn")
 
-
-# ------------------------------------------------------------------------------
-#  Main
-# ------------------------------------------------------------------------------
-
-# Constants taken from `src_mcu\src\constants.h`
-# ----------------------------------------------
-# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
-# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
-PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
-PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
-NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
-N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
-
-# General constants
-# -----------------
-# Pixel distance between the integer PCS coordinates.
-# Too large -> memory intense. Too small -> poor quality.
-# 32 is a good value.
-PCS_PIXEL_DIST = 32
-
-# fmt: off
-PLOT_TO_SCREEN = 1          # Plot to screen, or save to disk instead?
-SHOW_NOISE_IN_PLOT = 1      # 0: Only show the valves
-SHOW_NOISE_AS_GRAY = 0      # 0: B&W, 1: grayscale
-# fmt: on
-
-# Protocol parameters
-# -------------------
-N_FRAMES = 200
-N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
-
-# [0-1] Threshold level to convert grayscale noise to binary BW map.
-BW_THRESHOLD = 0.5
-
-# Interpret `BW_THRESHOLD` instead as a wanted transparency to solve for?
-TUNE_TRANSPARENCY = True
-
-T_STEP_A = 0.1
-T_STEP_B = 0.1
-
-FEATURE_SIZE_A = 50  # 50
-FEATURE_SIZE_B = 100  # 100, 0 indicates to not use stack B
-
-SEED_A = 1
-SEED_B = 13
 
 # ------------------------------------------------------------------------------
 #  Calculate OpenSimplex noise
