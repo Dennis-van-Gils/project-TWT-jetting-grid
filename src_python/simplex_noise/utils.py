@@ -144,7 +144,7 @@ def binarize_stack(
     Two methods are possible:
     1) When `tune_transparency` == False, a simple threshold value as given by
        `BW_threshold` is applied. Pixels with a value above this threshold are
-       set to True, otherwise False.
+       set to True (1), otherwise False (0).
     2) When `tune_transparency` == True, a Newton solver is employed per frame
        to solve for the needed threshold level to achieve a near constant
        transparency over all frames. The given `BW_threshold` value gets now

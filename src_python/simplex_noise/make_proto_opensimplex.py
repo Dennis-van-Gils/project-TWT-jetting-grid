@@ -103,10 +103,16 @@ N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 
 # General constants
 # -----------------
-PCS_PIXEL_DIST = 32  # 32, Pixel distance between the integer PCS coordinates
+# Pixel distance between the integer PCS coordinates.
+# Too large -> memory intense. Too small -> poor quality.
+# 32 is a good value.
+PCS_PIXEL_DIST = 32
 
-PLOT_NOISE = True
-PLOT_NOISE_AS_GRAY = False  # True: grayscale, False: B&W
+# fmt: off
+PLOT_TO_SCREEN = True       # Plot to screen, or save to disk instead?
+SHOW_NOISE_IN_PLOT = True   # False: Only show the valves
+SHOW_NOISE_AS_GRAY = False  # False: B&W, True: grayscale
+# fmt: on
 
 # Protocol parameters
 # -------------------
@@ -164,7 +170,7 @@ rescale_stack(stack_A, symmetrically=False)
 stack_BW, alpha = binarize_stack(stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY)
 
 # Determine which stack to plot
-if PLOT_NOISE_AS_GRAY:
+if SHOW_NOISE_AS_GRAY:
     stack_to_plot = stack_A
 else:
     stack_to_plot = stack_BW
@@ -213,16 +219,19 @@ for frame in range(N_FRAMES):
             valve_display_px_x[frame, valve] = valve_map_px_x[valve]
             valve_display_px_y[frame, valve] = valve_map_px_y[valve]
 
+if REPORT_MALLOC:
+    tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
+
 # ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
 
-fig_1 = plt.figure()
+fig_1 = plt.figure(figsize=(5, 5))
 ax = plt.axes()
-frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
+ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
-if PLOT_NOISE:
+if SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
         stack_to_plot[0],
         cmap="gray",
@@ -245,35 +254,16 @@ if PLOT_NOISE:
 ax.set_aspect("equal", adjustable="box")
 ax.set_xlim(0, N_PIXELS)
 ax.set_ylim(0, N_PIXELS)
+# ax.grid(False)
+# ax.axis("off")
 
 
-def init_anim():
-    frame_text.set_text("")
-    if PLOT_NOISE:
-        hax_noise.set_data(stack_to_plot[0])
-    hax_valves.set_data(valve_display_px_x[0, :], valve_display_px_y[0, :])
-    return hax_valves, frame_text
-
-
-def anim(j):
-    frame_text.set_text(f"frame {j:03d}, transparency = {alpha[j]:.2f}")
-    if PLOT_NOISE:
+def animate_fig_1(j):
+    ax_text.set_text(f"frame {j:03d}")
+    if SHOW_NOISE_IN_PLOT:
         hax_noise.set_data(stack_to_plot[j])
     hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
-    return hax_valves, frame_text
 
-
-anim = animation.FuncAnimation(
-    fig_1,
-    anim,
-    frames=N_FRAMES,
-    interval=50,  # [ms] == 1000/FPS
-    init_func=init_anim,  # blit=True,
-)
-
-# plt.grid(False)
-# plt.axis("off")
-move_figure(fig_1, 0, 0)
 
 fig_2 = plt.figure(2)
 plt.plot(alpha)
@@ -281,66 +271,43 @@ plt.xlim(0, N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
-move_figure(fig_2, 720, 0)
 
-if REPORT_MALLOC:
-    tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
-
-# plt.show()
-
-# Export images to disk?
-if 1:
-    fig_1 = plt.figure(figsize=(5, 5))  # figsize * 100 = pixels
-    ax = plt.axes()
-    frame_text = ax.text(0, 1.02, "", transform=ax.transAxes)
-
-    # Plot the noise map
-    if PLOT_NOISE:
-        hax_noise = ax.imshow(
-            stack_to_plot[0],
-            cmap="gray",
-            vmin=0,
-            vmax=1,
-            interpolation="none",
-            origin="lower",
-        )
-
-    # Plot the valve locations
-    (hax_valves,) = ax.plot(
-        valve_display_px_x[0, :],
-        valve_display_px_y[0, :],
-        marker="o",
-        color="deeppink",
-        linestyle="none",
-        markersize=5,
+if PLOT_TO_SCREEN:
+    # No export to disk
+    anim = animation.FuncAnimation(
+        fig_1,
+        animate_fig_1,
+        frames=N_FRAMES,
+        interval=50,  # [ms] == 1000/FPS
+        init_func=animate_fig_1(0),
     )
 
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_xlim(0, N_PIXELS)
-    ax.set_ylim(0, N_PIXELS)
+    move_figure(fig_1, 0, 0)
+    move_figure(fig_2, 720, 0)
+    plt.show()
 
+else:
+    # Export images to disk
     print("Generating gif frames...")
     tick = perf_counter()
     pil_imgs = []
-
-    for j in trange(N_FRAMES):
-        frame_text.set_text(f"frame {j:03d}")
-        if PLOT_NOISE:
-            hax_noise.set_data(stack_to_plot[j])
-        hax_valves.set_data(valve_display_px_x[j, :], valve_display_px_y[j, :])
-
+    for frame in trange(N_FRAMES):
+        animate_fig_1(frame)
         pil_img = fig2img_RGB(fig_1)
         pil_imgs.append(pil_img)
-
     print(f"done in {(perf_counter() - tick):.2f} s\n")
 
+    print("Saving images...")
+    tick = perf_counter()
     pil_imgs[0].save(
-        "output.gif",
+        "proto_anim.gif",
         save_all=True,
         append_images=pil_imgs[1:],
         duration=50,  # [ms] == 1000/FPS
         loop=0,
     )
+    fig_2.savefig("proto_alpha.png")
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
 
 """
     # NOTE: Don't use below image export mechanism. It is extremely memory
