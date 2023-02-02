@@ -6,32 +6,6 @@ Installation:
     conda activate simplex
     pip install -r requirements.txt
     ipython make_proto_opensimplex.py
-
-Protocol coordinate system (PCS):
-  The jetting nozzles are laid out in a square grid, aka the protocol coordinate
-  system.
-
-  ●: Indicates a valve & nozzle
-  -: Indicates no nozzle & valve exists
-
-      -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7
-     ┌─────────────────────────────────────────────┐
-   7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-   1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-   0 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -1 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -2 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -3 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -4 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -5 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-  -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
-  -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
-     └─────────────────────────────────────────────┘
 """
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
@@ -55,8 +29,8 @@ from utils import (
     rescale_stack,
     binarize_stack,
 )
-from utils_pillow import fig2img_RGB, fig2img_RGBA
-
+from utils_pillow import fig2img_RGB
+import constants as C
 
 # DEBUG info: Report on memory allocation?
 REPORT_MALLOC = False
@@ -65,52 +39,6 @@ if REPORT_MALLOC:
     from tracemalloc_report import tracemalloc_report
 
     tracemalloc.start()
-
-# ------------------------------------------------------------------------------
-#  Main
-# ------------------------------------------------------------------------------
-
-# Constants taken from `src_mcu\src\constants.h`
-# ----------------------------------------------
-# The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
-# Physical valves are numbered 1 to 112, with 0 indicating 'no valve'.
-PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
-PCS_X_MAX = 7  # Maximum x-axis coordinate of the PCS
-NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
-N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
-
-# General constants
-# -----------------
-# Pixel distance between the integer PCS coordinates.
-# Too large -> memory intense. Too small -> poor quality.
-# 32 is a good value. Leave it.
-PCS_PIXEL_DIST = 32
-
-# fmt: off
-PLOT_TO_SCREEN = 1          # Plot to screen, or save to disk instead?
-SHOW_NOISE_IN_PLOT = 1      # 0: Only show the valves
-SHOW_NOISE_AS_GRAY = 0      # 0: B&W, 1: grayscale
-# fmt: on
-
-# Protocol parameters
-# -------------------
-N_FRAMES = 2000
-N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
-
-# [0-1] Threshold level to convert grayscale noise to binary BW map.
-BW_THRESHOLD = 0.5
-
-# Interpret `BW_THRESHOLD` instead as a wanted transparency to solve for?
-TUNE_TRANSPARENCY = True
-
-T_STEP_A = 0.1
-T_STEP_B = 0.1
-
-FEATURE_SIZE_A = 50  # 50
-FEATURE_SIZE_B = 100  # 100, 0 indicates to not use stack B
-
-SEED_A = 1
-SEED_B = 13
 
 # ------------------------------------------------------------------------------
 #  ProtoConfig
@@ -134,7 +62,7 @@ class ProtoConfig:
 
         # Derived
         np.seterr(divide="ignore")
-        self.x_step = np.divide(1, feature_size * PCS_PIXEL_DIST / 32)
+        self.x_step = np.divide(1, feature_size * C.PCS_PIXEL_DIST / 32)
         np.seterr(divide="warn")
 
 
@@ -142,10 +70,15 @@ class ProtoConfig:
 #  Calculate OpenSimplex noise
 # ------------------------------------------------------------------------------
 
-cfg_A = ProtoConfig(N_FRAMES, N_PIXELS, T_STEP_A, FEATURE_SIZE_A, SEED_A)
-cfg_B = ProtoConfig(N_FRAMES, N_PIXELS, T_STEP_B, FEATURE_SIZE_B, SEED_B)
+cfg_A = ProtoConfig(
+    C.N_FRAMES, C.N_PIXELS, C.T_STEP_A, C.FEATURE_SIZE_A, C.SEED_A
+)
+cfg_B = ProtoConfig(
+    C.N_FRAMES, C.N_PIXELS, C.T_STEP_B, C.FEATURE_SIZE_B, C.SEED_B
+)
 
-# Generate image stacks holding OpenSimplex noise
+# Generate image stacks containing OpenSimplex noise. The images will have pixel
+# values between [-1, 1].
 img_stack_A = looping_animated_2D_image(
     N_frames=cfg_A.N_frames,
     N_pixels_x=cfg_A.N_pixels,
@@ -156,7 +89,7 @@ img_stack_A = looping_animated_2D_image(
 )
 print("")
 
-if FEATURE_SIZE_B > 0:
+if C.FEATURE_SIZE_B > 0:
     img_stack_B = looping_animated_2D_image(
         N_frames=cfg_B.N_frames,
         N_pixels_x=cfg_B.N_pixels,
@@ -167,18 +100,21 @@ if FEATURE_SIZE_B > 0:
     )
     print("")
 
-    add_stack_B_to_A(img_stack_A, img_stack_B)
+    add_stack_B_to_A(img_stack_A, img_stack_B)  # Pixel values are now [-2, 2]
     del img_stack_B
 
-rescale_stack(img_stack_A, symmetrically=False)
+# Rescale and offset all images in the stack to lie within the range [0, 1].
+# Leave `symmetrically=True` to prevent biasing the pixel intensity distribution
+# towards 0 or 1.
+rescale_stack(img_stack_A, symmetrically=True)
 
 # Transform grayscale noise into binary BW map and calculate/tune transparency
 img_stack_BW, alpha_noise = binarize_stack(
-    img_stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY
+    img_stack_A, C.BW_THRESHOLD, C.TUNE_TRANSPARENCY
 )
 
 # Determine which stack to plot
-if SHOW_NOISE_AS_GRAY:
+if C.SHOW_NOISE_AS_GRAY:
     img_stack_plot = img_stack_A
 else:
     img_stack_plot = img_stack_BW
@@ -199,7 +135,7 @@ img_stack_plot = 1 - img_stack_plot
 # Create a map holding the pixel locations inside the noise image corresponding
 # to each valve location
 _pxs = np.arange(
-    PCS_PIXEL_DIST - 1, N_PIXELS - (PCS_PIXEL_DIST - 1), PCS_PIXEL_DIST
+    C.PCS_PIXEL_DIST - 1, C.N_PIXELS - (C.PCS_PIXEL_DIST - 1), C.PCS_PIXEL_DIST
 )
 _grid_x, _grid_y = np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
 # `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
@@ -208,7 +144,7 @@ valve2px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
 valve2px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 
 # Create a map holding the PCS coordinates of each valve
-_coords = np.arange(PCS_X_MIN, PCS_X_MAX + 1)
+_coords = np.arange(C.PCS_X_MIN, C.PCS_X_MAX + 1)
 _grid_x, _grid_y = np.meshgrid(_coords, _coords)  # shape: (15, 15), (15, 15)
 # `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
 # locations that actually correspond to a valve.
@@ -220,25 +156,29 @@ valve2pcs_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 # ------------------------------------------------------------------------------
 
 # Create a stack holding the boolean states of all valves
-valves_stack = np.zeros([N_FRAMES, N_VALVES], dtype=bool)
+valves_stack = np.zeros([C.N_FRAMES, C.N_VALVES], dtype=bool)
 
 # Create a stack for plotting only the opened valves
-valves_plot_pcs_x = np.empty((N_FRAMES, N_VALVES))
+valves_plot_pcs_x = np.empty((C.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_x[:] = np.nan
-valves_plot_pcs_y = np.empty((N_FRAMES, N_VALVES))
+valves_plot_pcs_y = np.empty((C.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
-for frame in prange(N_FRAMES):  # pylint: disable=not-an-iterable
+for frame in prange(C.N_FRAMES):  # pylint: disable=not-an-iterable
     valves_stack[frame, :] = img_stack_BW[frame, valve2px_y, valve2px_x] == 1
 
-    for valve in prange(N_VALVES):  # pylint: disable=not-an-iterable
+    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
         if valves_stack[frame, valve]:
             valves_plot_pcs_x[frame, valve] = valve2pcs_x[valve]
             valves_plot_pcs_y[frame, valve] = valve2pcs_y[valve]
 
 # Calculate the valve transparency
-alpha_valves = valves_stack.sum(1) / N_VALVES
+alpha_valves = valves_stack.sum(1) / C.N_VALVES
+
+print("Average transparencies:")
+print(f"  alpha_noise  = {np.mean(alpha_noise):.2f}")
+print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
 
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
@@ -252,7 +192,7 @@ ax = plt.axes()
 ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
-if SHOW_NOISE_IN_PLOT:
+if C.SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
         img_stack_plot[0],
         cmap="gray",
@@ -261,10 +201,10 @@ if SHOW_NOISE_IN_PLOT:
         interpolation="none",
         origin="lower",
         extent=[
-            PCS_X_MIN - 1,
-            PCS_X_MAX + 1,
-            PCS_X_MIN - 1,
-            PCS_X_MAX + 1,
+            C.PCS_X_MIN - 1,
+            C.PCS_X_MAX + 1,
+            C.PCS_X_MIN - 1,
+            C.PCS_X_MAX + 1,
         ],
     )
 
@@ -282,15 +222,15 @@ if SHOW_NOISE_IN_PLOT:
 # ax.xaxis.set_major_locator(major_locator) # Slows down drawing a lot!
 # ax.yaxis.set_major_locator(major_locator) # Slows down drawing a lot!
 ax.set_aspect("equal", adjustable="box")
-ax.set_xlim(PCS_X_MIN - 1, PCS_X_MAX + 1)
-ax.set_ylim(PCS_X_MIN - 1, PCS_X_MAX + 1)
+ax.set_xlim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
+ax.set_ylim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.grid(which="major")
 # ax.axis("off")
 
 
 def animate_fig_1(j):
     ax_text.set_text(f"frame {j:04d}")
-    if SHOW_NOISE_IN_PLOT:
+    if C.SHOW_NOISE_IN_PLOT:
         hax_noise.set_data(img_stack_plot[j])
     hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
 
@@ -299,7 +239,7 @@ fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves")
 plt.plot(alpha_noise, "k", label="noise")
-plt.xlim(0, N_FRAMES)
+plt.xlim(0, C.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
@@ -308,17 +248,17 @@ plt.legend()
 fig_3 = plt.figure(3)
 fig_3.set_tight_layout(True)
 plt.plot(valves_stack[:, 0])
-plt.xlim(0, N_FRAMES)
+plt.xlim(0, C.N_FRAMES)
 plt.title("valve 0")
 plt.xlabel("frame #")
 plt.ylabel("state [0 - 1]")
 
-if PLOT_TO_SCREEN:
+if C.PLOT_TO_SCREEN:
     # No export to disk
     anim = animation.FuncAnimation(
         fig_1,
         animate_fig_1,
-        frames=N_FRAMES,
+        frames=C.N_FRAMES,
         interval=50,  # [ms] == 1000/FPS
         init_func=animate_fig_1(0),
     )
@@ -326,14 +266,18 @@ if PLOT_TO_SCREEN:
     move_figure(fig_1, 0, 0)
     move_figure(fig_2, 500, 0)
     move_figure(fig_3, 500 + 500, 0)
-    plt.show()
+
+    plt.show(block=False)
+    plt.pause(0.001)
+    input("Press [Enter] to end.")
+    plt.close("all")
 
 else:
     # Export images to disk
     print("Generating gif frames...")
     tick = perf_counter()
     pil_imgs = []
-    for frame in trange(N_FRAMES):
+    for frame in trange(C.N_FRAMES):
         animate_fig_1(frame)
         pil_img = fig2img_RGB(fig_1)
         pil_imgs.append(pil_img)

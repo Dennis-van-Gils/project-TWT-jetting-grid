@@ -33,7 +33,7 @@ def move_figure(f, x, y):
 
 def add_stack_B_to_A(stack_A: np.ndarray, stack_B: np.ndarray):
     """Add B to A"""
-    for i in prange(np.size(stack_A, 0)):  # pylint: disable=not-an-iterable
+    for i in prange(stack_A.shape[0]):  # pylint: disable=not-an-iterable
         np.add(stack_A[i], stack_B[i], out=stack_A[i])
 
 
@@ -42,32 +42,54 @@ def add_stack_B_to_A(stack_A: np.ndarray, stack_B: np.ndarray):
 # ------------------------------------------------------------------------------
 
 
-def rescale_stack(arr: np.ndarray, symmetrically: bool = True):
-    """Rescale noise to [0, 1]
-    NOTE: In-place operation on argument `arr`
+def rescale_stack(stack: np.ndarray, symmetrically: bool = True):
+    """Rescale and offset all images in the stack by a single gain and offset,
+    such that the output image values will lie within the range [0, 1]. The
+    contrast will be maximized in one of two different ways.
+
+    Args:
+        stack (numpy.ndarray):
+            2D image stack [time, y-pixel, x-pixel] containing float values.
+            NOTE: In-place operation.
+
+        symmetrically (bool, default = True):
+            When `True` it will determine the maximum deviation around 0 and
+            rescale the positive upper part and the negative lower part by the
+            same gain, ensuring the output range is either [>0, 1] or [0, <1].
+            This allows the value of 0.5 in the output images to corresponds to
+            0 in the input images.
+            NOTE: Requires the image values to be loosely centered around 0.
+
+            When `False` it will simply maximize the contrast to cover the
+            full [0, 1] range.
     """
     # NOTE: Can't seem to get @jit or @njit to work. Fails on `out` parameter of
     # ufuncs `np.divide()` and `np.add()`. Also, `prange` will not go parallel.
+    # Addendum: Do not worry about this. The employed numpy ufuncs are optimized
+    # incredibly well by numba, regardless. This code outperforms any
+    # alternative version using the @jit or @njit decorator on a code
+    # block without numpy ufuncs.
 
     print("Rescaling noise...")
     tick = perf_counter()
 
-    in_min = np.min(arr)
-    in_max = np.max(arr)
+    N_frames = stack.shape[0]
+    in_min = np.min(stack)
+    in_max = np.max(stack)
 
     if symmetrically:
         f_norm = max([abs(in_min), abs(in_max)]) * 2
-        for i in trange(arr.shape[0]):  # pylint: disable=not-an-iterable
-            np.divide(arr[i], f_norm, out=arr[i])
-            np.add(arr[i], 0.5, out=arr[i])
+        for i in trange(N_frames):  # pylint: disable=not-an-iterable
+            np.divide(stack[i], f_norm, out=stack[i])
+            np.add(stack[i], 0.5, out=stack[i])
     else:
         f_norm = in_max - in_min
-        for i in trange(arr.shape[0]):  # pylint: disable=not-an-iterable
-            np.subtract(arr[i], in_min, out=arr[i])
-            np.divide(arr[i], f_norm, out=arr[i])
+        for i in trange(N_frames):  # pylint: disable=not-an-iterable
+            np.subtract(stack[i], in_min, out=stack[i])
+            np.divide(stack[i], f_norm, out=stack[i])
 
-    out_min = np.min(arr)
-    out_max = np.max(arr)
+    out_min = np.min(stack)
+    out_max = np.max(stack)
 
     print(f"from [{in_min:+.3f}, {in_max:+.3f}]")
     print(f"to   [{out_min:+.3f}, {out_max:+.3f}]")
@@ -142,10 +164,10 @@ def binarize_stack(
     """Binarize each frame of the image stack.
 
     Two methods are possible:
-    1) When `tune_transparency` == False, a simple threshold value as given by
-       `BW_threshold` is applied. Pixels with a value above this threshold are
-       set to True (1), otherwise False (0).
-    2) When `tune_transparency` == True, a Newton solver is employed per frame
+    1) When `tune_transparency=False`, a simple threshold value as given by
+       `BW_threshold` is applied. Pixels with a value above `1 - BW_threshold`
+       are set to True (1), otherwise False (0).
+    2) When `tune_transparency=True`, a Newton solver is employed per frame
        to solve for the needed threshold level to achieve a near constant
        transparency over all frames. The given `BW_threshold` value gets now
        interpretted as the transparency value to solve for.
@@ -180,7 +202,9 @@ def binarize_stack(
         _binarize_stack_using_newton(stack_in, BW_threshold, stack_BW, alpha)
     else:
         print("Binarizing noise...")
-        _binarize_stack_using_threshold(stack_in, BW_threshold, stack_BW, alpha)
+        _binarize_stack_using_threshold(
+            stack_in, 1 - BW_threshold, stack_BW, alpha
+        )
 
     print(f"done in {(perf_counter() - tick):.2f} s\n")
     return stack_BW, alpha
