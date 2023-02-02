@@ -10,6 +10,7 @@ Installation:
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
 
+import sys
 from time import perf_counter
 
 import numpy as np
@@ -182,6 +183,13 @@ print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
 
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
+
+# ------------------------------------------------------------------------------
+#  Save `valves_stack` to disk
+# ------------------------------------------------------------------------------
+
+np.save("proto_valves_stack.npy", valves_stack)
+# sys.exit()
 
 # ------------------------------------------------------------------------------
 #  Plot
