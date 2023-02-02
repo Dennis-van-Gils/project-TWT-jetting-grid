@@ -40,6 +40,7 @@ from time import perf_counter
 
 import numpy as np
 from tqdm import trange
+from numba import prange
 
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -172,7 +173,7 @@ if FEATURE_SIZE_B > 0:
 rescale_stack(img_stack_A, symmetrically=False)
 
 # Transform grayscale noise into binary BW map and calculate/tune transparency
-img_stack_BW, alpha = binarize_stack(
+img_stack_BW, alpha_noise = binarize_stack(
     img_stack_A, BW_THRESHOLD, TUNE_TRANSPARENCY
 )
 
@@ -228,13 +229,16 @@ valves_plot_pcs_y = np.empty((N_FRAMES, N_VALVES))
 valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
-for frame in range(N_FRAMES):
+for frame in prange(N_FRAMES):  # pylint: disable=not-an-iterable
     valves_stack[frame, :] = img_stack_BW[frame, valve2px_y, valve2px_x] == 1
 
-    for valve in range(N_VALVES):
+    for valve in prange(N_VALVES):  # pylint: disable=not-an-iterable
         if valves_stack[frame, valve]:
             valves_plot_pcs_x[frame, valve] = valve2pcs_x[valve]
             valves_plot_pcs_y[frame, valve] = valve2pcs_y[valve]
+
+# Calculate the valve transparency
+alpha_valves = valves_stack.sum(1) / N_VALVES
 
 if REPORT_MALLOC:
     tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
@@ -293,11 +297,13 @@ def animate_fig_1(j):
 
 fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
-plt.plot(alpha)
+plt.plot(alpha_valves, "deeppink", label="valves")
+plt.plot(alpha_noise, "k", label="noise")
 plt.xlim(0, N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
+plt.legend()
 
 fig_3 = plt.figure(3)
 fig_3.set_tight_layout(True)
