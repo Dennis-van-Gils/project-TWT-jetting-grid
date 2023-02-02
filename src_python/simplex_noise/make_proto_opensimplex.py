@@ -156,10 +156,10 @@ valve2pcs_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 #  Determine the state of each valve
 # ------------------------------------------------------------------------------
 
-# Create a stack holding the boolean states of all valves
+# Create a stack that will contain the boolean states of all valves
 valves_stack = np.zeros([C.N_FRAMES, C.N_VALVES], dtype=bool)
 
-# Create a stack for plotting only the opened valves
+# Create a stack that will contain only the opened valves for plotting
 valves_plot_pcs_x = np.empty((C.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_x[:] = np.nan
 valves_plot_pcs_y = np.empty((C.N_FRAMES, C.N_VALVES))
