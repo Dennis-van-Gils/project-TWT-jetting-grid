@@ -101,7 +101,7 @@ if C.FEATURE_SIZE_B > 0:
     )
     print("")
 
-    add_stack_B_to_A(img_stack_A, img_stack_B)  # Pixel values are now [-2, 2]
+    add_stack_B_to_A(img_stack_A, img_stack_B)  # Pixel vals now between [-2, 2]
     del img_stack_B
 
 # Rescale and offset all images in the stack to lie within the range [0, 1].
