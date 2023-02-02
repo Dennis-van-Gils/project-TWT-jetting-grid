@@ -32,7 +32,10 @@ def move_figure(f, x, y):
 
 
 def add_stack_B_to_A(stack_A: np.ndarray, stack_B: np.ndarray):
-    """Add B to A"""
+    """Add the pixel values of each frame inside stack B to the pixel values of
+    the matching frame inside stack A.
+    NOTE: In-place operation on argument `stack_A`.
+    """
     for i in prange(stack_A.shape[0]):  # pylint: disable=not-an-iterable
         np.add(stack_A[i], stack_B[i], out=stack_A[i])
 
@@ -43,21 +46,21 @@ def add_stack_B_to_A(stack_A: np.ndarray, stack_B: np.ndarray):
 
 
 def rescale_stack(stack: np.ndarray, symmetrically: bool = True):
-    """Rescale and offset all images in the stack by a single gain and offset,
-    such that the output image values will lie within the range [0, 1]. The
-    contrast will be maximized in one of two different ways.
+    """Rescale and offset all images in the stack by a single constant gain and
+    offset, such that the output image values will lie within the range [0, 1].
+    The gain (image contrast) will get maximized in one of two different ways.
+    NOTE: In-place operation on argument `stack`.
 
     Args:
         stack (numpy.ndarray):
             2D image stack [time, y-pixel, x-pixel] containing float values.
-            NOTE: In-place operation.
 
         symmetrically (bool, default = True):
-            When `True` it will determine the maximum deviation around 0 and
-            rescale the positive upper part and the negative lower part by the
-            same gain, ensuring the output range is either [>0, 1] or [0, <1].
-            This allows the value of 0.5 in the output images to corresponds to
-            0 in the input images.
+            When `True` it will determine the maximum deviation around 0 over
+            all frames and rescale the positive upper part and the negative
+            lower part of each individual frame by the same gain, ensuring the
+            output range becomes either [>0, 1] or [0, <1]. This allows the value
+            of 0.5 in the output images to corresponds to 0 in the input images.
             NOTE: Requires the image values to be loosely centered around 0.
 
             When `False` it will simply maximize the contrast to cover the
@@ -141,7 +144,8 @@ def _binarize_stack_using_newton(
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
     NOTE: In-place operation on arguments `stack_BW` and `alpha`
     """
-    # NOTE: Can't `njit` on `optimize.newton()`
+    # NOTE: Can't `njit` on `optimize.newton()`. We use python package
+    # `scipy-numba` to get scipy to make use of numba.
 
     for i in trange(stack_in.shape[0]):
         # Solve for transparency
@@ -164,10 +168,10 @@ def binarize_stack(
     """Binarize each frame of the image stack.
 
     Two methods are possible:
-    1) When `tune_transparency=False`, a simple threshold value as given by
+    1) When `tune_transparency=False` a simple threshold value as given by
        `BW_threshold` is applied. Pixels with a value above `1 - BW_threshold`
-       are set to True (1), otherwise False (0).
-    2) When `tune_transparency=True`, a Newton solver is employed per frame
+       are set to True (1), else False (0).
+    2) When `tune_transparency=True` a Newton solver is employed per frame
        to solve for the needed threshold level to achieve a near constant
        transparency over all frames. The given `BW_threshold` value gets now
        interpretted as the transparency value to solve for.
@@ -180,7 +184,7 @@ def binarize_stack(
             2D image stack [time, y-pixel, x-pixel] containing float values.
 
         BW_threshold (float):
-            Either the simple threshold value or the transparency value [0 - 1]
+            Either the simple threshold value, or the transparency value [0 - 1]
             to solve for, see above.
 
         tune_transparency (bool):
