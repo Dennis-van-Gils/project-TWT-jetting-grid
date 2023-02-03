@@ -53,7 +53,7 @@ SHOW_NOISE_AS_GRAY = 0    # Show noise as [0] BW,   [1] Grayscale
 
 # Protocol parameters
 # -------------------
-N_FRAMES = 2000
+N_FRAMES = 5000
 N_PIXELS = PCS_PIXEL_DIST * (NUMEL_PCS_AXIS + 1)
 
 # Threshold level to convert grayscale noise to BW. Can also get
