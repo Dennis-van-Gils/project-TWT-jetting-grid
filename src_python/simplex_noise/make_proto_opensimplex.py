@@ -230,14 +230,6 @@ plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 plt.legend()
 
-fig_3 = plt.figure(3)
-fig_3.set_tight_layout(True)
-plt.plot(valves_stack[:, 0])
-plt.xlim(0, C.N_FRAMES)
-plt.title("valve 0")
-plt.xlabel("frame #")
-plt.ylabel("state [0 - 1]")
-
 if C.PLOT_TO_SCREEN:
     # No export to disk
     anim = animation.FuncAnimation(
@@ -250,7 +242,6 @@ if C.PLOT_TO_SCREEN:
 
     move_figure(fig_1, 0, 0)
     move_figure(fig_2, 500, 0)
-    move_figure(fig_3, 500 + 500, 0)
 
     plt.show(block=False)
     plt.pause(0.001)
