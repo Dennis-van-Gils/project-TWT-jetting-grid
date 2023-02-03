@@ -29,7 +29,7 @@ Protocol coordinate system (PCS):
      └─────────────────────────────────────────────┘
 """
 
-import numpy as np
+import numpy as _np
 
 # Constants taken from `src_mcu\src\constants.h`
 # ----------------------------------------------
@@ -38,7 +38,7 @@ import numpy as np
 PCS_X_MIN = -7  # Minimum x-axis coordinate of the PCS
 PCS_X_MAX = 7   # Maximum x-axis coordinate of the PCS
 NUMEL_PCS_AXIS = PCS_X_MAX - PCS_X_MIN + 1
-N_VALVES = int(np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
+N_VALVES = int(_np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 
 # General constants
 # -----------------
@@ -77,5 +77,31 @@ FEATURE_SIZE_B = 100  # Try 100. 0 indicates to not use stack B.
 SEED_A = 1
 SEED_B = 13
 
+# ------------------------------------------------------------------------------
+#  Valve transformations
+# ------------------------------------------------------------------------------
+# NOTE: The valve index of below arrays does /not/ indicate the valve number as
+# laid out in the lab, but instead is simply linearly increasing.
+
+# Create a map holding the pixel locations inside the noise image corresponding
+# to each valve location
+_pxs = _np.arange(
+    PCS_PIXEL_DIST - 1, N_PIXELS - (PCS_PIXEL_DIST - 1), PCS_PIXEL_DIST
+)
+_grid_x, _grid_y = _np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
+# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
+# locations that actually correspond to a valve.
+valve2px_x = _np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
+valve2px_y = _np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
+
+# Create a map holding the PCS coordinates of each valve
+_coords = _np.arange(PCS_X_MIN, PCS_X_MAX + 1)
+_grid_x, _grid_y = _np.meshgrid(_coords, _coords)  # shape: (15, 15), (15, 15)
+# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
+# locations that actually correspond to a valve.
+valve2pcs_x = _np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
+valve2pcs_y = _np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
+
 # Tidy up the namespace
-del np
+del _pxs, _coords, _grid_x, _grid_y
+del _np

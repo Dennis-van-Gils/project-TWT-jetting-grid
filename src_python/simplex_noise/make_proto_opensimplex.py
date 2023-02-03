@@ -128,31 +128,6 @@ else:
 img_stack_plot = 1 - img_stack_plot
 
 # ------------------------------------------------------------------------------
-#  Valve transformations
-# ------------------------------------------------------------------------------
-# NOTE: The valve index of below arrays does /not/ indicate the valve number as
-# laid out in the lab, but instead is simply linearly increasing.
-
-# Create a map holding the pixel locations inside the noise image corresponding
-# to each valve location
-_pxs = np.arange(
-    C.PCS_PIXEL_DIST - 1, C.N_PIXELS - (C.PCS_PIXEL_DIST - 1), C.PCS_PIXEL_DIST
-)
-_grid_x, _grid_y = np.meshgrid(_pxs, _pxs)  # shape: (15, 15), (15, 15)
-# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
-# locations that actually correspond to a valve.
-valve2px_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
-valve2px_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
-
-# Create a map holding the PCS coordinates of each valve
-_coords = np.arange(C.PCS_X_MIN, C.PCS_X_MAX + 1)
-_grid_x, _grid_y = np.meshgrid(_coords, _coords)  # shape: (15, 15), (15, 15)
-# `grid_x` and `grid_y` map /all/ integer PCS coordinates. We only need the
-# locations that actually correspond to a valve.
-valve2pcs_x = np.reshape(_grid_x, -1)[1::2]  # shape: (112,)
-valve2pcs_y = np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
-
-# ------------------------------------------------------------------------------
 #  Determine the state of each valve
 # ------------------------------------------------------------------------------
 
@@ -167,12 +142,14 @@ valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
 for frame in prange(C.N_FRAMES):  # pylint: disable=not-an-iterable
-    valves_stack[frame, :] = img_stack_BW[frame, valve2px_y, valve2px_x] == 1
+    valves_stack[frame, :] = (
+        img_stack_BW[frame, C.valve2px_y, C.valve2px_x] == 1
+    )
 
     for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
         if valves_stack[frame, valve]:
-            valves_plot_pcs_x[frame, valve] = valve2pcs_x[valve]
-            valves_plot_pcs_y[frame, valve] = valve2pcs_y[valve]
+            valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
+            valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
 
 # Calculate the valve transparency
 alpha_valves = valves_stack.sum(1) / C.N_VALVES
