@@ -161,14 +161,16 @@ fig_4, axs = plt.subplots(2)
 fig_4.set_tight_layout(True)
 move_figure(fig_4, 1000, 0)
 
-axs[0].step(bins[0:-1], pdf_off_1, "-r", where="mid", label="off original")
-axs[0].step(bins[0:-1], pdf_off_2, "-k", where="mid", label="off adjusted")
-axs[1].step(bins[0:-1], pdf_on_1, "-r", where="mid", label="on original")
-axs[1].step(bins[0:-1], pdf_on_2, "-k", where="mid", label="on adjusted")
+axs[0].set_title("valve OFF")
+axs[0].step(bins[0:-1], pdf_off_1, "-r", where="mid", label="original")
+axs[0].step(bins[0:-1], pdf_off_2, "-k", where="mid", label="adjusted")
 
-axs[0].set_title("Cumulative PDFs")
+axs[1].set_title("valve ON")
+axs[1].step(bins[0:-1], pdf_on_1, "-r", where="mid", label="original")
+axs[1].step(bins[0:-1], pdf_on_2, "-k", where="mid", label="adjusted")
+
 for ax in axs:
-    ax.set_xlabel("segment length")
+    ax.set_xlabel("duration")
     ax.set_ylabel("PDF")
     ax.set_xlim(0, 60)
     ax.legend()
