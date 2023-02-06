@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
+"""Utility functions that operate on a `valves_stack`.
+"""
+__author__ = "Dennis van Gils"
+# pylint: disable=invalid-name, missing-function-docstring
 
 from typing import Tuple
 from time import perf_counter

@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
-# pylint: disable=unused-import
-
-from time import perf_counter
+__author__ = "Dennis van Gils"
+# pylint: disable=invalid-name
 
 import numpy as np
 from matplotlib import pyplot as plt
 
 from utils_matplotlib import move_figure
-from utils_valve_stack import (
-    adjust_valve_times,
-    valve_on_off_PDFs,
-    MustDebugThisException,
-)
+from utils_valves_stack import adjust_valve_times, valve_on_off_PDFs
 import constants as C
 
 # ------------------------------------------------------------------------------
