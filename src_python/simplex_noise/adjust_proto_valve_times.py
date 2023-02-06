@@ -16,15 +16,15 @@ from utils_valve_stack import (
 )
 import constants as C
 
+# Constants
+MIN_VALVE_DURATION = 5
+
 # DEBUG info
 DEBUG_TIMESERIES_PLOT = False
 
 # ------------------------------------------------------------------------------
 #  Main
 # ------------------------------------------------------------------------------
-
-MIN_VALVE_DURATION = 5
-MAX_BIN_VAL = 200
 
 print("Adjusting valve times...")
 tick = perf_counter()
@@ -39,8 +39,8 @@ if DEBUG_TIMESERIES_PLOT:
 # Load data from disk
 valves_stack = np.asarray(np.load("proto_valves_stack.npy"), dtype=int)
 
-# Allocate adjusted valves_stack
-valves_stack_star = np.zeros(valves_stack.shape)
+# Allocate output array: Valves stack containing adjusted valve on/off durations
+valves_stack_out = np.zeros(valves_stack.shape)
 
 # Timestamps without taking offset into account
 t = np.arange(0, C.N_FRAMES)
@@ -145,18 +145,19 @@ for valve_idx in np.arange(C.N_VALVES):
         plt.waitforbuttonpress()
 
     # Store adjusted timeseries
-    valves_stack_star[:, valve_idx] = y
+    valves_stack_out[:, valve_idx] = y
 
 print(f"done in {perf_counter() - tick:.2f} s\n")
 
 # ------------------------------------------------------------------------------
-#  Plot PDFs
+#  Valve ON/OFF duration PDFs
 # ------------------------------------------------------------------------------
 
-bins = np.arange(0, MAX_BIN_VAL)
+bins = np.arange(0, C.N_FRAMES)
 pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack, bins)
-pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_star, bins)
+pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_out, bins)
 
+# Plot
 fig_4, axs = plt.subplots(2)
 fig_4.set_tight_layout(True)
 move_figure(fig_4, 1000, 0)
