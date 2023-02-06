@@ -5,6 +5,9 @@ matplotlib
 scipy
 numba-scipy
 
+# Improved backend (better than TkInter) for matplotlib
+pyqt5
+
 # OpenSimplex noise
 opensimplex-loops
 
