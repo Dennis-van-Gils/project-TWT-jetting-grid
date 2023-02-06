@@ -29,7 +29,7 @@ pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_out, bins)
 # Plot
 fig_4, axs = plt.subplots(2)
 fig_4.set_tight_layout(True)
-move_figure(fig_4, 1000, 0)
+move_figure(fig_4, 200, 0)
 
 axs[0].set_title("valve OFF")
 axs[0].step(bins[0:-1], pdf_off_1, "-r", where="mid", label="original")
