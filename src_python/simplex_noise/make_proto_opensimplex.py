@@ -21,16 +21,14 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 from matplotlib.ticker import MultipleLocator
 
-plt.rcParams["figure.figsize"] = [5, 4]
-
 from opensimplex_loops import looping_animated_2D_image
-from utils import (
-    move_figure,
+from utils_matplotlib import move_figure
+from utils_pillow import fig2img_RGB
+from utils_img_stack import (
     add_stack_B_to_A,
     rescale_stack,
     binarize_stack,
 )
-from utils_pillow import fig2img_RGB
 import constants as C
 
 # DEBUG info: Report on memory allocation?
@@ -220,7 +218,7 @@ def animate_fig_1(j):
     hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
 
 
-fig_2 = plt.figure(2)
+fig_2 = plt.figure(2, figsize=(5, 4))
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves")
 plt.plot(alpha_noise, "k", label="noise")
