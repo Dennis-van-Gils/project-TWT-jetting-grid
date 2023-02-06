@@ -6,6 +6,9 @@ from typing import Tuple
 from time import perf_counter
 
 import numpy as np
+from matplotlib import pyplot as plt
+
+from utils_matplotlib import move_figure
 
 
 class NoFlanksDetectedException(Exception):
@@ -19,12 +22,12 @@ class MustDebugThisException(Exception):
 
 
 # ------------------------------------------------------------------------------
-#  find_first_downflank
+#  _find_first_downflank
 # ------------------------------------------------------------------------------
 
 
 # NOTE: Do not @njit()
-def find_first_downflank(array: np.ndarray):
+def _find_first_downflank(array: np.ndarray):
     compare_val = array[0]
     for idx, val in np.ndenumerate(array):
         if val != compare_val:
@@ -36,11 +39,11 @@ def find_first_downflank(array: np.ndarray):
 
 
 # ------------------------------------------------------------------------------
-#  detect_segments
+#  _detect_segments
 # ------------------------------------------------------------------------------
 
 # NOTE: Do not @njit()
-def detect_segments(
+def _detect_segments(
     y: np.ndarray,
 ) -> Tuple[
     np.ndarray,
@@ -87,7 +90,7 @@ def detect_segments(
             Array containing the duration of each 'valve on' segment.
     """
     N_frames = y.size
-    t_offset = find_first_downflank(y)
+    t_offset = _find_first_downflank(y)
     y = np.roll(y, -t_offset)
 
     # Calculate the duration of each valve on/off segment
@@ -119,6 +122,142 @@ def detect_segments(
         durations_lo,
         durations_hi,
     )
+
+
+# ------------------------------------------------------------------------------
+#  adjust_valve_times()
+# ------------------------------------------------------------------------------
+
+
+def adjust_valve_times(
+    valves_stack_in: np.ndarray, min_valve_duration: int, debug: bool = False
+) -> np.ndarray:
+    """TODO: write docstr"""
+
+    print("Adjusting valve times...")
+    tick = perf_counter()
+
+    N_frames, N_valves = valves_stack_in.shape
+
+    # Allocate output array: Valves stack containing adjusted valve on/off durations
+    valves_stack_out = np.zeros(valves_stack_in.shape)
+
+    # Timestamps without taking offset into account
+    t = np.arange(0, N_frames)
+
+    if debug:
+        fig_3 = plt.figure(3)
+        fig_3.set_figwidth(8)
+        fig_3.set_figheight(4)
+        fig_3.set_tight_layout(True)
+        move_figure(fig_3, 500, 0)
+
+    # Walk over all valves
+    for valve_idx in np.arange(N_valves):
+        # Retrieve timeseries of single valve
+        y = valves_stack_in[:, valve_idx]
+        y_orig = np.copy(y)
+
+        (
+            y,
+            t_offset_1,
+            t_upfl,
+            t_dnfl,
+            t_dnfl_star,
+            durations_lo,
+            durations_hi,
+        ) = _detect_segments(y)
+
+        if debug:
+            plt.cla()
+            plt.step(t, y, "r", where="post", label="original")
+            plt.plot(t_dnfl, np.zeros(t_dnfl.size), "or")
+            plt.plot(t_upfl, np.ones(t_upfl.size), "or")
+            plt.title(f"A: valve {valve_idx}")
+            plt.xlabel(f"frame # + {t_offset_1}")
+            plt.ylabel("state [0 - 1]")
+            plt.xlim(0, 200)
+
+            plt.show(block=False)
+            plt.pause(0.01)
+
+        # Remove smallest segments
+        # ------------------------
+        # Remove too short 'valve on' durations
+        for k, seglen in enumerate(durations_hi):
+            if seglen < min_valve_duration:
+                y[t_upfl[k] : t_dnfl_star[k]] = 0
+
+        (
+            y,
+            t_offset_2,
+            t_upfl,
+            t_dnfl,
+            t_dnfl_star,
+            durations_lo,
+            durations_hi,
+        ) = _detect_segments(y)
+
+        # Remove too short 'valve off' durations
+        for k, seglen in enumerate(durations_lo):
+            if seglen < min_valve_duration:
+                y[t_dnfl[k] : t_upfl[k]] = 1
+
+        (
+            y,
+            t_offset_3,
+            t_upfl,
+            t_dnfl,
+            t_dnfl_star,
+            durations_lo,
+            durations_hi,
+        ) = _detect_segments(y)
+
+        if debug:
+            t_offset = t_offset_3 + t_offset_2
+            plt.step(
+                t, np.roll(y, t_offset), "k", where="post", label="adjusted"
+            )
+
+            plt.show(block=False)
+            plt.pause(0.01)
+            # plt.show()
+            plt.waitforbuttonpress()
+
+        # Sanity check
+        if np.any(durations_lo < min_valve_duration) or np.any(
+            durations_hi < min_valve_duration
+        ):
+            raise MustDebugThisException
+
+        # Roll the timeseries back to its original timings
+        # ------------------------------------------------
+        t_offset = t_offset_3 + t_offset_2 + t_offset_1
+        y = np.roll(y, t_offset)
+        t_dnfl = (t_dnfl + t_offset) % N_frames
+        t_upfl = (t_upfl + t_offset) % N_frames
+
+        if debug:
+            plt.cla()
+            plt.step(t, y_orig, "r", where="post", label="original")
+            plt.step(t, y, "k", where="post", label="adjusted")
+            plt.plot(t_dnfl, np.zeros(t_dnfl.size), "ok")
+            plt.plot(t_upfl, np.ones(t_upfl.size), "ok")
+            plt.title(f"B: valve {valve_idx}")
+            plt.xlabel("frame #")
+            plt.ylabel("state [0 - 1]")
+            plt.xlim(0, 200)
+
+            plt.show(block=False)
+            plt.pause(0.01)
+            # plt.show()
+            plt.waitforbuttonpress()
+
+        # Store adjusted timeseries
+        valves_stack_out[:, valve_idx] = y
+
+    print(f"done in {perf_counter() - tick:.2f} s\n")
+    return valves_stack_out
 
 
 # ------------------------------------------------------------------------------
@@ -168,7 +307,7 @@ def valve_on_off_PDFs(
             _,
             durations_lo,
             durations_hi,
-        ) = detect_segments(y)
+        ) = _detect_segments(y)
 
         hist_lo, _ = np.histogram(durations_lo, bins)
         hist_hi, _ = np.histogram(durations_hi, bins)
