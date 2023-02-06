@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Utility functions that operate on an `img_stack`.
+"""
+__author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter

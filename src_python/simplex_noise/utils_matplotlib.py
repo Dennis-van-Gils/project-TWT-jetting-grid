@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
+"""Utility functions for matplotlib.
+"""
+__author__ = "Dennis van Gils"
 
 import matplotlib
 

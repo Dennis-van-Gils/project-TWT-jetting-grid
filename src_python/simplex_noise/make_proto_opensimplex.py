@@ -7,6 +7,7 @@ Installation:
     pip install -r requirements.txt
     ipython make_proto_opensimplex.py
 """
+__author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 # pylint: disable=unused-import
 

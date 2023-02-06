@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Utility functions for PIL "pillow": Fork of the Python Imaging Library
+"""
+__author__ = "Dennis van Gils"
 # pylint: disable=invalid-name
 
 import io

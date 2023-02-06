@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Configuration constants for the generation of a turbulent jetting protocol
+using OpenSimplex noise.
+"""
+# pylint: disable=pointless-string-statement
 # fmt: off
+__author__ = "Dennis van Gils"
+
 """
 Protocol coordinate system (PCS):
   The jetting nozzles are laid out in a square grid, aka the protocol coordinate
