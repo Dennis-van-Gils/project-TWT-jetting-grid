@@ -23,7 +23,7 @@ DEBUG_TIMESERIES_PLOT = False
 #  Main
 # ------------------------------------------------------------------------------
 
-MIN_SEGMENT_LENGTH = 5
+MIN_VALVE_DURATION = 5
 MAX_BIN_VAL = 200
 
 print("Adjusting valve times...")
@@ -57,8 +57,8 @@ for valve_idx in np.arange(C.N_VALVES):
         t_upfl,
         t_dnfl,
         t_dnfl_star,
-        seglens_lo,
-        seglens_hi,
+        durations_lo,
+        durations_hi,
     ) = detect_segments(y)
 
     if DEBUG_TIMESERIES_PLOT:
@@ -76,9 +76,9 @@ for valve_idx in np.arange(C.N_VALVES):
 
     # Remove smallest segments
     # ------------------------
-    # Remove too short HIGH segments
-    for k, seglen in enumerate(seglens_hi):
-        if seglen < MIN_SEGMENT_LENGTH:
+    # Remove too short 'valve on' durations
+    for k, seglen in enumerate(durations_hi):
+        if seglen < MIN_VALVE_DURATION:
             y[t_upfl[k] : t_dnfl_star[k]] = 0
 
     (
@@ -87,13 +87,13 @@ for valve_idx in np.arange(C.N_VALVES):
         t_upfl,
         t_dnfl,
         t_dnfl_star,
-        seglens_lo,
-        seglens_hi,
+        durations_lo,
+        durations_hi,
     ) = detect_segments(y)
 
-    # Remove too short LOW segments
-    for k, seglen in enumerate(seglens_lo):
-        if seglen < MIN_SEGMENT_LENGTH:
+    # Remove too short 'valve off' durations
+    for k, seglen in enumerate(durations_lo):
+        if seglen < MIN_VALVE_DURATION:
             y[t_dnfl[k] : t_upfl[k]] = 1
 
     (
@@ -102,8 +102,8 @@ for valve_idx in np.arange(C.N_VALVES):
         t_upfl,
         t_dnfl,
         t_dnfl_star,
-        seglens_lo,
-        seglens_hi,
+        durations_lo,
+        durations_hi,
     ) = detect_segments(y)
 
     if DEBUG_TIMESERIES_PLOT:
@@ -116,8 +116,8 @@ for valve_idx in np.arange(C.N_VALVES):
         plt.waitforbuttonpress()
 
     # Sanity check
-    if np.any(seglens_lo < MIN_SEGMENT_LENGTH) or np.any(
-        seglens_hi < MIN_SEGMENT_LENGTH
+    if np.any(durations_lo < MIN_VALVE_DURATION) or np.any(
+        durations_hi < MIN_VALVE_DURATION
     ):
         raise MustDebugThisException
 

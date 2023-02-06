@@ -41,7 +41,7 @@ def find_first_downflank(array: np.ndarray):
 
 # NOTE: Do not @njit()
 def detect_segments(
-    _y: np.ndarray,
+    y: np.ndarray,
 ) -> Tuple[
     np.ndarray,
     float,
@@ -51,44 +51,73 @@ def detect_segments(
     np.ndarray,
     np.ndarray,
 ]:
-    """The valve timeseries are a closed loop, so we must take special care to
-    handle the periodic boundary at the start and end correctly. We do a trick:
-    We find the first downflank and roll the timeseries to start at this
-    downflank. This shifts the timeseries by `_t_offset`, but makes analyzing
-    the HIGH and LOW segments way easier.
-    """
-    N_frames = _y.size
-    _t_offset = find_first_downflank(_y)
-    _y = np.roll(_y, -_t_offset)
+    """Detect continuous segments inside the valve timeseries where the valve is
+    either 'on' or 'off'. The valve timeseries are a closed loop, so we must
+    take special care to handle the periodic boundary at the start and end
+    correctly. We do a trick: We find the first downflank and roll the
+    timeseries to start at this downflank. This shifts the timeseries by
+    `t_offset`, but makes analyzing the HIGH and LOW segments way easier.
 
-    # Calculate the segment lengths of valve on/off states
-    # ----------------------------------------------------
+    Args:
+        y (np.ndarray):
+            Timeseries of a single valve
+
+    Returns: (Tuple)
+        y (np.ndarray):
+            Adjusted timeseries of a single valve, rolled forward by `t_offset`.
+
+        t_offset (int):
+            Index of the first downflank within the input timeseries.
+
+        t_upfl (np.ndarray):
+            Array of indices of detected upflanks, shifted by `t_offset`.
+
+        t_dnfl (np.ndarray):
+            Array of indices of detected downflanks, shifted by `t_offset`.
+            Zero is appended to the start of the array.
+
+        t_dnfl_star (np.ndarray):
+            Array of indices of detected downflanks, shifted by `t_offset`.
+            The 'N_frames' index is appended to the end of the array.
+
+        durations_lo (np.ndarray):
+            Array containing the duration of each 'valve off' segment.
+
+        durations_hi (np.ndarray):
+            Array containing the duration of each 'valve on' segment.
+    """
+    N_frames = y.size
+    t_offset = find_first_downflank(y)
+    y = np.roll(y, -t_offset)
+
+    # Calculate the duration of each valve on/off segment
+    # ---------------------------------------------------
     # upfl: upflank
     # dnfl: downflank
-    _t_upfl = np.where(np.diff(_y) == 1)[0] + 1
-    _t_dnfl = np.where(np.diff(_y) == -1)[0] + 1
-    _t_dnfl = np.append(0, _t_dnfl)
-    _t_dnfl_star = np.append(_t_dnfl[1:], N_frames)
+    t_upfl = np.where(np.diff(y) == 1)[0] + 1
+    t_dnfl = np.where(np.diff(y) == -1)[0] + 1
+    t_dnfl_star = np.append(t_dnfl, N_frames)
+    t_dnfl = np.append(0, t_dnfl)
 
     # Sanity check
-    if _t_upfl.size != _t_dnfl.size:
+    if t_upfl.size != t_dnfl.size:
         raise MustDebugThisException
 
-    _seglens_lo = _t_upfl - _t_dnfl
-    _seglens_hi = _t_dnfl_star - _t_upfl
+    durations_lo = t_upfl - t_dnfl
+    durations_hi = t_dnfl_star - t_upfl
 
     # Sanity check
-    if np.sum(_seglens_lo) + np.sum(_seglens_hi) != N_frames:
+    if np.sum(durations_lo) + np.sum(durations_hi) != N_frames:
         raise MustDebugThisException
 
     return (
-        _y,
-        _t_offset,
-        _t_upfl,
-        _t_dnfl,
-        _t_dnfl_star,
-        _seglens_lo,
-        _seglens_hi,
+        y,
+        t_offset,
+        t_upfl,
+        t_dnfl,
+        t_dnfl_star,
+        durations_lo,
+        durations_hi,
     )
 
 
@@ -137,12 +166,12 @@ def valve_on_off_PDFs(
             _,
             _,
             _,
-            seglens_lo,
-            seglens_hi,
+            durations_lo,
+            durations_hi,
         ) = detect_segments(y)
 
-        hist_lo, _ = np.histogram(seglens_lo, bins)
-        hist_hi, _ = np.histogram(seglens_hi, bins)
+        hist_lo, _ = np.histogram(durations_lo, bins)
+        hist_hi, _ = np.histogram(durations_hi, bins)
         np.add(cumul_hist_lo, hist_lo, out=cumul_hist_lo)
         np.add(cumul_hist_hi, hist_hi, out=cumul_hist_hi)
 
