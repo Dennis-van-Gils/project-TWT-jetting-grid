@@ -11,7 +11,7 @@ specified by `T_STEP`.
 If `FEATURE_SIZE_B` is set to 0, set B will be completely ignored and no mixing
 will take place.
 
-These settings will get stored inside the header section of the generated
+Below settings will get stored inside the header section of the generated
 protocol textfile.
 """
 
@@ -32,19 +32,22 @@ BW_THRESHOLD = 0.5
 # the resulting valve transparency over each frame.
 TUNE_TRANSPARENCY = 1
 
-# OpenSimplex noise feature size [arb. unit, try ~ 50]
+# OpenSimplex coherent noise feature size [arb. unit, try ~ 50]
 FEATURE_SIZE_A = 50
 FEATURE_SIZE_B = 100
 
-# Time step [arb. unit, try ~ 0.1]
+# Time step size through OpenSimplex noise [arb. unit, try ~ 0.1]
 T_STEP_A = 0.1
 T_STEP_B = 0.1
 
-# Noise seeds
+# OpenSimplex noise seeds
 SEED_A = 1
 SEED_B = 13
 
-# Minimum valve on/off duration [number of frames]
+# Minimum valve on/off duration [number of frames].
+# The originally generated valve durations can be automatically post-processed
+# to ensure a minimum time duration between opening and closing each valve. When
+# set to 0 or 1, no adjustment to the valve durations will be made.
 MIN_VALVE_DURATION = 5
 
 

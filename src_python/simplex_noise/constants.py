@@ -6,6 +6,8 @@ Protocol coordinate system (PCS):
   The jetting nozzles are laid out in a square grid, aka the protocol coordinate
   system.
 
+  The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
+
   ●: Indicates a valve & nozzle
   -: Indicates no nozzle & valve exists
 
@@ -27,8 +29,6 @@ Protocol coordinate system (PCS):
   -6 │ ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ● │
   -7 │ -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  -  ●  - │
      └─────────────────────────────────────────────┘
-
-  The PCS spans (-7, -7) to (7, 7) where (0, 0) is the center of the grid.
 """
 __author__ = "Dennis van Gils"
 
