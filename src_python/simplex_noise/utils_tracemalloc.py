@@ -6,7 +6,7 @@
 REPORT_MALLOC = False
 if REPORT_MALLOC:
     import tracemalloc
-    from tracemalloc_report import tracemalloc_report
+    from utils_tracemalloc import tracemalloc_report
 
     tracemalloc.start()
 
