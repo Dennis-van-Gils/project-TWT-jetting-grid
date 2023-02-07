@@ -16,7 +16,6 @@ protocol textfile.
 """
 
 # Filename without extension for exporting the generated protocol files to disk.
-# Leaving it blank will auto-generate a name like "proto_###".
 EXPORT_FILENAME = "proto_001"
 EXPORT_SUBFOLDER = "protocols"
 
