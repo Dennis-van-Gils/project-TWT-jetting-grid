@@ -16,7 +16,6 @@ import config_proto_OpenSimplex as CFG
 
 # Constants
 filename = os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example.txt")
-DT = 0.1  # [s] Fixed time interval of each frame
 
 # Load valves stack
 valves_stack = np.asarray(
@@ -36,15 +35,14 @@ N_frames, N_valves = valves_stack.shape
 with open(filename, "w", encoding="utf-8") as f:
     # Write header info
     f.write("[HEADER]\n")
-    f.write(f"N_frames: {N_frames}\n")
-    f.write(f"N_valves: {N_valves}\n")
+    f.write(CFG.create_header_string())
 
     # Write data
     timestamp = 0
     f.write("[DATA]\n")
     for frame_idx in trange(N_frames):
         f.write(f"{timestamp:.1f}")
-        timestamp += DT
+        timestamp += CFG.DT_FRAME
         for valve_idx, state in enumerate(valves_stack[frame_idx, :]):
             if state:
                 pcs_x = C.valve2pcs_x[valve_idx]

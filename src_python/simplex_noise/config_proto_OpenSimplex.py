@@ -22,6 +22,9 @@ EXPORT_SUBFOLDER = "protocols"
 # Number of frames (i.e. protocol lines) to generate
 N_FRAMES = 5000
 
+# Time interval between each frame [s]
+DT_FRAME = 0.1
+
 # Threshold level to convert [0-1]-grayscale OpenSimplex noise to black and
 # white (BW). Can also get reinterpreted as a transparency fraction [0-1] to
 # solve for, see `TUNE_TRANSPARENCY`.
@@ -32,11 +35,11 @@ BW_THRESHOLD = 0.5
 # the resulting valve transparency over each frame.
 TUNE_TRANSPARENCY = 1
 
-# OpenSimplex coherent noise feature size [arb. unit, try ~ 50]
+# OpenSimplex noise coherent feature size [arb. unit, try ~ 50]
 FEATURE_SIZE_A = 50
 FEATURE_SIZE_B = 100
 
-# Time step size through OpenSimplex noise [arb. unit, try ~ 0.1]
+# OpenSimplex noise time step size [arb. unit, try ~ 0.1]
 T_STEP_A = 0.1
 T_STEP_B = 0.1
 
@@ -56,6 +59,7 @@ MIN_VALVE_DURATION = 5
 #  Do not edit the code below
 # ------------------------------------------------------------------------------
 __author__ = "Dennis van Gils"
+__version__ = "1.0"
 
 import numpy as _np
 import constants as C
@@ -93,3 +97,31 @@ valve2px_y = _np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 # Tidy up the namespace
 del _pxs, _grid_x, _grid_y
 del _np
+
+# ------------------------------------------------------------------------------
+#  create_header_string
+# ------------------------------------------------------------------------------
+
+
+def create_header_string() -> str:
+    w = 19
+    header_str = (
+        f"{'TYPE':<{w}}OpenSimplex noise v{__version__}\n\n"
+        f"{'N_FRAMES':<{w}}{N_FRAMES}\n"
+        f"{'DT_FRAME':<{w}}{DT_FRAME} s\n\n"
+        f"{'BW_THRESHOLD':<{w}}{BW_THRESHOLD}\n"
+        f"{'TUNE_TRANSPARENCY':<{w}}{bool(TUNE_TRANSPARENCY)!s}\n\n"
+        f"{'FEATURE_SIZE_A':<{w}}{FEATURE_SIZE_A}\n"
+        f"{'FEATURE_SIZE_B':<{w}}{FEATURE_SIZE_B}\n\n"
+        f"{'T_STEP_A':<{w}}{T_STEP_A}\n"
+        f"{'T_STEP_B':<{w}}{T_STEP_B}\n\n"
+        f"{'SEED_A':<{w}}{SEED_A}\n"
+        f"{'SEED_B':<{w}}{SEED_B}\n\n"
+        f"{'MIN_VALVE_DURATION':<{w}}{MIN_VALVE_DURATION} frames\n\n"
+        f"{'PCS_PIXEL_DIST':<{w}}{PCS_PIXEL_DIST}\n"
+        f"{'N_PIXELS':<{w}}{N_PIXELS}\n"
+        f"{'X_STEP_A':<{w}}{X_STEP_A}\n"
+        f"{'X_STEP_B':<{w}}{X_STEP_B}\n\n"
+    )
+
+    return header_str
