@@ -33,13 +33,10 @@ from utils_img_stack import (
 from utils_valves_stack import adjust_valve_times
 import constants as C
 
-# DEBUG info: Report on memory allocation?
-REPORT_MALLOC = False
-if REPORT_MALLOC:
-    import tracemalloc
-    from tracemalloc_report import tracemalloc_report
-
-    tracemalloc.start()
+# Global flags
+PLOT_TO_SCREEN = 1  # [0] Save plots to disk, [1] Show on screen
+SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
+SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
 #  ProtoConfig
@@ -115,7 +112,7 @@ img_stack_BW, alpha_noise = binarize_stack(
 )
 
 # Determine which stack to plot
-if C.SHOW_NOISE_AS_GRAY:
+if SHOW_NOISE_AS_GRAY:
     img_stack_plot = img_stack_A
 else:
     img_stack_plot = img_stack_BW
@@ -160,9 +157,6 @@ print("Average transparencies:")
 print(f"  alpha_noise  = {np.mean(alpha_noise):.2f}")
 print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
 
-if REPORT_MALLOC:
-    tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
-
 # ------------------------------------------------------------------------------
 #  Save `valves_stack` to disk
 # ------------------------------------------------------------------------------
@@ -199,7 +193,7 @@ ax = plt.axes()
 ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
-if C.SHOW_NOISE_IN_PLOT:
+if SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
         img_stack_plot[0],
         cmap="gray",
@@ -237,7 +231,7 @@ ax.grid(which="major")
 
 def animate_fig_1(j):
     ax_text.set_text(f"frame {j:04d}")
-    if C.SHOW_NOISE_IN_PLOT:
+    if SHOW_NOISE_IN_PLOT:
         hax_noise.set_data(img_stack_plot[j])
     hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
 
@@ -253,7 +247,7 @@ plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 plt.legend()
 
-if C.PLOT_TO_SCREEN:
+if PLOT_TO_SCREEN:
     # No export to disk
     anim = animation.FuncAnimation(
         fig_1,

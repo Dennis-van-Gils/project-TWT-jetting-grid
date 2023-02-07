@@ -53,10 +53,6 @@ N_VALVES = int(_np.floor(NUMEL_PCS_AXIS * NUMEL_PCS_AXIS / 2))  # == 112
 # 32 is a good value. Leave it.
 PCS_PIXEL_DIST = 32
 
-PLOT_TO_SCREEN = 1        # [0] Save plots to disk, [1] Show on screen
-SHOW_NOISE_IN_PLOT = 1    # [0] Only show valves,   [1] Show noise as well
-SHOW_NOISE_AS_GRAY = 0    # Show noise as [0] BW,   [1] Grayscale
-
 # Protocol parameters
 # -------------------
 N_FRAMES = 5000

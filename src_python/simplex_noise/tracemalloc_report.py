@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Example code block
+
+# DEBUG info: Report on memory allocation?
+REPORT_MALLOC = False
+if REPORT_MALLOC:
+    import tracemalloc
+    from tracemalloc_report import tracemalloc_report
+
+    tracemalloc.start()
+
+if REPORT_MALLOC:
+    tracemalloc_report(tracemalloc.take_snapshot(), limit=4)
+"""
 
 import os
 import linecache
