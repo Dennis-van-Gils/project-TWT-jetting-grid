@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 
 from utils_matplotlib import move_figure
 from utils_valves_stack import adjust_valve_times, valve_on_off_PDFs
-import constants as C
+import config_proto_OpenSimplex as CFG
 
 # ------------------------------------------------------------------------------
 #  Valve ON/OFF duration PDFs
@@ -22,7 +22,7 @@ valves_stack_in = np.asarray(np.load("proto_valves_stack.npy"), dtype=np.int8)
 valves_stack_out = adjust_valve_times(valves_stack_in, MIN_VALVE_DURATION)
 
 # Calculate PDFs
-bins = np.arange(0, C.N_FRAMES)
+bins = np.arange(0, CFG.N_FRAMES)
 pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack_in, bins)
 pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_out, bins)
 

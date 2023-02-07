@@ -6,7 +6,7 @@ __author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 from scipy import optimize
@@ -150,7 +150,9 @@ def _binarize_stack_using_newton(
 
 
 def binarize_stack(
-    stack_in: np.ndarray, BW_threshold: float, tune_transparency: bool
+    stack_in: np.ndarray,
+    BW_threshold: float,
+    tune_transparency: Union[bool, int],
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Binarize each frame of the image stack.
 
@@ -174,7 +176,7 @@ def binarize_stack(
             Either the simple threshold value, or the transparency value [0 - 1]
             to solve for, see above.
 
-        tune_transparency (bool):
+        tune_transparency (bool | int):
             See above.
 
     Returns: (Tuple)

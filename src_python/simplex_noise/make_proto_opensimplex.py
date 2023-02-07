@@ -32,6 +32,7 @@ from utils_img_stack import (
 )
 from utils_valves_stack import adjust_valve_times
 import constants as C
+import config_proto_OpenSimplex as CFG
 
 # Global flags
 PLOT_TO_SCREEN = 1  # [0] Save plots to disk, [1] Show on screen
@@ -39,61 +40,28 @@ SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
-#  ProtoConfig
-# ------------------------------------------------------------------------------
-
-
-class ProtoConfig:
-    def __init__(
-        self,
-        N_frames: int,
-        N_pixels: int,
-        t_step: float,
-        feature_size: int,
-        seed: int,
-    ):
-        self.N_frames = N_frames
-        self.N_pixels = N_pixels
-        self.t_step = t_step
-        self.feature_size = feature_size
-        self.seed = seed
-
-        # Derived
-        np.seterr(divide="ignore")
-        self.x_step = np.divide(1, feature_size * C.PCS_PIXEL_DIST / 32)
-        np.seterr(divide="warn")
-
-
-# ------------------------------------------------------------------------------
 #  Calculate OpenSimplex noise
 # ------------------------------------------------------------------------------
-
-cfg_A = ProtoConfig(
-    C.N_FRAMES, C.N_PIXELS, C.T_STEP_A, C.FEATURE_SIZE_A, C.SEED_A
-)
-cfg_B = ProtoConfig(
-    C.N_FRAMES, C.N_PIXELS, C.T_STEP_B, C.FEATURE_SIZE_B, C.SEED_B
-)
 
 # Generate image stacks containing OpenSimplex noise. The images will have pixel
 # values between [-1, 1].
 img_stack_A = looping_animated_2D_image(
-    N_frames=cfg_A.N_frames,
-    N_pixels_x=cfg_A.N_pixels,
-    t_step=cfg_A.t_step,
-    x_step=cfg_A.x_step,
-    seed=cfg_A.seed,
+    N_frames=CFG.N_FRAMES,
+    N_pixels_x=CFG.N_PIXELS,
+    t_step=CFG.T_STEP_A,
+    x_step=CFG.X_STEP_A,
+    seed=CFG.SEED_A,
     dtype=np.float32,
 )
 print("")
 
-if C.FEATURE_SIZE_B > 0:
+if CFG.FEATURE_SIZE_B > 0:
     img_stack_B = looping_animated_2D_image(
-        N_frames=cfg_B.N_frames,
-        N_pixels_x=cfg_B.N_pixels,
-        t_step=cfg_B.t_step,
-        x_step=cfg_B.x_step,
-        seed=cfg_B.seed,
+        N_frames=CFG.N_FRAMES,
+        N_pixels_x=CFG.N_PIXELS,
+        t_step=CFG.T_STEP_B,
+        x_step=CFG.X_STEP_B,
+        seed=CFG.SEED_B,
         dtype=np.float32,
     )
     print("")
@@ -108,7 +76,7 @@ rescale_stack(img_stack_A, symmetrically=True)
 
 # Transform grayscale noise into binary BW map and calculate/tune transparency
 img_stack_BW, alpha_noise = binarize_stack(
-    img_stack_A, C.BW_THRESHOLD, C.TUNE_TRANSPARENCY
+    img_stack_A, CFG.BW_THRESHOLD, CFG.TUNE_TRANSPARENCY
 )
 
 # Determine which stack to plot
@@ -131,18 +99,18 @@ img_stack_plot = 1 - img_stack_plot
 # Create a stack that will contain the boolean states of all valves
 # NOTE: Use `int8` as type, not `bool` because we need number representation
 # for later calculations.
-valves_stack = np.zeros([C.N_FRAMES, C.N_VALVES], dtype=np.int8)
+valves_stack = np.zeros([CFG.N_FRAMES, C.N_VALVES], dtype=np.int8)
 
 # Create a stack that will contain only the opened valves for plotting
-valves_plot_pcs_x = np.empty((C.N_FRAMES, C.N_VALVES))
+valves_plot_pcs_x = np.empty((CFG.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_x[:] = np.nan
-valves_plot_pcs_y = np.empty((C.N_FRAMES, C.N_VALVES))
+valves_plot_pcs_y = np.empty((CFG.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
-for frame in prange(C.N_FRAMES):  # pylint: disable=not-an-iterable
+for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
     valves_stack[frame, :] = (
-        img_stack_BW[frame, C.valve2px_y, C.valve2px_x] == 1
+        img_stack_BW[frame, CFG.valve2px_y, CFG.valve2px_x] == 1
     )
 
     for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
@@ -165,7 +133,7 @@ np.save("proto_valves_stack.npy", valves_stack)
 # sys.exit()
 
 # Adjust valve times
-valves_stack_out = adjust_valve_times(valves_stack, C.MIN_VALVE_DURATION)
+valves_stack_out = adjust_valve_times(valves_stack, CFG.MIN_VALVE_DURATION)
 
 np.save("proto_valves_stack_out.npy", valves_stack_out)
 
@@ -178,7 +146,7 @@ valves_plot_pcs_x[:] = np.nan
 valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
-for frame in prange(C.N_FRAMES):  # pylint: disable=not-an-iterable
+for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
     for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
         if valves_stack_out[frame, valve]:
             valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
@@ -241,7 +209,7 @@ fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves original")
 plt.plot(alpha_valves_out, "g", label="valves adjusted")
 plt.plot(alpha_noise, "k", label="noise")
-plt.xlim(0, C.N_FRAMES)
+plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
@@ -252,7 +220,7 @@ if PLOT_TO_SCREEN:
     anim = animation.FuncAnimation(
         fig_1,
         animate_fig_1,
-        frames=C.N_FRAMES,
+        frames=CFG.N_FRAMES,
         interval=50,  # [ms] == 1000/FPS
         init_func=animate_fig_1(0),
     )
@@ -270,7 +238,7 @@ else:
     print("Generating gif frames...")
     tick = perf_counter()
     pil_imgs = []
-    for frame in trange(C.N_FRAMES):
+    for frame in trange(CFG.N_FRAMES):
         animate_fig_1(frame)
         pil_img = fig2img_RGB(fig_1)
         pil_imgs.append(pil_img)
