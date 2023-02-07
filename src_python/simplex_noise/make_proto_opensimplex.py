@@ -137,7 +137,11 @@ np.save(
 # sys.exit()
 
 # Adjust valve times
-valves_stack_out = adjust_valve_times(valves_stack, CFG.MIN_VALVE_DURATION)
+if CFG.MIN_VALVE_DURATION > 1:
+    valves_stack_out = adjust_valve_times(valves_stack, CFG.MIN_VALVE_DURATION)
+else:
+    print("Skipping adjusting valve times.\n")
+    valves_stack_out = valves_stack
 
 np.save(
     os.path.join(
