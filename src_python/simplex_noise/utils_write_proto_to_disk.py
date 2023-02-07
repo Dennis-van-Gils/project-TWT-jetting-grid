@@ -5,7 +5,6 @@
 __author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring
 
-import os
 from time import perf_counter
 
 import numpy as np
@@ -15,15 +14,11 @@ import constants as C
 import config_proto_OpenSimplex as CFG
 
 # Constants
-filename = os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example.txt")
+filename = CFG.EXPORT_PATH_NO_EXT + ".txt"
 
 # Load valves stack
 valves_stack = np.asarray(
-    np.load(
-        os.path.join(
-            CFG.EXPORT_SUBFOLDER, "proto_example_valves_stack_adjusted.npy"
-        )
-    ),
+    np.load(CFG.EXPORT_PATH_NO_EXT + "_valves_stack_adjusted.npy"),
     dtype=np.int8,
 )
 

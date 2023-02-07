@@ -12,7 +12,6 @@ __author__ = "Dennis van Gils"
 # pylint: disable=unused-import
 
 import sys
-import os
 from time import perf_counter
 
 import numpy as np
@@ -37,7 +36,7 @@ import config_proto_OpenSimplex as CFG
 
 # Global flags
 PLOT_TO_SCREEN = 0  # [0] Save plots to disk, [1] Show on screen
-SHOW_NOISE_IN_PLOT = 0  # [0] Only show valves,   [1] Show noise as well
+SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
@@ -130,10 +129,7 @@ print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
 #  Save `valves_stack` to disk
 # ------------------------------------------------------------------------------
 
-np.save(
-    os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example_valves_stack.npy"),
-    valves_stack,
-)
+np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack)
 # sys.exit()
 
 # Adjust valve times
@@ -143,12 +139,7 @@ else:
     print("Skipping adjusting valve times.\n")
     valves_stack_out = valves_stack
 
-np.save(
-    os.path.join(
-        CFG.EXPORT_SUBFOLDER, "proto_example_valves_stack_adjusted.npy"
-    ),
-    valves_stack_out,
-)
+np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack_adjusted.npy", valves_stack_out)
 
 # Calculate the valve transparency
 alpha_valves_out = valves_stack_out.sum(1) / C.N_VALVES
@@ -260,13 +251,13 @@ else:
     print("Saving images...")
     tick = perf_counter()
     pil_imgs[0].save(
-        os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example.gif"),
+        CFG.EXPORT_PATH_NO_EXT + ".gif",
         save_all=True,
         append_images=pil_imgs[1:],
         duration=50,  # [ms] == 1000/FPS
         loop=0,
     )
-    fig_2.savefig(os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example_alpha.png"))
+    fig_2.savefig(CFG.EXPORT_PATH_NO_EXT + "_alpha.png")
     print(f"done in {(perf_counter() - tick):.2f} s\n")
 
 """
