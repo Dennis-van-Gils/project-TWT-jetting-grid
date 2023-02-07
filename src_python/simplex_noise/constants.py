@@ -71,17 +71,20 @@ BW_THRESHOLD = 0.5
 # the resulting valve transparency over each frame.
 TUNE_TRANSPARENCY = 1
 
-# Time step [arb. unit]
-T_STEP_A = 0.1
-T_STEP_B = 0.1
-
 # Noise feature size [arb. unit]
 FEATURE_SIZE_A = 50   # Try 50
 FEATURE_SIZE_B = 100  # Try 100. 0 indicates to not use stack B.
 
+# Time step [arb. unit]
+T_STEP_A = 0.1
+T_STEP_B = 0.1
+
 # Noise seeds
 SEED_A = 1
 SEED_B = 13
+
+# Minimum valve on/off duration
+MIN_VALVE_DURATION = 5
 
 # ------------------------------------------------------------------------------
 #  Valve transformations
