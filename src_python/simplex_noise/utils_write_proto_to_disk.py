@@ -5,21 +5,28 @@
 __author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring
 
+import os
 from time import perf_counter
 
 import numpy as np
 from tqdm import trange
 
-# from numba import prange
-
 import constants as C
+import config_proto_OpenSimplex as CFG
 
 # Constants
-filename = "proto_1.txt"
+filename = os.path.join(CFG.EXPORT_SUBFOLDER, "proto_example.txt")
 DT = 0.1  # [s] Fixed time interval of each frame
 
 # Load valves stack
-valves_stack = np.asarray(np.load("proto_valves_stack_out.npy"), dtype=np.int8)
+valves_stack = np.asarray(
+    np.load(
+        os.path.join(
+            CFG.EXPORT_SUBFOLDER, "proto_example_valves_stack_adjusted.npy"
+        )
+    ),
+    dtype=np.int8,
+)
 
 print("Saving protocol to disk...")
 tick = perf_counter()
