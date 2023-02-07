@@ -51,7 +51,7 @@ def _detect_segments(
     y: np.ndarray,
 ) -> Tuple[
     np.ndarray,
-    float,
+    int,
     np.ndarray,
     np.ndarray,
     np.ndarray,
@@ -143,7 +143,7 @@ def adjust_valve_times(
 
     # Allocate output array: Valves stack containing adjusted valve on/off durations
     N_frames, N_valves = valves_stack_in.shape
-    valves_stack_out = np.zeros(valves_stack_in.shape)
+    valves_stack_out = np.zeros(valves_stack_in.shape, dtype=np.int8)
 
     # Timestamps without taking offset into account
     t = np.arange(0, N_frames)
