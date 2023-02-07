@@ -30,6 +30,7 @@ from utils_img_stack import (
     rescale_stack,
     binarize_stack,
 )
+from utils_valves_stack import adjust_valve_times
 import constants as C
 
 # DEBUG info: Report on memory allocation?
@@ -131,7 +132,9 @@ img_stack_plot = 1 - img_stack_plot
 # ------------------------------------------------------------------------------
 
 # Create a stack that will contain the boolean states of all valves
-valves_stack = np.zeros([C.N_FRAMES, C.N_VALVES], dtype=bool)
+# NOTE: Use `int8` as type, not `bool` because we need number representation
+# for later calculations.
+valves_stack = np.zeros([C.N_FRAMES, C.N_VALVES], dtype=np.int8)
 
 # Create a stack that will contain only the opened valves for plotting
 valves_plot_pcs_x = np.empty((C.N_FRAMES, C.N_VALVES))
@@ -166,6 +169,26 @@ if REPORT_MALLOC:
 
 np.save("proto_valves_stack.npy", valves_stack)
 # sys.exit()
+
+# Adjust valve times
+valves_stack_out = adjust_valve_times(valves_stack, C.MIN_VALVE_DURATION)
+
+np.save("proto_valves_stack_out.npy", valves_stack_out)
+
+# Calculate the valve transparency
+alpha_valves_out = valves_stack_out.sum(1) / C.N_VALVES
+print(f"  alpha_valves_out = {np.mean(alpha_valves_out):.2f}\n")
+
+# Create a stack that will contain only the opened valves for plotting
+valves_plot_pcs_x[:] = np.nan
+valves_plot_pcs_y[:] = np.nan
+
+# Populate stacks
+for frame in prange(C.N_FRAMES):  # pylint: disable=not-an-iterable
+    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
+        if valves_stack_out[frame, valve]:
+            valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
+            valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -221,7 +244,8 @@ def animate_fig_1(j):
 
 fig_2 = plt.figure(2, figsize=(5, 4))
 fig_2.set_tight_layout(True)
-plt.plot(alpha_valves, "deeppink", label="valves")
+plt.plot(alpha_valves, "deeppink", label="valves original")
+plt.plot(alpha_valves_out, "g", label="valves adjusted")
 plt.plot(alpha_noise, "k", label="noise")
 plt.xlim(0, C.N_FRAMES)
 plt.title("transparency")

@@ -16,7 +16,7 @@ import constants as C
 MIN_VALVE_DURATION = 5
 
 # Load data from disk
-valves_stack_in = np.asarray(np.load("proto_valves_stack.npy"), dtype=int)
+valves_stack_in = np.asarray(np.load("proto_valves_stack.npy"), dtype=np.int8)
 
 # Adjust valve times
 valves_stack_out = adjust_valve_times(valves_stack_in, MIN_VALVE_DURATION)
