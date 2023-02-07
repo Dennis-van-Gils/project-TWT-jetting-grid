@@ -45,6 +45,7 @@ def _find_first_downflank(array: np.ndarray):
 #  _detect_segments
 # ------------------------------------------------------------------------------
 
+
 # NOTE: Do not @njit()
 def _detect_segments(
     y: np.ndarray,
@@ -140,9 +141,8 @@ def adjust_valve_times(
     print("Adjusting valve times...")
     tick = perf_counter()
 
-    N_frames, N_valves = valves_stack_in.shape
-
     # Allocate output array: Valves stack containing adjusted valve on/off durations
+    N_frames, N_valves = valves_stack_in.shape
     valves_stack_out = np.zeros(valves_stack_in.shape)
 
     # Timestamps without taking offset into account
@@ -266,6 +266,7 @@ def adjust_valve_times(
 # ------------------------------------------------------------------------------
 #  valve_on_off_PDFs
 # ------------------------------------------------------------------------------
+
 
 # NOTE: Do not @njit()
 def valve_on_off_PDFs(
