@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Utility functions that operate on a `valves_stack`.
+"""TODO: IN PROGRESS. UNFUGLIFY.
 """
 __author__ = "Dennis van Gils"
 # pylint: disable=invalid-name, missing-function-docstring
