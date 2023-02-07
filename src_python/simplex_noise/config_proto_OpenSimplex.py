@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""User configuration parameters for the generation of a jetting protocol using
+"""User-configurable parameters for the generation of a jetting protocol using
 OpenSimplex noise.
 
 Two different sets of OpenSimplex noise can be mixed together: set A and set B.
@@ -14,10 +14,13 @@ will take place.
 Below settings will get stored inside the header section of the generated
 protocol textfile.
 """
+# ------------------------------------------------------------------------------
+#  Start of user-configurable parameters
+# ------------------------------------------------------------------------------
 
-# Filename without extension for exporting the generated protocol files to disk.
-EXPORT_FILENAME = "proto_001"
+# Filename without extension for exporting the generated protocol files to disk
 EXPORT_SUBFOLDER = "protocols"
+EXPORT_FILENAME = "proto_example"
 
 # Number of frames (i.e. protocol lines) to generate
 N_FRAMES = 5000
@@ -53,14 +56,15 @@ SEED_B = 13
 # set to 0 or 1, no adjustment to the valve durations will be made.
 MIN_VALVE_DURATION = 5
 
-
 # ------------------------------------------------------------------------------
 #  End of user-configurable parameters
-#  Do not edit the code below
 # ------------------------------------------------------------------------------
-__author__ = "Dennis van Gils"
-__version__ = "1.0"
+# pylint: disable=wrong-import-position, invalid-name, missing-function-docstring
 
+__author__ = "Dennis van Gils"
+__version__ = "1.0"  # Export file header info. Bump when major changes occur
+
+import os as _os
 import numpy as _np
 import constants as C
 
@@ -76,6 +80,11 @@ if FEATURE_SIZE_B != 0:
     X_STEP_B = _np.divide(1, FEATURE_SIZE_B * PCS_PIXEL_DIST / 32)
 else:
     X_STEP_B = 0
+
+if EXPORT_SUBFOLDER.strip() == "":
+    EXPORT_PATH_NO_EXT = EXPORT_FILENAME
+else:
+    EXPORT_PATH_NO_EXT = _os.path.join(EXPORT_SUBFOLDER, EXPORT_FILENAME)
 
 # ------------------------------------------------------------------------------
 #  Valve transformations
@@ -96,7 +105,7 @@ valve2px_y = _np.reshape(_grid_y, -1)[1::2]  # shape: (112,)
 
 # Tidy up the namespace
 del _pxs, _grid_x, _grid_y
-del _np
+del _os, _np
 
 # ------------------------------------------------------------------------------
 #  create_header_string
