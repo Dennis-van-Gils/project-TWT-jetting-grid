@@ -127,6 +127,17 @@ def generate_protocol_arrays_OpenSimplex() -> Tuple[
 
 
 def export_protocol_to_disk(valves_stack: np.ndarray, export_path: str):
+    """Exports the `valves_stack` to a text file on disk, formatted such that it
+    can to be send over to the microcontroller.
+
+    Args:
+        valves_stack (np.ndarray):
+            Stack containing the boolean states of all valves as 0's and 1's.
+            Array shape: [N_frames, N_valves]
+
+        export_path (str):
+            Relative or absolute path including filename to write to.
+    """
     print(f"Exporting protocol to disk as '{export_path}'...")
     tick = perf_counter()
 
