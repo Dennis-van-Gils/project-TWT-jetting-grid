@@ -7,8 +7,8 @@ Twente Water Tunnel facility.
 Installation
 ------------
     
-1) Download the contents of this GitHub folder and unzip.
-2) Open Anaconda prompt and navigate to the unzipped folder.
+1) Download the contents of this GitHub folder `here <https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/Dennis-van-Gils/project-TWT-jetting-grid/tree/main/protocols>`_ and unzip.
+2) Open Anaconda prompt and navigate into the unzipped folder.
 3) Now, we will create a separate Python environment called 'twt' to install the necessary packages and run the scripts in.
 
     In Anaconda prompt::
@@ -28,4 +28,12 @@ In Anaconda prompt::
     conda activate twt
     ipython make_proto_opensimplex.py
 
-See the `protocols subfolder </protocols/protocols>`_ for an example of the generated output.
+
+Example output
+--------------
+
+See the `protocols subfolder </protocols/protocols>`_.
+
+.. image:: /protocols/protocols/proto_example.gif
+.. image:: /protocols/protocols/proto_example_alpha.png
+.. image:: /protocols/protocols/proto_example_pdfs.png
