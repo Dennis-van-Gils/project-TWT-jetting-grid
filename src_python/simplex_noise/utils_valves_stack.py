@@ -129,19 +129,46 @@ def _detect_segments(
 
 
 # ------------------------------------------------------------------------------
-#  adjust_valve_times()
+#  adjust_minimum_valve_durations()
 # ------------------------------------------------------------------------------
 
 
-def adjust_valve_times(
+def adjust_minimum_valve_durations(
     valves_stack_in: np.ndarray, min_valve_duration: int, debug: bool = False
 ) -> np.ndarray:
-    """TODO: write docstr"""
+    """Adjust the minimum 'valve on' and 'valve off' durations.
+    Evenly numbered valves will prefer extending the 'valve on' durations.
+    Oddly numbered valves will prefer extending the 'valve off' durations.
+    This ensures that we do not deviate too much from the original transparency
+    level.
 
-    print("Adjusting valve times...")
+    Args:
+        valves_stack_in (np.ndarray):
+            Stack containing the boolean states of all valves as 0's and 1's.
+            Array shape: [N_frames, N_valves]
+
+        min_valve_duration (int):
+            Minimum valve on/off duration [number of frames]. When set to 0 or
+            1, no adjustment to the valve durations will be made.
+
+        debug (bool, default=False):
+            Useful for debugging. When True will show the before and after
+            timeseries plots of each valve highlighting the up- and downflanks.
+
+    Returns:
+        valves_stack_out (np.ndarray):
+            Stack containing the boolean states of all valves as 0's and 1's.
+            Array shape: [N_frames, N_valves]
+    """
+
+    if min_valve_duration <= 1:
+        print("Adjusting minimum valve durations is skipped\n")
+        return valves_stack_in
+
+    print("Adjusting minimum valve durations...")
     tick = perf_counter()
 
-    # Allocate output array: Valves stack containing adjusted valve on/off durations
+    # Allocate valves stack containing adjusted valve on/off durations
     N_frames, N_valves = valves_stack_in.shape
     valves_stack_out = np.zeros(valves_stack_in.shape, dtype=np.int8)
 
@@ -186,35 +213,71 @@ def adjust_valve_times(
 
         # Remove smallest segments
         # ------------------------
-        # Remove too short 'valve on' durations
-        for k, seglen in enumerate(durations_hi):
-            if seglen < min_valve_duration:
-                y[t_upfl[k] : t_dnfl_star[k]] = 0
+        # Evenly numbered valves will prefer extending the 'valve on' durations.
+        # Oddly numbered valves will prefer extending the 'valve off' durations.
+        # This ensures that we do not deviate too much from the original
+        # transparency level.
 
-        (
-            y,
-            t_offset_2,
-            t_upfl,
-            t_dnfl,
-            t_dnfl_star,
-            durations_lo,
-            durations_hi,
-        ) = _detect_segments(y)
+        if (valve_idx % 2) == 0:
+            # Remove too short 'valve on' durations
+            for k, seglen in enumerate(durations_hi):
+                if seglen < min_valve_duration:
+                    y[t_upfl[k] : t_dnfl_star[k]] = 0
 
-        # Remove too short 'valve off' durations
-        for k, seglen in enumerate(durations_lo):
-            if seglen < min_valve_duration:
-                y[t_dnfl[k] : t_upfl[k]] = 1
+            (
+                y,
+                t_offset_2,
+                t_upfl,
+                t_dnfl,
+                t_dnfl_star,
+                durations_lo,
+                durations_hi,
+            ) = _detect_segments(y)
 
-        (
-            y,
-            t_offset_3,
-            t_upfl,
-            t_dnfl,
-            t_dnfl_star,
-            durations_lo,
-            durations_hi,
-        ) = _detect_segments(y)
+            # Remove too short 'valve off' durations
+            for k, seglen in enumerate(durations_lo):
+                if seglen < min_valve_duration:
+                    y[t_dnfl[k] : t_upfl[k]] = 1
+
+            (
+                y,
+                t_offset_3,
+                t_upfl,
+                t_dnfl,
+                t_dnfl_star,
+                durations_lo,
+                durations_hi,
+            ) = _detect_segments(y)
+        else:
+            # Remove too short 'valve off' durations
+            for k, seglen in enumerate(durations_lo):
+                if seglen < min_valve_duration:
+                    y[t_dnfl[k] : t_upfl[k]] = 1
+
+            (
+                y,
+                t_offset_3,
+                t_upfl,
+                t_dnfl,
+                t_dnfl_star,
+                durations_lo,
+                durations_hi,
+            ) = _detect_segments(y)
+
+            # Remove too short 'valve on' durations
+            for k, seglen in enumerate(durations_hi):
+                if seglen < min_valve_duration:
+                    y[t_upfl[k] : t_dnfl_star[k]] = 0
+
+            (
+                y,
+                t_offset_2,
+                t_upfl,
+                t_dnfl,
+                t_dnfl_star,
+                durations_lo,
+                durations_hi,
+            ) = _detect_segments(y)
 
         if debug:
             t_offset = t_offset_3 + t_offset_2
@@ -277,8 +340,8 @@ def valve_on_off_PDFs(
 
     Args:
         valves_stack (np.ndarray):
-            Stack containing the boolean states of all valves. The array shape
-            should be [N_frames, N_valves].
+            Stack containing the boolean states of all valves as 0's and 1's.
+            The array shape should be [N_frames, N_valves].
 
         bins (np.ndarray):
             The bin centers to calculate the PDF over.
