@@ -3,10 +3,6 @@
 
 # Specific to this library
 port*.txt
-output.gif
-proto_anim.gif
-proto_alpha.png
-proto_valves_stack.npy
 cache.npz
 
 # Byte-compiled / optimized / DLL files
