@@ -127,7 +127,7 @@ def generate_protocol_arrays_OpenSimplex() -> Tuple[
 
 
 def export_protocol_to_disk(valves_stack: np.ndarray, export_path: str):
-    print(f"Exporting protocol to disk as '{export_path}' ...")
+    print(f"Exporting protocol to disk as '{export_path}'...")
     tick = perf_counter()
 
     valves_stack = np.asarray(valves_stack, dtype=np.int8)

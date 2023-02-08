@@ -92,16 +92,16 @@ else:
 valves_stack_adj = adjust_minimum_valve_durations(
     valves_stack, CFG.MIN_VALVE_DURATION
 )
-alpha_valves_adjusted = valves_stack_adj.sum(1) / C.N_VALVES
-
-# Export
-export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
+alpha_valves_adj = valves_stack_adj.sum(1) / C.N_VALVES
 
 # Report
 print("Average transparencies:")
-print(f"  alpha_noise           = {np.mean(alpha_noise):.2f}")
-print(f"  alpha_valves          = {np.mean(alpha_valves):.2f}")
-print(f"  alpha_valves_adjusted = {np.mean(alpha_valves_adjusted):.2f}\n")
+print(f"  alpha_noise      = {np.mean(alpha_noise):.2f}")
+print(f"  alpha_valves     = {np.mean(alpha_valves):.2f}")
+print(f"  alpha_valves_adj = {np.mean(alpha_valves_adj):.2f}\n")
+
+# Export
+export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -181,7 +181,7 @@ def animate_fig_1(j):
 fig_2 = plt.figure(2, figsize=(5, 4))
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves original")
-plt.plot(alpha_valves_adjusted, "g", label="valves adjusted")
+plt.plot(alpha_valves_adj, "g", label="valves adjusted")
 plt.plot(alpha_noise, "k", label="noise")
 plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")

@@ -349,8 +349,8 @@ def valve_on_off_PDFs(
         pdf_valve_off (numpy.ndarray):
             PDF values of the 'valve on' time durations.
     """
-    print("Calculating PDFs...")
-    tick = perf_counter()
+    # print("Calculating PDFs...")
+    # tick = perf_counter()
 
     # Allocate cumulative histograms
     cumul_hist_lo = np.zeros(bins.size - 1)
@@ -379,6 +379,6 @@ def valve_on_off_PDFs(
 
     pdf_lo = cumul_hist_lo / np.sum(cumul_hist_lo)
     pdf_hi = cumul_hist_hi / np.sum(cumul_hist_hi)
-    print(f"done in {(perf_counter() - tick):.2f} s\n")
+    # print(f"done in {(perf_counter() - tick):.2f} s\n")
 
     return pdf_lo, pdf_hi
