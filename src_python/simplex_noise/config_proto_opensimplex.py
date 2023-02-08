@@ -22,8 +22,9 @@ protocol textfile.
 EXPORT_SUBFOLDER = "protocols"
 EXPORT_FILENAME = "proto_example"
 
-# Number of frames (i.e. protocol lines) to generate
-N_FRAMES = 2000
+# Number of frames (i.e. protocol lines) to generate.
+# Do need exceed 5000 as this hits the memory limit of the microcontroller.
+N_FRAMES = 5000
 
 # Time interval between each frame [s]
 DT_FRAME = 0.1
