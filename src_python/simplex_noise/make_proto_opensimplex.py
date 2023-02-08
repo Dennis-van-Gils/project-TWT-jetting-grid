@@ -39,7 +39,7 @@ SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
-#  Generate OpenSimplex noise
+#  Generate OpenSimplex protocol
 # ------------------------------------------------------------------------------
 
 # Flags usefull for developing. Leave both set to False for normal operation.
@@ -88,21 +88,16 @@ else:
     img_stack_plot = img_stack_noise_BW
     del img_stack_noise  # Not needed anymore -> Free up large chunk of mem
 
-
-# ------------------------------------------------------------------------------
-#  Adjust valve times
-# ------------------------------------------------------------------------------
-
-# Adjust valve durations
-valves_stack_out = adjust_minimum_valve_durations(
+# Adjust minimum valve durations
+valves_stack_adj = adjust_minimum_valve_durations(
     valves_stack, CFG.MIN_VALVE_DURATION
 )
+alpha_valves_adjusted = valves_stack_adj.sum(1) / C.N_VALVES
 
+# Export
 export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
 
-# Calculate the valve transparency
-alpha_valves_adjusted = valves_stack_out.sum(1) / C.N_VALVES
-
+# Report
 print("Average transparencies:")
 print(f"  alpha_noise           = {np.mean(alpha_noise):.2f}")
 print(f"  alpha_valves          = {np.mean(alpha_valves):.2f}")
@@ -197,7 +192,7 @@ plt.legend()
 # Calculate PDFs
 bins = np.arange(0, CFG.N_FRAMES)
 pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack, bins)
-pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_out, bins)
+pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_adj, bins)
 
 # Plot
 fig_4, axs = plt.subplots(2)
