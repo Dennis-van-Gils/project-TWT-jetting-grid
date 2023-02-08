@@ -24,7 +24,7 @@ from matplotlib.ticker import MultipleLocator
 
 from utils_matplotlib import move_figure
 from utils_pillow import fig2img_RGB
-from utils_valves_stack import adjust_valve_times
+from utils_valves_stack import adjust_minimum_valve_durations, valve_on_off_PDFs
 from utils_protocols import (
     generate_protocol_arrays_OpenSimplex,
     export_protocol_to_disk,
@@ -34,7 +34,7 @@ import constants as C
 import config_proto_OpenSimplex as CFG
 
 # Global flags
-PLOT_TO_SCREEN = 0  # [0] Save plots to disk, [1] Show on screen
+PLOT_TO_SCREEN = 1  # [0] Save plots to disk, [1] Show on screen
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
@@ -42,86 +42,71 @@ SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 #  Generate OpenSimplex noise
 # ------------------------------------------------------------------------------
 
-(
-    valves_stack,
-    img_stack_noise,
-    img_stack_noise_BW,
-    alpha_noise,
-    alpha_valves,
-) = generate_protocol_arrays_OpenSimplex()
+# Flags usefull for developing. Leave both set to False for normal operation.
+LOAD_FROM_CACHE = False
+SAVE_TO_CACHE = True
 
-# Determine which noise image stack to plot
+if not LOAD_FROM_CACHE:
+    # Normal operation
+    (
+        valves_stack,
+        img_stack_noise,
+        img_stack_noise_BW,
+        alpha_noise,
+        alpha_valves,
+    ) = generate_protocol_arrays_OpenSimplex()
+
+    if SAVE_TO_CACHE:
+        print("Saving cache to disk...")
+        tick = perf_counter()
+        np.savez(
+            "cache.npz",
+            valves_stack=valves_stack,
+            img_stack_noise=img_stack_noise,
+            img_stack_noise_BW=img_stack_noise_BW,
+            alpha_noise=alpha_noise,
+            alpha_valves=alpha_valves,
+        )
+        print(f"done in {(perf_counter() - tick):.2f} s\n")
+
+else:
+    # Developer: Retrieving data straight from the cache file on disk
+    print("Reading cache from disk...")
+    tick = perf_counter()
+    with np.load("cache.npz", allow_pickle=False) as cache:
+        valves_stack = cache["valves_stack"]
+        img_stack_noise = cache["img_stack_noise"]
+        img_stack_noise_BW = cache["img_stack_noise_BW"]
+        alpha_noise = cache["alpha_noise"]
+        alpha_valves = cache["alpha_valves"]
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
+
+# Determine which noise image stack to plot later
 if SHOW_NOISE_AS_GRAY:
     img_stack_plot = img_stack_noise
 else:
     img_stack_plot = img_stack_noise_BW
-    del img_stack_noise  # Not needed anymore -> free up large chunk of mem
+    del img_stack_noise  # Not needed anymore -> Free up large chunk of mem
 
-# Invert the colors. It is more intuitive to watch the turned on valves as black
-# on a white background, than it is reversed. This is opposite to a masking
-# layer in Photoshop, where a white region indicates True. Here, black indicates
-# True.
-img_stack_plot = 1 - img_stack_plot
 
 # ------------------------------------------------------------------------------
-#  Determine the state of each valve
+#  Adjust valve times
 # ------------------------------------------------------------------------------
 
-# Create a stack that will contain only the opened valves for plotting
-valves_plot_pcs_x = np.empty((CFG.N_FRAMES, C.N_VALVES))
-valves_plot_pcs_x[:] = np.nan
-valves_plot_pcs_y = np.empty((CFG.N_FRAMES, C.N_VALVES))
-valves_plot_pcs_y[:] = np.nan
-
-# Populate stacks
-for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
-    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
-        if valves_stack[frame, valve]:
-            valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
-            valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
-
-# Calculate the valve transparency
-alpha_valves = valves_stack.sum(1) / C.N_VALVES
-
-print("Average transparencies:")
-print(f"  alpha_noise  = {np.mean(alpha_noise):.2f}")
-print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
-
-# ------------------------------------------------------------------------------
-#  Save `valves_stack` to disk
-# ------------------------------------------------------------------------------
-
-if 0:
-    np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack)
-
-# Adjust valve times
-if CFG.MIN_VALVE_DURATION > 1:
-    valves_stack_out = adjust_valve_times(valves_stack, CFG.MIN_VALVE_DURATION)
-else:
-    print("Skipping adjusting valve times.\n")
-    valves_stack_out = valves_stack
+# Adjust valve durations
+valves_stack_out = adjust_minimum_valve_durations(
+    valves_stack, CFG.MIN_VALVE_DURATION
+)
 
 export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
 
-if 0:
-    np.save(
-        CFG.EXPORT_PATH_NO_EXT + "_valves_stack_adjusted.npy", valves_stack_out
-    )
-
 # Calculate the valve transparency
-alpha_valves_out = valves_stack_out.sum(1) / C.N_VALVES
-print(f"  alpha_valves_out = {np.mean(alpha_valves_out):.2f}\n")
+alpha_valves_adjusted = valves_stack_out.sum(1) / C.N_VALVES
 
-# Create a stack that will contain only the opened valves for plotting
-valves_plot_pcs_x[:] = np.nan
-valves_plot_pcs_y[:] = np.nan
-
-# Populate stacks
-for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
-    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
-        if valves_stack_out[frame, valve]:
-            valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
-            valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
+print("Average transparencies:")
+print(f"  alpha_noise           = {np.mean(alpha_noise):.2f}")
+print(f"  alpha_valves          = {np.mean(alpha_valves):.2f}")
+print(f"  alpha_valves_adjusted = {np.mean(alpha_valves_adjusted):.2f}\n")
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -132,6 +117,14 @@ ax = plt.axes()
 ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
 # Plot the noise map
+# ------------------
+
+# Invert the colors. It is more intuitive to watch the turned on valves as black
+# on a white background, than it is reversed. This is opposite to a masking
+# layer in Photoshop, where a white region indicates True. Here, black indicates
+# True.
+img_stack_plot = 1 - img_stack_plot
+
 if SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
         img_stack_plot[0],
@@ -149,6 +142,21 @@ if SHOW_NOISE_IN_PLOT:
     )
 
 # Plot the valve locations
+# ------------------------
+
+# Create a stack that will contain only the opened valves for plotting
+valves_plot_pcs_x = np.empty((CFG.N_FRAMES, C.N_VALVES))
+valves_plot_pcs_x[:] = np.nan
+valves_plot_pcs_y = np.empty((CFG.N_FRAMES, C.N_VALVES))
+valves_plot_pcs_y[:] = np.nan
+
+# Populate stacks
+for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
+    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
+        if valves_stack[frame, valve]:
+            valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
+            valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
+
 (hax_valves,) = ax.plot(
     valves_plot_pcs_x[0, :],
     valves_plot_pcs_y[0, :],
@@ -178,13 +186,38 @@ def animate_fig_1(j):
 fig_2 = plt.figure(2, figsize=(5, 4))
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves original")
-plt.plot(alpha_valves_out, "g", label="valves adjusted")
+plt.plot(alpha_valves_adjusted, "g", label="valves adjusted")
 plt.plot(alpha_noise, "k", label="noise")
 plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 plt.legend()
+
+# Calculate PDFs
+bins = np.arange(0, CFG.N_FRAMES)
+pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack, bins)
+pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_out, bins)
+
+# Plot
+fig_4, axs = plt.subplots(2)
+fig_4.set_tight_layout(True)
+move_figure(fig_4, 200, 0)
+
+axs[0].set_title("valve OFF")
+axs[0].step(bins[0:-1], pdf_off_1, "-r", where="mid", label="original")
+axs[0].step(bins[0:-1], pdf_off_2, "-k", where="mid", label="adjusted")
+
+axs[1].set_title("valve ON")
+axs[1].step(bins[0:-1], pdf_on_1, "-r", where="mid", label="original")
+axs[1].step(bins[0:-1], pdf_on_2, "-k", where="mid", label="adjusted")
+
+for ax in axs:
+    ax.set_xlabel("duration")
+    ax.set_ylabel("PDF")
+    ax.set_xlim(0, 60)
+    ax.legend()
+    ax.grid()
 
 if PLOT_TO_SCREEN:
     # No export to disk
