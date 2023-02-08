@@ -100,15 +100,22 @@ else:
     alpha_valves_adj,
 ) = adjust_minimum_valve_durations(valves_stack, CFG.MIN_VALVE_DURATION)
 
-# Report
-print("Average transparencies:")
-print(f"  alpha_noise      = {np.mean(alpha_noise):.2f}")
-print(f"  alpha_valves     = {np.mean(alpha_valves):.2f}")
-print(f"  alpha_valves_adj = {np.mean(alpha_valves_adj):.2f}\n")
-
 # Calculate PDFs
-bins, pdf_off_orig, pdf_on_orig = valve_on_off_PDFs(valves_stack, CFG.DT_FRAME)
+bins, pdf_off, pdf_on = valve_on_off_PDFs(valves_stack, CFG.DT_FRAME)
 _, pdf_off_adj, pdf_on_adj = valve_on_off_PDFs(valves_stack_adj, CFG.DT_FRAME)
+
+# Report transparencies
+def build_stats_str(x):
+    return f"{np.mean(x):.2f} ± {np.std(x):.3f}"
+
+
+stats_alpha_noise = build_stats_str(alpha_noise)
+stats_alpha_valves = build_stats_str(alpha_valves)
+stats_alpha_valves_adj = build_stats_str(alpha_valves_adj)
+print("Transparencies (avg ± stdev):")
+print(f"  alpha_noise      = {stats_alpha_noise}")
+print(f"  alpha_valves     = {stats_alpha_valves}")
+print(f"  alpha_valves_adj = {stats_alpha_valves_adj}\n")
 
 # ------------------------------------------------------------------------------
 #  Export protocol to disk
@@ -123,17 +130,17 @@ np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack_adj)
 # PDFs
 idx_last_nonzero_bin = bins.size - np.min(
     (
-        np.argmax(np.flipud(pdf_on_orig) > 0),
+        np.argmax(np.flipud(pdf_on) > 0),
         np.argmax(np.flipud(pdf_on_adj) > 0),
-        np.argmax(np.flipud(pdf_off_orig) > 0),
+        np.argmax(np.flipud(pdf_off) > 0),
         np.argmax(np.flipud(pdf_off_adj) > 0),
     )
 )
 pdfs = np.zeros((idx_last_nonzero_bin, 5))
 pdfs[:, 0] = bins[:idx_last_nonzero_bin]
-pdfs[:, 1] = pdf_on_orig[:idx_last_nonzero_bin]
+pdfs[:, 1] = pdf_on[:idx_last_nonzero_bin]
 pdfs[:, 2] = pdf_on_adj[:idx_last_nonzero_bin]
-pdfs[:, 3] = pdf_off_orig[:idx_last_nonzero_bin]
+pdfs[:, 3] = pdf_off[:idx_last_nonzero_bin]
 pdfs[:, 4] = pdf_off_adj[:idx_last_nonzero_bin]
 
 np.savetxt(
@@ -229,9 +236,9 @@ anim = animation.FuncAnimation(
 
 fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
-plt.plot(alpha_valves, "deeppink", label="valves original")
-plt.plot(alpha_valves_adj, "k", label="valves adjusted")
-plt.plot(alpha_noise, "g", label="noise")
+plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
+plt.plot(alpha_valves_adj, "k", label=f"valves adj {stats_alpha_valves_adj}")
+plt.plot(alpha_noise, "g", label=f"noise {stats_alpha_noise}")
 plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
@@ -247,11 +254,11 @@ fig_3.set_tight_layout(True)
 move_figure(fig_3, 200, 0)
 
 axs[0].set_title("valve ON")
-axs[0].step(bins, pdf_on_orig, "deeppink", where="mid", label="original")
+axs[0].step(bins, pdf_on, "deeppink", where="mid", label="original")
 axs[0].step(bins, pdf_on_adj, "k", where="mid", label="adjusted")
 
 axs[1].set_title("valve OFF")
-axs[1].step(bins, pdf_off_orig, "deeppink", where="mid", label="original")
+axs[1].step(bins, pdf_off, "deeppink", where="mid", label="original")
 axs[1].step(bins, pdf_off_adj, "k", where="mid", label="adjusted")
 
 for ax in axs:
