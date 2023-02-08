@@ -88,10 +88,12 @@ def _detect_segments(
             The 'N_frames' index is appended to the end of the array.
 
         durations_lo (np.ndarray):
-            Array containing the duration of each 'valve off' segment.
+            Array containing the duration of each 'valve off' segment. Units are
+            in number of frames.
 
         durations_hi (np.ndarray):
-            Array containing the duration of each 'valve on' segment.
+            Array containing the duration of each 'valve on' segment. Units are
+            in number of frames.
     """
     N_frames = y.size
     t_offset = _find_first_downflank(y)
@@ -336,20 +338,25 @@ def adjust_minimum_valve_durations(
 
 # NOTE: Do not @njit()
 def valve_on_off_PDFs(
-    valves_stack: np.ndarray, bins: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+    valves_stack: np.ndarray, dT_frame: float
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the cumulative (i.e. taken over all valves) probability
-    density functions (PDFs) of the 'valve on' and 'valve off' time durations.
+    density functions (PDFs) of the 'valve on' and 'valve off' time durations in
+    seconds.
 
     Args:
         valves_stack (np.ndarray):
             Stack containing the boolean states of all valves as 0's and 1's.
             The array shape should be [N_frames, N_valves].
 
-        bins (np.ndarray):
-            The bin centers to calculate the PDF over.
+        dT_frame (float):
+            Time interval between the frames in order to transform the bin units
+            from [number of frames] to [s].
 
     Returns: (Tuple)
+        bins (numpy.ndarray):
+            The bin centers in units of [s].
+
         pdf_valve_on (numpy.ndarray):
             PDF values of the 'valve off' time durations.
 
@@ -359,12 +366,14 @@ def valve_on_off_PDFs(
     # print("Calculating PDFs...")
     # tick = perf_counter()
 
+    N_frames, N_valves = valves_stack.shape
+    bins = np.arange(N_frames) * dT_frame  # Bin edges including rightmost edge
+
     # Allocate cumulative histograms
     cumul_hist_lo = np.zeros(bins.size - 1)
     cumul_hist_hi = np.zeros(bins.size - 1)
 
     # Walk over all valves
-    N_valves = valves_stack.shape[1]
     for valve_idx in np.arange(N_valves):
         # Retrieve timeseries of single valve
         y = valves_stack[:, valve_idx]
@@ -379,13 +388,13 @@ def valve_on_off_PDFs(
             durations_hi,
         ) = _detect_segments(y)
 
-        hist_lo, _ = np.histogram(durations_lo, bins)
-        hist_hi, _ = np.histogram(durations_hi, bins)
+        hist_lo, _ = np.histogram(durations_lo * dT_frame, bins)
+        hist_hi, _ = np.histogram(durations_hi * dT_frame, bins)
         np.add(cumul_hist_lo, hist_lo, out=cumul_hist_lo)
         np.add(cumul_hist_hi, hist_hi, out=cumul_hist_hi)
 
-    pdf_lo = cumul_hist_lo / np.sum(cumul_hist_lo)
-    pdf_hi = cumul_hist_hi / np.sum(cumul_hist_hi)
+    pdf_lo = cumul_hist_lo / np.trapz(cumul_hist_lo, dx=dT_frame)
+    pdf_hi = cumul_hist_hi / np.trapz(cumul_hist_hi, dx=dT_frame)
     # print(f"done in {(perf_counter() - tick):.2f} s\n")
 
-    return pdf_lo, pdf_hi
+    return bins[:-1], pdf_lo, pdf_hi
