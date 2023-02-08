@@ -137,8 +137,8 @@ def adjust_minimum_valve_durations(
     valves_stack_in: np.ndarray, min_valve_duration: int, debug: bool = False
 ) -> np.ndarray:
     """Adjust the minimum 'valve on' and 'valve off' durations.
-    Evenly numbered valves will prefer extending the 'valve on' durations.
-    Oddly numbered valves will prefer extending the 'valve off' durations.
+    Evenly numbered valves will prefer extending the 'valve off' durations.
+    Oddly numbered valves will prefer extending the 'valve on' durations.
     This ensures that we do not deviate too much from the original transparency
     level.
 
@@ -213,10 +213,6 @@ def adjust_minimum_valve_durations(
 
         # Remove smallest segments
         # ------------------------
-        # Evenly numbered valves will prefer extending the 'valve on' durations.
-        # Oddly numbered valves will prefer extending the 'valve off' durations.
-        # This ensures that we do not deviate too much from the original
-        # transparency level.
 
         if (valve_idx % 2) == 0:
             # Remove too short 'valve on' durations
