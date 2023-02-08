@@ -5,7 +5,8 @@ matplotlib
 scipy
 numba-scipy
 
-# Improved backend (better than TkInter) for matplotlib
+# Improved backend (better than TkInter) for matplotlib.
+# Optional, comment out when install is problematic.
 pyqt5
 
 # OpenSimplex noise
