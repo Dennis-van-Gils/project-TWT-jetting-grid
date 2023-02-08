@@ -43,7 +43,7 @@ SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 # ------------------------------------------------------------------------------
 
 # Flags usefull for developing. Leave both set to False for normal operation.
-LOAD_FROM_CACHE = False
+LOAD_FROM_CACHE = True
 SAVE_TO_CACHE = True
 
 if not LOAD_FROM_CACHE:
@@ -89,10 +89,10 @@ else:
     del img_stack_noise  # Not needed anymore -> Free up large chunk of mem
 
 # Adjust minimum valve durations
-valves_stack_adj = adjust_minimum_valve_durations(
-    valves_stack, CFG.MIN_VALVE_DURATION
-)
-alpha_valves_adj = valves_stack_adj.sum(1) / C.N_VALVES
+(
+    valves_stack_adj,
+    alpha_valves_adj,
+) = adjust_minimum_valve_durations(valves_stack, CFG.MIN_VALVE_DURATION)
 
 # Report
 print("Average transparencies:")
@@ -200,12 +200,12 @@ fig_4.set_tight_layout(True)
 move_figure(fig_4, 200, 0)
 
 axs[0].set_title("valve OFF")
-axs[0].step(bins[0:-1], pdf_off_1, "-r", where="mid", label="original")
-axs[0].step(bins[0:-1], pdf_off_2, "-k", where="mid", label="adjusted")
+axs[0].step(bins[0:-1], pdf_off_1, "deeppink", where="mid", label="original")
+axs[0].step(bins[0:-1], pdf_off_2, "k", where="mid", label="adjusted")
 
 axs[1].set_title("valve ON")
-axs[1].step(bins[0:-1], pdf_on_1, "-r", where="mid", label="original")
-axs[1].step(bins[0:-1], pdf_on_2, "-k", where="mid", label="adjusted")
+axs[1].step(bins[0:-1], pdf_on_1, "deeppink", where="mid", label="original")
+axs[1].step(bins[0:-1], pdf_on_2, "k", where="mid", label="adjusted")
 
 for ax in axs:
     ax.set_xlabel("duration")

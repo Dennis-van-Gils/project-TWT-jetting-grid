@@ -135,7 +135,7 @@ def _detect_segments(
 
 def adjust_minimum_valve_durations(
     valves_stack_in: np.ndarray, min_valve_duration: int, debug: bool = False
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     """Adjust the minimum 'valve on' and 'valve off' durations.
     Evenly numbered valves will prefer extending the 'valve off' durations.
     Oddly numbered valves will prefer extending the 'valve on' durations.
@@ -155,10 +155,15 @@ def adjust_minimum_valve_durations(
             Useful for debugging. When True will show the before and after
             timeseries plots of each valve highlighting the up- and downflanks.
 
-    Returns:
+    Returns: (Tuple)
         valves_stack_out (np.ndarray):
             Stack containing the boolean states of all valves as 0's and 1's.
             Array shape: [N_frames, N_valves]
+
+        alpha_valves_out (np.ndarray):
+            Transparency of each frame given as the ratio of the number of
+            turned on valves over all valves in the frame.
+            Array shape: [N_frames]
     """
 
     if min_valve_duration <= 1:
@@ -318,8 +323,10 @@ def adjust_minimum_valve_durations(
         # Store adjusted timeseries
         valves_stack_out[:, valve_idx] = y
 
+    alpha_valves_out = valves_stack_out.sum(1) / N_valves
+
     print(f"done in {perf_counter() - tick:.2f} s\n")
-    return valves_stack_out
+    return valves_stack_out, alpha_valves_out
 
 
 # ------------------------------------------------------------------------------
