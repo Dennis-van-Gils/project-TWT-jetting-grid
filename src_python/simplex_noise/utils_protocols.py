@@ -151,4 +151,4 @@ def export_protocol_to_disk(valves_stack: np.ndarray, export_path: str):
                     f.write(f"\t{pcs_x:d},{pcs_y:d}")
             f.write("\n")
 
-        print(f"done in {perf_counter() - tick:.2f} s\n")
+    print(f"done in {perf_counter() - tick:.2f} s\n")
