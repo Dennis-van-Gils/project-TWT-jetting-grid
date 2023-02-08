@@ -24,7 +24,10 @@ from matplotlib.ticker import MultipleLocator
 
 from utils_matplotlib import move_figure
 from utils_pillow import fig2img_RGB
-from utils_valves_stack import adjust_minimum_valve_durations, valve_on_off_PDFs
+from utils_valves_stack import (
+    adjust_minimum_valve_durations,
+    valve_on_off_PDFs,
+)
 from utils_protocols import (
     generate_protocol_arrays_OpenSimplex,
     export_protocol_to_disk,
@@ -42,7 +45,7 @@ SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 #  Generate OpenSimplex protocol
 # ------------------------------------------------------------------------------
 
-# Flags usefull for developing. Leave both set to False for normal operation.
+# Flags useful for developing. Leave both set to False for normal operation.
 LOAD_FROM_CACHE = True
 SAVE_TO_CACHE = True
 
