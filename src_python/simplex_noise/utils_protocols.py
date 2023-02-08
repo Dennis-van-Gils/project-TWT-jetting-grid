@@ -20,7 +20,7 @@ from utils_img_stack import (
 )
 
 import constants as C
-import config_proto_OpenSimplex as CFG
+import config_proto_opensimplex as CFG
 
 # ------------------------------------------------------------------------------
 #  generate_protocol_arrays_OpenSimplex

@@ -34,7 +34,7 @@ from utils_protocols import (
 )
 
 import constants as C
-import config_proto_OpenSimplex as CFG
+import config_proto_opensimplex as CFG
 
 # Global flags
 PLOT_TO_SCREEN = 1  # [0] Save plots to disk, [1] Show on screen
