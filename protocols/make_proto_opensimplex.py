@@ -3,15 +3,15 @@
 """
 Installation:
     In Anaconda prompt:
-    > conda create -n simplex python=3.10
-    > conda activate simplex
+    > conda create -n twt python=3.10
+    > conda activate twt
     > pip install -r requirements.txt
 
 Usage:
     Edit `config_proto_opensimplex.py` to your needs.
     Set global flags in this file to your needs.
     In Anaconda prompt:
-    > conda activate simplex
+    > conda activate twt
     > ipython make_proto_opensimplex.py
 """
 __author__ = "Dennis van Gils"
