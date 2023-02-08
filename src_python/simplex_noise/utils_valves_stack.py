@@ -67,7 +67,7 @@ def _detect_segments(
 
     Args:
         y (np.ndarray):
-            Timeseries of a single valve
+            Timeseries of a single valve as an array of 0's and 1's.
 
     Returns: (Tuple)
         y (np.ndarray):
@@ -165,16 +165,16 @@ def adjust_minimum_valve_durations(
             turned on valves over all valves in the frame.
             Array shape: [N_frames]
     """
+    N_frames, N_valves = valves_stack_in.shape
 
     if min_valve_duration <= 1:
         print("Adjusting minimum valve durations is skipped\n")
-        return valves_stack_in
+        return valves_stack_in, valves_stack_in.sum(1) / N_valves
 
     print("Adjusting minimum valve durations...")
     tick = perf_counter()
 
     # Allocate valves stack containing adjusted valve on/off durations
-    N_frames, N_valves = valves_stack_in.shape
     valves_stack_out = np.zeros(valves_stack_in.shape, dtype=np.int8)
 
     # Timestamps without taking offset into account
