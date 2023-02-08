@@ -42,15 +42,15 @@ import config_proto_opensimplex as CFG
 # Global flags
 EXPORT_GIF = 0  # Export animation as a .gif to disk?
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
-SHOW_NOISE_AS_GRAY = 1  # Show noise as [0] BW,   [1] Grayscale
+SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
 #  Generate OpenSimplex protocol
 # ------------------------------------------------------------------------------
 
 # Flags useful for developing. Leave both set to False for normal operation.
-LOAD_FROM_CACHE = True
-SAVE_TO_CACHE = True
+LOAD_FROM_CACHE = False
+SAVE_TO_CACHE = False
 
 if not LOAD_FROM_CACHE:
     # Normal operation
@@ -106,9 +106,42 @@ print(f"  alpha_noise      = {np.mean(alpha_noise):.2f}")
 print(f"  alpha_valves     = {np.mean(alpha_valves):.2f}")
 print(f"  alpha_valves_adj = {np.mean(alpha_valves_adj):.2f}\n")
 
-# Export
+# Calculate PDFs
+bins, pdf_off_orig, pdf_on_orig = valve_on_off_PDFs(valves_stack, CFG.DT_FRAME)
+_, pdf_off_adj, pdf_on_adj = valve_on_off_PDFs(valves_stack_adj, CFG.DT_FRAME)
+
+# ------------------------------------------------------------------------------
+#  Export protocol to disk
+# ------------------------------------------------------------------------------
+
+# Protocol formatted such that it can be send to the microcontroller
 export_protocol_to_disk(valves_stack_adj, CFG.EXPORT_PATH_NO_EXT + ".txt")
+
+# The final `valves_stack`, useful for optional post-processing
 np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack_adj)
+
+# PDFs
+idx_last_nonzero_bin = bins.size - np.min(
+    (
+        np.argmax(np.flipud(pdf_on_orig) > 0),
+        np.argmax(np.flipud(pdf_on_adj) > 0),
+        np.argmax(np.flipud(pdf_off_orig) > 0),
+        np.argmax(np.flipud(pdf_off_adj) > 0),
+    )
+)
+pdfs = np.zeros((idx_last_nonzero_bin, 5))
+pdfs[:, 0] = bins[:idx_last_nonzero_bin]
+pdfs[:, 1] = pdf_on_orig[:idx_last_nonzero_bin]
+pdfs[:, 2] = pdf_on_adj[:idx_last_nonzero_bin]
+pdfs[:, 3] = pdf_off_orig[:idx_last_nonzero_bin]
+pdfs[:, 4] = pdf_off_adj[:idx_last_nonzero_bin]
+
+np.savetxt(
+    CFG.EXPORT_PATH_NO_EXT + "_pdfs.txt",
+    pdfs,
+    fmt="%.1f\t%.3e\t%.3e\t%.3e\t%.3e",
+    header="duration[s]\tpdf_on_orig\tpdf_on_adj\tpdf_off_orig\tpdf_off_adj",
+)
 
 # ------------------------------------------------------------------------------
 #  Plot
@@ -197,8 +230,8 @@ anim = animation.FuncAnimation(
 fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves original")
-plt.plot(alpha_valves_adj, "g", label="valves adjusted")
-plt.plot(alpha_noise, "k", label="noise")
+plt.plot(alpha_valves_adj, "k", label="valves adjusted")
+plt.plot(alpha_noise, "g", label="noise")
 plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
@@ -208,28 +241,23 @@ plt.legend()
 # 3: Probability densities
 # ------------------------
 
-# Calculate PDFs
-bins = np.arange(0, CFG.N_FRAMES)
-pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack, bins)
-pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_adj, bins)
-
 # Plot
 fig_3, axs = plt.subplots(2)
 fig_3.set_tight_layout(True)
 move_figure(fig_3, 200, 0)
 
-axs[0].set_title("valve OFF")
-axs[0].step(bins[0:-1], pdf_off_1, "deeppink", where="mid", label="original")
-axs[0].step(bins[0:-1], pdf_off_2, "k", where="mid", label="adjusted")
+axs[0].set_title("valve ON")
+axs[0].step(bins, pdf_on_orig, "deeppink", where="mid", label="original")
+axs[0].step(bins, pdf_on_adj, "k", where="mid", label="adjusted")
 
-axs[1].set_title("valve ON")
-axs[1].step(bins[0:-1], pdf_on_1, "deeppink", where="mid", label="original")
-axs[1].step(bins[0:-1], pdf_on_2, "k", where="mid", label="adjusted")
+axs[1].set_title("valve OFF")
+axs[1].step(bins, pdf_off_orig, "deeppink", where="mid", label="original")
+axs[1].step(bins, pdf_off_adj, "k", where="mid", label="adjusted")
 
 for ax in axs:
-    ax.set_xlabel("duration")
+    ax.set_xlabel("duration (s)")
     ax.set_ylabel("PDF")
-    ax.set_xlim(0, 60)
+    ax.set_xlim(0, 6)
     ax.legend()
     ax.grid()
 
@@ -242,8 +270,6 @@ move_figure(fig_3, 1000, 0)
 
 fig_2.savefig(CFG.EXPORT_PATH_NO_EXT + "_alpha.png")
 fig_3.savefig(CFG.EXPORT_PATH_NO_EXT + "_pdfs.png")
-
-# np.savetxt()
 
 # Export animation
 # ----------------
