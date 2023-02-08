@@ -2,25 +2,28 @@
 # -*- coding: utf-8 -*-
 """
 Installation:
-    conda create -n simplex python=3.10
-    conda activate simplex
-    pip install -r requirements.txt
-    ipython make_proto_opensimplex.py
+    In Anaconda prompt:
+    > conda create -n simplex python=3.10
+    > conda activate simplex
+    > pip install -r requirements.txt
+
+Usage:
+    Edit `config_proto_opensimplex.py` to your needs.
+    Set global flags in this file to your needs.
+    In Anaconda prompt:
+    > conda activate simplex
+    > ipython make_proto_opensimplex.py
 """
 __author__ = "Dennis van Gils"
-# pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
-# pylint: disable=unused-import
+# pylint: disable=invalid-name, missing-function-docstring
 
-import sys
 from time import perf_counter
 
 import numpy as np
 from tqdm import trange
-from numba import prange
 
 from matplotlib import pyplot as plt
 from matplotlib import animation
-from matplotlib.ticker import MultipleLocator
 
 from utils_matplotlib import move_figure
 from utils_pillow import fig2img_RGB
@@ -37,9 +40,9 @@ import constants as C
 import config_proto_opensimplex as CFG
 
 # Global flags
-PLOT_TO_SCREEN = 1  # [0] Save plots to disk, [1] Show on screen
+EXPORT_GIF = 0  # Export animation as a .gif to disk?
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
-SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
+SHOW_NOISE_AS_GRAY = 1  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
 #  Generate OpenSimplex protocol
@@ -104,19 +107,22 @@ print(f"  alpha_valves     = {np.mean(alpha_valves):.2f}")
 print(f"  alpha_valves_adj = {np.mean(alpha_valves_adj):.2f}\n")
 
 # Export
-export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
+export_protocol_to_disk(valves_stack_adj, CFG.EXPORT_PATH_NO_EXT + ".txt")
+np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack_adj)
 
 # ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
 
+# 1: Valve and noise animation
+# ----------------------------
+
 fig_1 = plt.figure(figsize=(5, 5))
 ax = plt.axes()
 ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 
-# Plot the noise map
-# ------------------
-
+# Noise image
+# -----------
 # Invert the colors. It is more intuitive to watch the turned on valves as black
 # on a white background, than it is reversed. This is opposite to a masking
 # layer in Photoshop, where a white region indicates True. Here, black indicates
@@ -139,19 +145,17 @@ if SHOW_NOISE_IN_PLOT:
         ],
     )
 
-# Plot the valve locations
-# ------------------------
-
-# Create a stack that will contain only the opened valves for plotting
+# Valves
+# ------
+# Create a stack that will contain only the opened valves
 valves_plot_pcs_x = np.empty((CFG.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_x[:] = np.nan
 valves_plot_pcs_y = np.empty((CFG.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_y[:] = np.nan
 
-# Populate stacks
-for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
-    for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
-        if valves_stack[frame, valve]:
+for frame in range(CFG.N_FRAMES):
+    for valve in range(C.N_VALVES):
+        if valves_stack_adj[frame, valve]:
             valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
             valves_plot_pcs_y[frame, valve] = C.valve2pcs_y[valve]
 
@@ -164,16 +168,13 @@ for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
     markersize=5,
 )
 
-# major_locator = MultipleLocator(1)
-# ax.xaxis.set_major_locator(major_locator) # Slows down drawing a lot!
-# ax.yaxis.set_major_locator(major_locator) # Slows down drawing a lot!
 ax.set_aspect("equal", adjustable="box")
 ax.set_xlim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.set_ylim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.grid(which="major")
 # ax.axis("off")
 
-
+# Animation function
 def animate_fig_1(j):
     ax_text.set_text(f"frame {j:04d}")
     if SHOW_NOISE_IN_PLOT:
@@ -181,7 +182,19 @@ def animate_fig_1(j):
     hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
 
 
-fig_2 = plt.figure(2, figsize=(5, 4))
+# Animate figure
+anim = animation.FuncAnimation(
+    fig_1,
+    animate_fig_1,
+    frames=CFG.N_FRAMES,
+    interval=50,  # [ms] == 1000/FPS
+    init_func=animate_fig_1(0),
+)
+
+# 2: Transparencies
+# -----------------
+
+fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
 plt.plot(alpha_valves, "deeppink", label="valves original")
 plt.plot(alpha_valves_adj, "g", label="valves adjusted")
@@ -192,15 +205,18 @@ plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
 plt.legend()
 
+# 3: Probability densities
+# ------------------------
+
 # Calculate PDFs
 bins = np.arange(0, CFG.N_FRAMES)
 pdf_off_1, pdf_on_1 = valve_on_off_PDFs(valves_stack, bins)
 pdf_off_2, pdf_on_2 = valve_on_off_PDFs(valves_stack_adj, bins)
 
 # Plot
-fig_4, axs = plt.subplots(2)
-fig_4.set_tight_layout(True)
-move_figure(fig_4, 200, 0)
+fig_3, axs = plt.subplots(2)
+fig_3.set_tight_layout(True)
+move_figure(fig_3, 200, 0)
 
 axs[0].set_title("valve OFF")
 axs[0].step(bins[0:-1], pdf_off_1, "deeppink", where="mid", label="original")
@@ -217,26 +233,22 @@ for ax in axs:
     ax.legend()
     ax.grid()
 
-if PLOT_TO_SCREEN:
-    # No export to disk
-    anim = animation.FuncAnimation(
-        fig_1,
-        animate_fig_1,
-        frames=CFG.N_FRAMES,
-        interval=50,  # [ms] == 1000/FPS
-        init_func=animate_fig_1(0),
-    )
+# Round up plots
+# --------------
 
-    move_figure(fig_1, 0, 0)
-    move_figure(fig_2, 500, 0)
+move_figure(fig_1, 0, 0)
+move_figure(fig_2, 500, 0)
+move_figure(fig_3, 1000, 0)
 
-    plt.show(block=False)
-    plt.pause(0.001)
-    input("Press [Enter] to end.")
-    plt.close("all")
+fig_2.savefig(CFG.EXPORT_PATH_NO_EXT + "_alpha.png")
+fig_3.savefig(CFG.EXPORT_PATH_NO_EXT + "_pdfs.png")
 
-else:
-    # Export images to disk
+# np.savetxt()
+
+# Export animation
+# ----------------
+
+if EXPORT_GIF:
     print("Generating gif frames...")
     tick = perf_counter()
     pil_imgs = []
@@ -246,7 +258,7 @@ else:
         pil_imgs.append(pil_img)
     print(f"done in {(perf_counter() - tick):.2f} s\n")
 
-    print("Saving images...")
+    print("Saving gif...")
     tick = perf_counter()
     pil_imgs[0].save(
         CFG.EXPORT_PATH_NO_EXT + ".gif",
@@ -255,18 +267,9 @@ else:
         duration=50,  # [ms] == 1000/FPS
         loop=0,
     )
-    fig_2.savefig(CFG.EXPORT_PATH_NO_EXT + "_alpha.png")
     print(f"done in {(perf_counter() - tick):.2f} s\n")
 
-"""
-    # NOTE: Don't use below image export mechanism. It is extremely memory
-    # hungry & slow.
-
-    anim.save(
-        "output.gif",
-        dpi=120,
-        writer="imagemagick",
-        fps=20,
-        progress_callback=lambda i, n: print(f"{i + 1} of {N_FRAMES}"),
-    )
-"""
+plt.show(block=False)
+plt.pause(0.001)
+input("Press [Enter] to close figures.")
+plt.close("all")
