@@ -23,7 +23,7 @@ EXPORT_SUBFOLDER = "protocols"
 EXPORT_FILENAME = "proto_example"
 
 # Number of frames (i.e. protocol lines) to generate
-N_FRAMES = 5000
+N_FRAMES = 2000
 
 # Time interval between each frame [s]
 DT_FRAME = 0.1
@@ -65,7 +65,10 @@ __author__ = "Dennis van Gils"
 __version__ = "1.0"  # Export file header info. Bump when major changes occur
 
 import os as _os
+from datetime import datetime
+
 import numpy as _np
+
 import constants as C
 
 # Pixel distance between the integer PCS coordinates.
@@ -115,7 +118,8 @@ del _os, _np
 def create_header_string() -> str:
     w = 19
     header_str = (
-        f"{'TYPE':<{w}}OpenSimplex noise v{__version__}\n\n"
+        f"{'TYPE':<{w}}OpenSimplex noise v{__version__}\n"
+        f"{'DATE':<{w}}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         f"{'N_FRAMES':<{w}}{N_FRAMES}\n"
         f"{'DT_FRAME':<{w}}{DT_FRAME} s\n\n"
         f"{'BW_THRESHOLD':<{w}}{BW_THRESHOLD}\n"

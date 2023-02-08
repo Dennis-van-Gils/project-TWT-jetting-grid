@@ -22,15 +22,14 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 from matplotlib.ticker import MultipleLocator
 
-from opensimplex_loops import looping_animated_2D_image
 from utils_matplotlib import move_figure
 from utils_pillow import fig2img_RGB
-from utils_img_stack import (
-    add_stack_B_to_A,
-    rescale_stack,
-    binarize_stack,
-)
 from utils_valves_stack import adjust_valve_times
+from utils_protocols import (
+    generate_protocol_arrays_OpenSimplex,
+    export_protocol_to_disk,
+)
+
 import constants as C
 import config_proto_OpenSimplex as CFG
 
@@ -40,51 +39,23 @@ SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
 # ------------------------------------------------------------------------------
-#  Calculate OpenSimplex noise
+#  Generate OpenSimplex noise
 # ------------------------------------------------------------------------------
 
-# Generate image stacks containing OpenSimplex noise. The images will have pixel
-# values between [-1, 1].
-img_stack_A = looping_animated_2D_image(
-    N_frames=CFG.N_FRAMES,
-    N_pixels_x=CFG.N_PIXELS,
-    t_step=CFG.T_STEP_A,
-    x_step=CFG.X_STEP_A,
-    seed=CFG.SEED_A,
-    dtype=np.float32,
-)
-print("")
+(
+    valves_stack,
+    img_stack_noise,
+    img_stack_noise_BW,
+    alpha_noise,
+    alpha_valves,
+) = generate_protocol_arrays_OpenSimplex()
 
-if CFG.FEATURE_SIZE_B > 0:
-    img_stack_B = looping_animated_2D_image(
-        N_frames=CFG.N_FRAMES,
-        N_pixels_x=CFG.N_PIXELS,
-        t_step=CFG.T_STEP_B,
-        x_step=CFG.X_STEP_B,
-        seed=CFG.SEED_B,
-        dtype=np.float32,
-    )
-    print("")
-
-    add_stack_B_to_A(img_stack_A, img_stack_B)  # Pixel vals now between [-2, 2]
-    del img_stack_B
-
-# Rescale and offset all images in the stack to lie within the range [0, 1].
-# Leave `symmetrically=True` to prevent biasing the pixel intensity distribution
-# towards 0 or 1.
-rescale_stack(img_stack_A, symmetrically=True)
-
-# Transform grayscale noise into binary BW map and calculate/tune transparency
-img_stack_BW, alpha_noise = binarize_stack(
-    img_stack_A, CFG.BW_THRESHOLD, CFG.TUNE_TRANSPARENCY
-)
-
-# Determine which stack to plot
+# Determine which noise image stack to plot
 if SHOW_NOISE_AS_GRAY:
-    img_stack_plot = img_stack_A
+    img_stack_plot = img_stack_noise
 else:
-    img_stack_plot = img_stack_BW
-    del img_stack_A
+    img_stack_plot = img_stack_noise_BW
+    del img_stack_noise  # Not needed anymore -> free up large chunk of mem
 
 # Invert the colors. It is more intuitive to watch the turned on valves as black
 # on a white background, than it is reversed. This is opposite to a masking
@@ -96,11 +67,6 @@ img_stack_plot = 1 - img_stack_plot
 #  Determine the state of each valve
 # ------------------------------------------------------------------------------
 
-# Create a stack that will contain the boolean states of all valves
-# NOTE: Use `int8` as type, not `bool` because we need number representation
-# for later calculations.
-valves_stack = np.zeros([CFG.N_FRAMES, C.N_VALVES], dtype=np.int8)
-
 # Create a stack that will contain only the opened valves for plotting
 valves_plot_pcs_x = np.empty((CFG.N_FRAMES, C.N_VALVES))
 valves_plot_pcs_x[:] = np.nan
@@ -109,10 +75,6 @@ valves_plot_pcs_y[:] = np.nan
 
 # Populate stacks
 for frame in prange(CFG.N_FRAMES):  # pylint: disable=not-an-iterable
-    valves_stack[frame, :] = (
-        img_stack_BW[frame, CFG.valve2px_y, CFG.valve2px_x] == 1
-    )
-
     for valve in prange(C.N_VALVES):  # pylint: disable=not-an-iterable
         if valves_stack[frame, valve]:
             valves_plot_pcs_x[frame, valve] = C.valve2pcs_x[valve]
@@ -129,8 +91,8 @@ print(f"  alpha_valves = {np.mean(alpha_valves):.2f}\n")
 #  Save `valves_stack` to disk
 # ------------------------------------------------------------------------------
 
-np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack)
-# sys.exit()
+if 0:
+    np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack)
 
 # Adjust valve times
 if CFG.MIN_VALVE_DURATION > 1:
@@ -139,7 +101,12 @@ else:
     print("Skipping adjusting valve times.\n")
     valves_stack_out = valves_stack
 
-np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack_adjusted.npy", valves_stack_out)
+export_protocol_to_disk(valves_stack, CFG.EXPORT_PATH_NO_EXT + ".txt")
+
+if 0:
+    np.save(
+        CFG.EXPORT_PATH_NO_EXT + "_valves_stack_adjusted.npy", valves_stack_out
+    )
 
 # Calculate the valve transparency
 alpha_valves_out = valves_stack_out.sum(1) / C.N_VALVES
