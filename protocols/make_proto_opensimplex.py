@@ -297,7 +297,7 @@ if EXPORT_GIF:
         CFG.EXPORT_PATH_NO_EXT + ".gif",
         save_all=True,
         append_images=pil_imgs[1:],
-        duration=50,  # [ms] == 1000/FPS
+        duration=CFG.DT_FRAME * 1000,  # [ms]
         loop=0,
     )
     print(f"done in {(perf_counter() - tick):.2f} s\n")
