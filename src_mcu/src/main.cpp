@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    13-12-2022
+ * @date    09-02-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -179,18 +179,17 @@ bool R_click_poll_EMA_collectively() {
 ------------------------------------------------------------------------------*/
 
 /**
- * @brief Set LED colors at PCS points without a valve to yellow and set the PCS
- * center point to off-white.
+ * @brief Set the LED colors at PCS points without a valve
  */
 void set_LED_matrix_data_fixed_grid() {
   for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
     for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
       if ((x + y) % 2 == 0) {
-        leds[p2led(P{x, y})] = CRGB::Yellow;
+        leds[p2led(P{x, y})] = CRGB(64, 64, 64);
       }
     }
   }
-  leds[p2led(P{0, 0})] = CRGB::DarkSalmon;
+  leds[p2led(P{0, 0})] = CRGB(0, 32, 0); // Center (0, 0)
 }
 
 /*------------------------------------------------------------------------------
@@ -480,7 +479,7 @@ void setup() {
 
   // Reached the end of setup, so now show the fixed grid in the LED matrix
   FastLED.clearData();
-  set_LED_matrix_data_fixed_grid();
+  set_LED_matrix_data_fixed_grid(); // DEBUG: Taken out momentarily
   FastLED.show();
 
   if (DEBUG) {
@@ -537,6 +536,10 @@ void loop() {
         } else if (strcmp(str_cmd, "preset2") == 0) {
           // Load a preset program
           load_protocol_program_preset_2();
+
+        } else if (strcmp(str_cmd, "preset3") == 0) {
+          // Load a preset program
+          load_protocol_program_preset_3();
 
         } else if (strcmp(str_cmd, ",") == 0) {
           // Go to the previous line of the protocol program and immediately

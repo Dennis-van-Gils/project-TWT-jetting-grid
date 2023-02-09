@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    03-12-2022
+ * @date    09-02-2023
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -165,7 +165,7 @@ void ProtocolManager::activate_buffer() {
     if (p.is_null()) {
       break; // Reached the end sentinel
     }
-    leds[p2led(p)] = CRGB::Blue;
+    leds[p2led(p)] = CRGB(0, 0, 128);
   }
 
   // Backup the current line buffer
