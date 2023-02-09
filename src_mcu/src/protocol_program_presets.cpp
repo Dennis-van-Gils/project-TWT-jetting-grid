@@ -2,7 +2,7 @@
  * @file    protocol_program_presets.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    13-12-2022
+ * @date    09-02-2023
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -62,5 +62,35 @@ void load_protocol_program_preset_2() {
   line.duration = 200;              // [ms]
   line.points[N_VALVES].set_null(); // Add end sentinel
   protocol_mgr.add_line(line);
+  protocol_mgr.prime_start();
+}
+
+void load_protocol_program_preset_3() {
+  Line line;
+  protocol_mgr.clear();
+  protocol_mgr.set_name("Preset: Alternating even/odd valves");
+  uint8_t idx_P = 0;
+
+  for (uint8_t idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
+    if (idx_valve % 2 == 0) {
+      line.points[idx_P] = valve2p(idx_valve);
+      idx_P++;
+    }
+  }
+  line.points[idx_P].set_null(); // Add end sentinel
+  line.duration = 1000; // [ms]
+  protocol_mgr.add_line(line);
+
+  idx_P = 0;
+  for (uint8_t idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
+    if (idx_valve % 2 == 1) {
+      line.points[idx_P] = valve2p(idx_valve);
+      idx_P++;
+    }
+  }
+  line.points[idx_P].set_null(); // Add end sentinel
+  line.duration = 1000; // [ms]
+  protocol_mgr.add_line(line);
+
   protocol_mgr.prime_start();
 }

@@ -2,7 +2,7 @@
  * @file    protocol_program_presets.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    13-12-2022
+ * @date    09-02-2023
  *
  * @brief   Predefined protocol program presets for the TWT jetting grid.
  *
@@ -28,3 +28,8 @@ void load_protocol_program_preset_1();
  * @brief All open
  */
 void load_protocol_program_preset_2();
+
+/**
+ * @brief Alternating even/odd valves
+ */
+void load_protocol_program_preset_3();
