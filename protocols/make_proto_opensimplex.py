@@ -227,7 +227,7 @@ anim = animation.FuncAnimation(
     fig_1,
     animate_fig_1,
     frames=CFG.N_FRAMES,
-    interval=50,  # [ms] == 1000/FPS
+    interval=CFG.DT_FRAME * 1000,  # [ms]
     init_func=animate_fig_1(0),
 )
 
