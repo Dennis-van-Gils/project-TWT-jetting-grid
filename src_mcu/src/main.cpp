@@ -517,8 +517,18 @@ void loop() {
           // Play the program
           fsm.transitionTo(state_run_program);
 
-        } else if (strcmp(str_cmd, "off") == 0) {
+        } else if (strcmp(str_cmd, "pause") == 0) {
           // Pause the program
+          fsm.transitionTo(state_idle);
+
+        } else if (strcmp(str_cmd, "off") == 0) {
+          // Turn all valves off and pause
+          // TODO: Capture into function
+          cp_mgr.clear_masks();
+          cp_mgr.send_masks();
+            for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
+          leds[p2led(valve2p(idx_valve + 1))] = 0;
+          }
           fsm.transitionTo(state_idle);
 
         } else if (strcmp(str_cmd, "load") == 0) {
