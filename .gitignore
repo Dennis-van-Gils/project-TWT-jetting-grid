@@ -4,6 +4,7 @@
 # Specific to this library
 port*.txt
 cache.npz
+proto_001*.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
