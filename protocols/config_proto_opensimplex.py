@@ -27,7 +27,7 @@ EXPORT_FILENAME = "proto_001"
 N_FRAMES = 5000
 
 # Time interval between each frame [s]
-DT_FRAME = 0.1
+DT_FRAME = 0.05
 
 # Threshold level to convert [0-1]-grayscale OpenSimplex noise to black and
 # white (BW). Can also get reinterpreted as a transparency fraction [0-1] to
