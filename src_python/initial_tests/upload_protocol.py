@@ -33,7 +33,7 @@ ard.auto_connect()
 
 
 # Read in protocol file from disk
-filename = "proto_1.txt"
+filename = "proto_example.txt"
 with open(file=filename, mode="r", encoding="utf8") as f:
     lines = [line.rstrip() for line in f]
 
@@ -52,7 +52,7 @@ lines = lines[data_line_idx:]
 ard.set_write_termination("\n")
 
 success, ans = ard.query("load")
-success, ans = ard.query("Random firing test pattern")
+success, ans = ard.query("OpenSimplex noise")
 success, ans = ard.query(f"{len(lines)}")
 
 if ans == "Loading stage 1: Success":
@@ -67,7 +67,7 @@ if ans == "Loading stage 1: Success":
 
         # Raw byte stream
         # raw = bytearray(struct.pack(">H", duration)) # Time duration [ms]
-        raw = bytearray(struct.pack(">H", 100))  # Time duration [ms]
+        raw = bytearray(struct.pack(">H", 50))  # Time duration [ms]
 
         str_points = fields[1:]
         for str_point in str_points:
