@@ -104,6 +104,7 @@ else:
 bins, pdf_off, pdf_on = valve_on_off_PDFs(valves_stack, CFG.DT_FRAME)
 _, pdf_off_adj, pdf_on_adj = valve_on_off_PDFs(valves_stack_adj, CFG.DT_FRAME)
 
+
 # Report transparencies
 def build_stats_str(x):
     return f"{np.mean(x):.2f} ± {np.std(x):.3f}"
@@ -213,6 +214,7 @@ ax.set_xlim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.set_ylim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.grid(which="major")
 # ax.axis("off")
+
 
 # Animation function
 def animate_fig_1(j):
