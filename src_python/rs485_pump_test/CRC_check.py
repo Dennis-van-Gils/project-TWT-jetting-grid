@@ -44,7 +44,7 @@ auchCRCLo = [
 # fmt: on
 
 
-def CRC_check(in_: bytearray):
+def CRC_check(in_: bytes):
     CRCHi = 0xFF
     CRCLo = 0xFF
     for b in in_:
@@ -53,16 +53,14 @@ def CRC_check(in_: bytearray):
         CRCLo = auchCRCLo[idx]
 
     # return (CRCHi << 8) | CRCLo
-    return (CRCHi, CRCLo)
+    return CRCHi, CRCLo
 
 
 if __name__ == "__main__":
     # Should result in 0xB8E2
     ans = CRC_check(b"\x01\x03\x02\x02\x08")
-    print(hex(ans[0]))
-    print(hex(ans[1]))
+    print(hex((ans[0]) << 8 | ans[1]))
 
     # Should result in 0x25C5
     ans = CRC_check(b"\x01\x03\x00\x32\x00\x01")
-    print(hex(ans[0]))
-    print(hex(ans[1]))
+    print(hex((ans[0]) << 8 | ans[1]))
