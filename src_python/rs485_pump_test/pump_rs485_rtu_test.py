@@ -5,6 +5,7 @@ import serial
 import time
 
 from CRC_check import CRC_check
+import HVL_Registers as hvl
 
 
 class RTU_single_reg:
@@ -40,36 +41,45 @@ class RTU_single_reg:
 
     def __str__(self):
         msg = ""
-        for b in self.byte_msg:
-            msg += "%02x " % b
+        for byte in self.byte_msg:
+            msg += f"{byte:02x} "
 
         return msg
 
 
-# Default 9600-8N1
-ser = serial.Serial("COM12")
+if __name__ == "__main__":
+    # Default for RTU is 9600-8N1
+    ser = serial.Serial(
+        port="COM12",
+        baudrate=9600,
+        bytesize=8,
+        parity="N",
+        stopbits=1,
+    )
 
-rtu = RTU_single_reg(func=0x06, addr_hi=0x00, addr_lo=0xE8)
-rtu.set_data(350)
-rtu.compile()
-print(rtu)
+    rtu = RTU_single_reg(func=0x06, addr_hi=0x00, addr_lo=0xE8)
+    rtu.set_data(350)
+    rtu.compile()
+    print(rtu)
 
-ser.write(rtu.byte_msg)
-time.sleep(0.1)
-ans = ser.read_all()
+    ser.write(rtu.byte_msg)
+    time.sleep(0.1)
+    ans = ser.read_all()
 
-for b in ans:
-    print("%02x " % b, end="")
-print("")
+    if ans is not None:
+        for b in ans:
+            print(f"{b:02x} ", end="")
+    print("")
 
-# Read baudrate
-cmd = bytearray([0x01, 0x03, 0x01, 0x0E, 0x00, 0x01])
-cmd.extend(CRC_check(cmd))
+    # Read baudrate
+    cmd = bytearray([0x01, 0x03, 0x01, 0x0E, 0x00, 0x01])
+    cmd.extend(CRC_check(cmd))
 
-ser.write(cmd)
-time.sleep(0.1)
-ans = ser.read_all()
+    ser.write(cmd)
+    time.sleep(0.1)
+    ans = ser.read_all()
 
-for b in ans:
-    print("%02x " % b, end="")
-    # print(b, end="")
+    if ans is not None:
+        for b in ans:
+            print(f"{b:02x} ", end="")
+            # print(b, end="")
