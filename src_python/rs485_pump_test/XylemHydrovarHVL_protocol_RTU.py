@@ -10,7 +10,26 @@ Function codes:
     0x10: WRITE COMMAND, write multiple contiguous registers
 """
 
+import os
 from enum import Enum, IntEnum
+
+from dvg_devices.BaseDevice import SerialDevice
+
+
+# Xylem Hydrovar HVL variable speed drive (VSD)
+class XylemHydrovarHVL(SerialDevice):
+    class State:
+        """Container for the process and measurement variables."""
+
+        pass
+
+    def __init__(
+        self,
+        name: str = "HVL",
+        long_name: str = "Xylem Hydrovar HVL variable speed drive",
+        path_config: str = (os.getcwd() + "/config/settings_Hydrovar.txt"),
+    ):
+        super().__init__(name=name, long_name=long_name)
 
 
 class HVL_FuncCode(Enum):
