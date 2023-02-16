@@ -11,26 +11,25 @@ handled inside of a single function, instead of having to handle this
 asynchronously across multiple functions.
 
 Reference documents:
-(1) Hydrovar HVL 2.015 - 4.220 Modbus Protocol & Parameters
-------------------------------------------------------------------------
-Function codes:
-    0x03: READ COMMAND, read holding registers
-    0x06: WRITE COMMAND, write single register
-    0x10: WRITE COMMAND, write multiple contiguous registers
+(1) Hydrovar HVL 2.015 - 4.220 | Modbus Protocol & Parameters
+    HVL Software Version: 2.10, 2.20
+    cod. 001085110 rev.B ed. 01/2018
+(2) Hydrovar HVL 2.015 - 4.220 | Handleiding voor installatie, bediening en
+    onderhoud
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
 __date__ = "15-02-2023"
 __version__ = "1.0.0"
+# pylint: disable=invalid-name
 
-import os
 from typing import Tuple, Union
-from pathlib import Path
-from enum import Enum, IntEnum
+from enum import IntEnum
 
+from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_devices.BaseDevice import SerialDevice
-from CRC_check import CRC_check
+from crc import crc16
 
 
 def pretty_format_hex(byte_msg: bytes) -> str:
@@ -45,7 +44,7 @@ def pretty_format_hex(byte_msg: bytes) -> str:
 # ------------------------------------------------------------------------------
 
 
-class HVL_FuncCode(Enum):
+class HVL_FuncCode(IntEnum):
     # Implemented:
     READ = 0x03  # Read the binary contents of registers
     WRITE = 0x06  # Write a value into a single register
@@ -81,6 +80,32 @@ class HVL_Register:
         self.datum_type = datum_type
         self.menu_index = menu_index
 
+
+# List of registers (incomplete list, just the bare necessities)
+# fmt: off
+HVLREG_STOP_START    = HVL_Register(0x0031, HVL_DType.U08, "")      # RW
+HVLREG_ACTUAL_VALUE  = HVL_Register(0x0032, HVL_DType.S16, "")      # R
+HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16, "P46")   # R
+HVLREG_EFF_REQ_VAL   = HVL_Register(0x0037, HVL_DType.U16, "P03")   # R
+HVLREG_START_VALUE   = HVL_Register(0x0038, HVL_DType.U08, "P04")   # RW
+HVLREG_ENABLE_DEVICE = HVL_Register(0x0061, HVL_DType.U08, "P24")   # RW
+HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08, "P1205") # RW
+
+# Pressure setpoint
+HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08, "P805")  # RW
+HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08, "P815")  # RW
+HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16, "P820")  # RW
+
+# Diagnostics
+HVLREG_TEMP_INVERTER = HVL_Register(0x0085, HVL_DType.S08, "P43")   # R
+HVLREG_CURR_INVERTER = HVL_Register(0x0087, HVL_DType.U16, "P44")   # R
+HVLREG_VOLT_INVERTER = HVL_Register(0x0088, HVL_DType.U16, "P45")   # R
+HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08, "P615")  # RW
+
+# Special status bits
+HVLREG_ERRORS_H3     = HVL_Register(0x012d, HVL_DType.B2 , "")      # R
+HVLREG_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1 , "")      # R
+# fmt: on
 
 # ------------------------------------------------------------------------------
 #   XylemHydrovarHVL
@@ -126,124 +151,167 @@ class XylemHydrovarHVL(SerialDevice):
         # Modbus slave address of the device (P1205)
         self.modbus_slave_address = connect_to_modbus_slave_address
 
-        # Location of the configuration file
-        # self.path_config = Path(path_config)
-
     # --------------------------------------------------------------------------
     #   ID_validation_query
     # --------------------------------------------------------------------------
 
     def ID_validation_query(self) -> Tuple[bool, Union[int, None]]:
-        success = self.query_modbus_slave_address()
-        return success, self.modbus_slave_address
+        # We're using a query on the Modbus slave address (P1205) as ID
+        # validation
+        success, data_val = self.RTU_read(HVLREG_ADDRESS)
+        return success, data_val
 
-    def construct_RTU_read_command(self, register: HVL_Register) -> bytes:
-        """Construct a full byte array including CRC check to send over to the
-        Hydrovar controller"""
+    # --------------------------------------------------------------------------
+    #   RTU_read
+    # --------------------------------------------------------------------------
+
+    def RTU_read(self, register: HVL_Register) -> Tuple[bool, Union[int, None]]:
+        """Send a 'read' RTU command over Modbus to the slave device.
+
+        Args:
+
+        Returns:
+
+        """
+        # Construct 'read' command
         # fmt: off
-        byte_msg = bytearray(8)
-        byte_msg[0] = self.modbus_slave_address
-        byte_msg[1] = HVL_FuncCode.READ.value
-        byte_msg[2] = (register.address & 0xFF00) >> 8  # address HI
-        byte_msg[3] = register.address & 0x00FF         # address LO
-        byte_msg[4] = 0x00                              # no. of points HI
-        byte_msg[5] = 0x01                              # no. of points LO
-        byte_msg[6:] = CRC_check(byte_msg[:6])
+        byte_cmd = bytearray(8)
+        byte_cmd[0] = self.modbus_slave_address
+        byte_cmd[1] = HVL_FuncCode.READ
+        byte_cmd[2] = (register.address & 0xff00) >> 8  # address HI
+        byte_cmd[3] = register.address & 0x00ff         # address LO
+        byte_cmd[4] = 0x00                              # no. of points HI
+        byte_cmd[5] = 0x01                              # no. of points LO
         # fmt: on
-        print(pretty_format_hex(byte_msg))
-        return byte_msg
+        byte_cmd[6:] = crc16(byte_cmd[:6])
 
-    def construct_RTU_write_command(
+        # Send command and read reply
+        success, reply = self.query(byte_cmd, returns_ascii=False)
+
+        # Parse the returned data value
+        if isinstance(reply, bytes):
+            data_val = (reply[3] << 8) + reply[4]
+
+            if register.datum_type == HVL_DType.S08:
+                data_val = data_val - 1 << 8
+            elif register.datum_type == HVL_DType.S16:
+                data_val = data_val - 1 << 16
+        else:
+            data_val = None
+
+        return success, data_val
+
+    # --------------------------------------------------------------------------
+    #   RTU_write
+    # --------------------------------------------------------------------------
+
+    def RTU_write(
         self, register: HVL_Register, value: int
-    ) -> bytes:
-        """Construct a full byte array including CRC check to send over to the
-        Hydrovar controller"""
+    ) -> Tuple[bool, Union[int, None]]:
+        """Send a 'write' RTU command over Modbus to the slave device.
+
+        Args:
+
+        Returns:
+
+        """
+        # Construct 'write' command
         # fmt: off
-        byte_msg = bytearray(8)
-        byte_msg[0] = self.modbus_slave_address
-        byte_msg[1] = HVL_FuncCode.WRITE.value
-        byte_msg[2] = (register.address & 0xFF00) >> 8  # address HI
-        byte_msg[3] = register.address & 0x00FF         # address LO
-        byte_msg[4] = (value & 0xFF00) >> 8             # data HI
-        byte_msg[5] = value & 0x00FF                    # data LO
-        byte_msg[6:] = CRC_check(byte_msg[:6])
+        byte_cmd = bytearray(8)
+        byte_cmd[0] = self.modbus_slave_address
+        byte_cmd[1] = HVL_FuncCode.WRITE
+        byte_cmd[2] = (register.address & 0xFF00) >> 8  # address HI
+        byte_cmd[3] = register.address & 0x00FF         # address LO
+
+        if (register.datum_type == HVL_DType.U08) or (
+            register.datum_type == HVL_DType.U16
+        ):
+            byte_cmd[4] = (value & 0xFF00) >> 8         # data HI
+            byte_cmd[5] = value & 0x00FF                # data LO
+        else:
+            # Not implemented (yet)
+            pft("WARNING: Datum type not implemented (yet)")
+            return False, None
+
+        byte_cmd[6:] = crc16(byte_cmd[:6])
         # fmt: on
-        print(pretty_format_hex(byte_msg))
-        return byte_msg
+
+        # Send command and read reply
+        success, reply = self.query(byte_cmd, returns_ascii=False)
+
+        # Parse the returned data value
+        if isinstance(reply, bytes):
+            data_val = (reply[4] << 8) + reply[5]
+
+            if register.datum_type == HVL_DType.S08:
+                data_val = data_val - 1 << 8
+            elif register.datum_type == HVL_DType.S16:
+                data_val = data_val - 1 << 16
+        else:
+            data_val = None
+
+        return success, data_val
 
     # --------------------------------------------------------------------------
     #
     # --------------------------------------------------------------------------
 
-    def turn_on_pump(self) -> bool:
-        byte_msg = self.construct_RTU_write_command(HVL_STOP_START, 1)
-        success, reply = self.query(byte_msg, returns_ascii=False)
+    def start_pump(self) -> bool:
+        success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
 
-        # TODO: make more intelligent
-        if isinstance(reply, bytes):
-            print(pretty_format_hex(reply))
-            print(f"DEC VALUE: {int(reply[4:6].hex(), 16):d}")
+        # TODO: Rethink
+        if success and (data_val == 1):
+            print("Pump turned ON")
+        elif success and (data_val == 0):
+            print("Pump could NOT be turned ON")
+        else:
+            print("I/O error")
 
         return success
 
-    def turn_off_pump(self) -> bool:
-        byte_msg = self.construct_RTU_write_command(HVL_STOP_START, 0)
-        success, reply = self.query(byte_msg, returns_ascii=False)
+    def stop_pump(self) -> bool:
+        success, data_val = self.RTU_write(HVLREG_STOP_START, 0)
 
-        # TODO: make more intelligent
-        if isinstance(reply, bytes):
-            print(pretty_format_hex(reply))
-            print(f"DEC VALUE: {int(reply[4:6].hex(), 16):d}")
+        # TODO: Rethink
+        if success and (data_val == 1):
+            print("Pump turned OFF")
+        elif success and (data_val == 0):
+            print("Pump could NOT be turned OFF")
+        else:
+            print("I/O error")
 
         return success
 
     def query_actual_value(self) -> bool:
-        byte_msg = self.construct_RTU_read_command(HVL_ACTUAL_VALUE)
-        success, reply = self.query(byte_msg, returns_ascii=False)
+        success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
 
-        # TODO: make more intelligent
-        if isinstance(reply, bytes):
-            print(pretty_format_hex(reply))
-            print(f"DEC VALUE: {int(reply[3:5].hex(), 16):d}")
+        # TODO: Rethink
+        if data_val is not None:
+            print(f"Actual pressure: {data_val/100:.2f} bar")
 
         return success
 
-    # --------------------------------------------------------------------------
-    #   query_modbus_slave_address
-    # --------------------------------------------------------------------------
+    def set_required_value(self, pressure_bar: float) -> bool:
+        # Limit pressure setpoint
+        MAX_PRESSURE = 3  # [bar]
+        pressure_bar = max(float(pressure_bar), 0)
+        pressure_bar = min(float(pressure_bar), MAX_PRESSURE)
 
-    def query_modbus_slave_address(self) -> bool:
-        """Query the Modbus slave address of the device (P1205).
+        success, data_val = self.RTU_write(
+            HVLREG_REQ_VAL_1, int(pressure_bar * 100)
+        )
 
-        Returns: True if successful, False otherwise.
-        """
-        byte_msg = self.construct_RTU_read_command(HVL_ADDRESS)
-        success, reply = self.query(byte_msg, returns_ascii=False)
-
-        # TODO: make more intelligent
-        if isinstance(reply, bytes):
-            print(pretty_format_hex(reply))
+        # TODO: Rethink
+        if data_val is not None:
+            print(f"Set required pressure: {data_val/100:.2f} bar")
 
         return success
 
+    def query_required_value(self) -> bool:
+        success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
 
-# List of registers (incomplete list, just the bare essentials)
-# fmt: off
-HVL_STOP_START    = HVL_Register(0x0031, HVL_DType.U08, "")
-HVL_ACTUAL_VALUE  = HVL_Register(0x0032, HVL_DType.S16, "")
-HVL_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16, "P46")
-HVL_EFF_REQ_VAL   = HVL_Register(0x0037, HVL_DType.U16, "P03")
-HVL_START_VALUE   = HVL_Register(0x0038, HVL_DType.U08, "P04")
-HVL_ENABLE_DEVICE = HVL_Register(0x0061, HVL_DType.U08, "P24")
-HVL_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08, "P1205")
+        # TODO: Rethink
+        if data_val is not None:
+            print(f"Set required pressure: {data_val/100:.2f} bar")
 
-# Diagnostics
-HVL_TEMP_INVERTER = HVL_Register(0x0085, HVL_DType.S08, "P43")
-HVL_CURR_INVERTER = HVL_Register(0x0087, HVL_DType.U16, "P44")
-HVL_VOLT_INVERTER = HVL_Register(0x0088, HVL_DType.U16, "P45")
-HVL_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08, "P615")
-
-# Special status bits
-HVL_ERRORS_H3     = HVL_Register(0x012d, HVL_DType.B2 , "")
-HVL_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1 , "")
-# fmt: on
+        return success
