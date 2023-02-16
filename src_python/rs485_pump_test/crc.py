@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=invalid-name
+
+from typing import Tuple
 
 # fmt:off
 auchCRCHi = [
@@ -44,23 +47,23 @@ auchCRCLo = [
 # fmt: on
 
 
-def CRC_check(in_: bytes):
+def crc16(bytes_in: bytes) -> Tuple[int, int]:
+    """Calculate the 16-bit CRC of a bytes array and return it."""
     CRCHi = 0xFF
     CRCLo = 0xFF
-    for b in in_:
-        idx = CRCHi ^ b
+    for byte in bytes_in:
+        idx = CRCHi ^ byte
         CRCHi = CRCLo ^ auchCRCHi[idx]
         CRCLo = auchCRCLo[idx]
 
-    # return (CRCHi << 8) | CRCLo
     return CRCHi, CRCLo
 
 
 if __name__ == "__main__":
-    # Should result in 0xB8E2
-    ans = CRC_check(b"\x01\x03\x02\x02\x08")
+    # Should result in 0xb8e2
+    ans = crc16(b"\x01\x03\x02\x02\x08")
     print(hex((ans[0]) << 8 | ans[1]))
 
-    # Should result in 0x25C5
-    ans = CRC_check(b"\x01\x03\x00\x32\x00\x01")
+    # Should result in 0x25c5
+    ans = crc16(b"\x01\x03\x00\x32\x00\x01")
     print(hex((ans[0]) << 8 | ans[1]))
