@@ -27,6 +27,8 @@ __version__ = "1.0.0"
 from typing import Tuple, Union
 from enum import IntEnum
 
+import numpy as np
+
 from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_devices.BaseDevice import SerialDevice
 from crc import crc16
@@ -116,7 +118,9 @@ class XylemHydrovarHVL(SerialDevice):
     class State:
         """Container for the process and measurement variables."""
 
-        pass
+        pump_is_on = False
+        actual_pressure = np.nan  # [bar]
+        required_pressure = np.nan  # [bar]
 
     def __init__(
         self,
@@ -189,7 +193,7 @@ class XylemHydrovarHVL(SerialDevice):
         success, reply = self.query(byte_cmd, returns_ascii=False)
 
         # Parse the returned data value
-        if isinstance(reply, bytes):
+        if success and isinstance(reply, bytes):
             data_val = (reply[3] << 8) + reply[4]
 
             if register.datum_type == HVL_DType.S08:
@@ -240,7 +244,7 @@ class XylemHydrovarHVL(SerialDevice):
         success, reply = self.query(byte_cmd, returns_ascii=False)
 
         # Parse the returned data value
-        if isinstance(reply, bytes):
+        if success and isinstance(reply, bytes):
             data_val = (reply[4] << 8) + reply[5]
 
             if register.datum_type == HVL_DType.S08:
@@ -258,60 +262,45 @@ class XylemHydrovarHVL(SerialDevice):
 
     def start_pump(self) -> bool:
         success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
-
-        # TODO: Rethink
-        if success and (data_val == 1):
-            print("Pump turned ON")
-        elif success and (data_val == 0):
-            print("Pump could NOT be turned ON")
-        else:
-            print("I/O error")
+        if data_val is not None:
+            self.state.pump_is_on = bool(data_val)
+            print(f"Pump turned {'ON' if self.state.pump_is_on else 'OFF'}")
 
         return success
 
     def stop_pump(self) -> bool:
         success, data_val = self.RTU_write(HVLREG_STOP_START, 0)
-
-        # TODO: Rethink
-        if success and (data_val == 1):
-            print("Pump turned OFF")
-        elif success and (data_val == 0):
-            print("Pump could NOT be turned OFF")
-        else:
-            print("I/O error")
+        if data_val is not None:
+            self.state.pump_is_on = bool(data_val)
+            print(f"Pump turned {'ON' if self.state.pump_is_on else 'OFF'}")
 
         return success
 
-    def query_actual_value(self) -> bool:
+    def read_actual_pressure(self) -> bool:
         success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
-
-        # TODO: Rethink
         if data_val is not None:
-            print(f"Actual pressure: {data_val/100:.2f} bar")
+            self.state.actual_pressure = float(data_val) / 100
+            print(f"Actual pressure: {self.state.actual_pressure:.2f} bar")
 
         return success
 
-    def set_required_value(self, pressure_bar: float) -> bool:
+    def set_required_pressure(self, P_bar: float) -> bool:
         # Limit pressure setpoint
-        MAX_PRESSURE = 3  # [bar]
-        pressure_bar = max(float(pressure_bar), 0)
-        pressure_bar = min(float(pressure_bar), MAX_PRESSURE)
+        MAX_PRESSURE = 1  # [bar]
+        P_bar = max(float(P_bar), 0)
+        P_bar = min(float(P_bar), MAX_PRESSURE)
 
-        success, data_val = self.RTU_write(
-            HVLREG_REQ_VAL_1, int(pressure_bar * 100)
-        )
-
-        # TODO: Rethink
+        success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
-            print(f"Set required pressure: {data_val/100:.2f} bar")
+            self.state.required_pressure = float(data_val) / 100
+            print(f"Required pressure: {self.state.required_pressure:.2f} bar")
 
         return success
 
-    def query_required_value(self) -> bool:
+    def read_required_pressure(self) -> bool:
         success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
-
-        # TODO: Rethink
         if data_val is not None:
-            print(f"Set required pressure: {data_val/100:.2f} bar")
+            self.state.required_pressure = float(data_val) / 100
+            print(f"Required pressure: {self.state.required_pressure:.2f} bar")
 
         return success
