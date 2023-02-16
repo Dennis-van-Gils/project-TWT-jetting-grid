@@ -20,7 +20,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "15-02-2023"
+__date__ = "16-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -34,11 +34,11 @@ from dvg_devices.BaseDevice import SerialDevice
 from crc import crc16
 
 
-def pretty_format_hex(byte_msg: bytes) -> str:
+def pretty_print_hex(byte_msg: bytes) -> str:
     msg = ""
     for byte in byte_msg:
         msg += f"{byte:02x} "
-    return msg
+    return msg.strip()
 
 
 # ------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ def pretty_format_hex(byte_msg: bytes) -> str:
 
 class HVL_FuncCode(IntEnum):
     # Implemented:
-    READ = 0x03  # Read the binary contents of registers
+    READ = 0x03  # Read the contents of a single register
     WRITE = 0x06  # Write a value into a single register
 
     # Not implemented:
@@ -116,11 +116,91 @@ HVLREG_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1 , "")      # R
 
 class XylemHydrovarHVL(SerialDevice):
     class State:
-        """Container for the process and measurement variables."""
+        """Container for the process and measurement variables"""
 
         pump_is_on = False
         actual_pressure = np.nan  # [bar]
         required_pressure = np.nan  # [bar]
+
+    class ErrorStatus:
+        """Container for the Error Status bits (H3)"""
+
+        # fmt: off
+        overcurrent       = False  # bit 00, error 11
+        overload          = False  # bit 01, error 12
+        overvoltage       = False  # bit 02, error 13
+        phase_loss        = False  # bit 03, error 16
+        inverter_overheat = False  # bit 04, error 14
+        motor_overheat    = False  # bit 05, error 15
+        lack_of_water     = False  # bit 06, error 21
+        minimum_threshold = False  # bit 07, error 22
+        act_val_sensor_1  = False  # bit 08, error 23
+        act_val_sensor_2  = False  # bit 09, error 24
+        setpoint_1_low_mA = False  # bit 10, error 25
+        setpoint_2_low_mA = False  # bit 11, error 26
+        # fmt: on
+
+        def report(self):
+            error_list = (
+                self.overcurrent,
+                self.overload,
+                self.overvoltage,
+                self.phase_loss,
+                self.inverter_overheat,
+                self.motor_overheat,
+                self.lack_of_water,
+                self.minimum_threshold,
+                self.act_val_sensor_1,
+                self.act_val_sensor_2,
+                self.setpoint_1_low_mA,
+                self.setpoint_2_low_mA,
+            )
+
+            if not np.any(error_list, where=True):
+                print("No errors")
+                return
+
+            print("ERRORS DETECTED")
+            print("---------------")
+            if self.overcurrent:
+                print("- OVERCURRENT")
+            if self.overload:
+                print("- OVERLOAD")
+            if self.overvoltage:
+                print("- OVERVOLTAGE")
+            if self.phase_loss:
+                print("- PHASE LOSS")
+            if self.inverter_overheat:
+                print("- INVERTER OVERHEAT")
+            if self.motor_overheat:
+                print("- MOTOR OVERHEAT")
+            if self.lack_of_water:
+                print("- LACK OF WATER")
+            if self.minimum_threshold:
+                print("- MINIMUM THRESHOLD")
+            if self.act_val_sensor_1:
+                print("- ACT VAL SENSOR 1")
+            if self.act_val_sensor_2:
+                print("- ACT VAL SENSOR 2")
+            if self.setpoint_1_low_mA:
+                print("- SETPOINT 1 I<4 mA")
+            if self.setpoint_2_low_mA:
+                print("- SETPOINT 2 I<4 mA")
+
+    class DeviceStatus:
+        """Container for the Extended Device Status bits (H4)"""
+
+        # fmt: off
+        device_is_preset                    = False  # bit 00
+        device_is_ready_for_regulation      = False  # bit 01
+        device_has_an_error                 = False  # bit 02
+        device_has_an_warning               = False  # bit 03
+        external_ON_OFF_terminal_enabled    = False  # bit 04
+        device_is_enabled_with_start_button = False  # bit 05
+        motor_is_running                    = False  # bit 06
+        solo_run_ON_OFF                     = False  # bit 14
+        inverter_STOP_START                 = False  # bit 15
+        # fmt: on
 
     def __init__(
         self,
@@ -151,6 +231,8 @@ class XylemHydrovarHVL(SerialDevice):
 
         # Container for the process and measurement variables
         self.state = self.State()
+        self.error_status = self.ErrorStatus()
+        self.device_status = self.DeviceStatus()
 
         # Modbus slave address of the device (P1205)
         self.modbus_slave_address = connect_to_modbus_slave_address
@@ -302,5 +384,26 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             self.state.required_pressure = float(data_val) / 100
             print(f"Required pressure: {self.state.required_pressure:.2f} bar")
+
+        return success
+
+    def read_error_status(self) -> bool:
+        success, data_val = self.RTU_read(HVLREG_ERRORS_H3)
+        if data_val is not None:
+            # fmt: off
+            self.error_status.overcurrent       = bool(data_val & (1 << 0))
+            self.error_status.overload          = bool(data_val & (1 << 1))
+            self.error_status.overvoltage       = bool(data_val & (1 << 2))
+            self.error_status.phase_loss        = bool(data_val & (1 << 3))
+            self.error_status.inverter_overheat = bool(data_val & (1 << 4))
+            self.error_status.motor_overheat    = bool(data_val & (1 << 5))
+            self.error_status.lack_of_water     = bool(data_val & (1 << 6))
+            self.error_status.minimum_threshold = bool(data_val & (1 << 7))
+            self.error_status.act_val_sensor_1  = bool(data_val & (1 << 8))
+            self.error_status.act_val_sensor_2  = bool(data_val & (1 << 9))
+            self.error_status.setpoint_1_low_mA = bool(data_val & (1 << 10))
+            self.error_status.setpoint_2_low_mA = bool(data_val & (1 << 11))
+            # fmt: on
+            self.error_status.report()
 
         return success
