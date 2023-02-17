@@ -24,6 +24,7 @@ __date__ = "17-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
+import sys
 from typing import Tuple, Union
 from enum import IntEnum
 
@@ -34,7 +35,7 @@ from dvg_devices.BaseDevice import SerialDevice
 from crc import crc16
 
 
-def pretty_print_hex(byte_msg: bytes) -> str:
+def pretty_format_hex(byte_msg: bytes) -> str:
     msg = ""
     for byte in byte_msg:
         msg += f"{byte:02x} "
@@ -307,7 +308,10 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd[2] = (register.address & 0xff00) >> 8  # address HI
         byte_cmd[3] = register.address & 0x00ff         # address LO
         byte_cmd[4] = 0x00                              # no. of points HI
-        byte_cmd[5] = 0x01                              # no. of points LO
+        if register.datum_type == HVL_DType.B2:
+            byte_cmd[5] = 0x02                          # no. of points LO
+        else:
+            byte_cmd[5] = 0x01                          # no. of points LO
         # fmt: on
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
@@ -316,12 +320,26 @@ class XylemHydrovarHVL(SerialDevice):
 
         # Parse the returned data value
         if success and isinstance(reply, bytes):
-            data_val = (reply[3] << 8) + reply[4]
+            byte_count = reply[2]
+            if byte_count == 2:
+                data_val = (reply[3] << 8) + reply[4]
+            elif byte_count == 4:  # HVL_DType.B2
+                data_val = (
+                    (reply[3] << 32)
+                    + (reply[4] << 16)
+                    + (reply[5] << 8)
+                    + (reply[6])
+                )
+            else:
+                pft("Unsupported byte count")
+                sys.exit()
 
             if register.datum_type == HVL_DType.S08:
-                data_val = data_val - 1 << 8
+                if data_val >= (1 << 7):
+                    data_val = data_val - 1 << 8
             elif register.datum_type == HVL_DType.S16:
-                data_val = data_val - 1 << 16
+                if data_val >= (1 << 15):
+                    data_val = data_val - 1 << 16
         else:
             data_val = None
 
