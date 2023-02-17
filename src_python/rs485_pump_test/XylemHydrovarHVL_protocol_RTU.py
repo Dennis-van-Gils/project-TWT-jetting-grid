@@ -331,7 +331,7 @@ class XylemHydrovarHVL(SerialDevice):
                     + (reply[6])
                 )
             else:
-                pft("Unsupported byte count")
+                pft("ERROR: Unsupported byte count")
                 sys.exit()
 
             if register.datum_type == HVL_DType.S08:
@@ -374,7 +374,7 @@ class XylemHydrovarHVL(SerialDevice):
             byte_cmd[5] = value & 0x00FF                # data LO
         else:
             # Not implemented (yet)
-            pft("WARNING: Datum type not implemented (yet)")
+            pft("ERROR: Datum type not implemented (yet)")
             return False, None
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
