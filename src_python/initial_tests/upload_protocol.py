@@ -30,6 +30,8 @@ class P:
 
 ard = Arduino()
 ard.auto_connect()
+# ard.ser.timeout = 4
+# ard.ser.write_timeout = 4
 
 
 # Read in protocol file from disk
@@ -52,8 +54,11 @@ lines = lines[data_line_idx:]
 ard.set_write_termination("\n")
 
 success, ans = ard.query("load")
+print(ans)
 success, ans = ard.query("OpenSimplex noise")
+print(ans)
 success, ans = ard.query(f"{len(lines)}")
+print(ans)
 
 if ans == "Loading stage 1: Success":
     # Prepare binary data stream
@@ -85,6 +90,8 @@ if ans == "Loading stage 1: Success":
 
     ### Send EOP
     ard.write(b"")
+
+    print("Last line send")
 
     ### Check for success
     success, ans = ard.readline()
