@@ -18,5 +18,12 @@ if __name__ == "__main__":
     }
 
     if hvl.auto_connect(PATH_PORT):
+        hvl.set_error_reset(False)
+
+        hvl.read_error_status()
+        hvl.read_device_status()
         hvl.read_actual_pressure()
+        hvl.read_required_pressure()
+
+        hvl.set_required_pressure(1)
         hvl.read_required_pressure()

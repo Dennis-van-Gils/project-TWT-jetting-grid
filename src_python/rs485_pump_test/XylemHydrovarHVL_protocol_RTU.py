@@ -13,14 +13,14 @@ asynchronously across multiple functions.
 Reference documents:
 (1) Hydrovar HVL 2.015 - 4.220 | Modbus Protocol & Parameters
     HVL Software Version: 2.10, 2.20
-    cod. 001085110 rev.B ed. 01/2018
-(2) Hydrovar HVL 2.015 - 4.220 | Handleiding voor installatie, bediening en
-    onderhoud
+    cod. 001085110 rev. B ed. 01/2018
+(2) Hydrovar HVL 2.015 - 4.220 | Installation, Operation, and Maintenance Manual
+    cod. 001085102 rev. A ed. 01/2016
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "16-02-2023"
+__date__ = "17-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -118,9 +118,13 @@ class XylemHydrovarHVL(SerialDevice):
     class State:
         """Container for the process and measurement variables"""
 
-        pump_is_on = False
-        actual_pressure = np.nan  # [bar]
-        required_pressure = np.nan  # [bar]
+        # fmt: off
+        pump_is_on        = False
+        actual_pressure   = np.nan  # [bar]
+        required_pressure = np.nan  # [bar] P820
+        start_value       = np.nan  # [pct] P04
+        pump_is_enabled   = False   #       P24
+        # fmt: on
 
     class ErrorStatus:
         """Container for the Error Status bits (H3)"""
@@ -163,29 +167,29 @@ class XylemHydrovarHVL(SerialDevice):
             print("ERRORS DETECTED")
             print("---------------")
             if self.overcurrent:
-                print("- OVERCURRENT")
+                print("- #11: OVERCURRENT")
             if self.overload:
-                print("- OVERLOAD")
+                print("- #12: OVERLOAD")
             if self.overvoltage:
-                print("- OVERVOLTAGE")
+                print("- #13: OVERVOLTAGE")
             if self.phase_loss:
-                print("- PHASE LOSS")
+                print("- #16: PHASE LOSS")
             if self.inverter_overheat:
-                print("- INVERTER OVERHEAT")
+                print("- #14: INVERTER OVERHEAT")
             if self.motor_overheat:
-                print("- MOTOR OVERHEAT")
+                print("- #15: MOTOR OVERHEAT")
             if self.lack_of_water:
-                print("- LACK OF WATER")
+                print("- #21: LACK OF WATER")
             if self.minimum_threshold:
-                print("- MINIMUM THRESHOLD")
+                print("- #22: MINIMUM THRESHOLD")
             if self.act_val_sensor_1:
-                print("- ACT VAL SENSOR 1")
+                print("- #23: ACT VAL SENSOR 1")
             if self.act_val_sensor_2:
-                print("- ACT VAL SENSOR 2")
+                print("- #24: ACT VAL SENSOR 2")
             if self.setpoint_1_low_mA:
-                print("- SETPOINT 1 I<4 mA")
+                print("- #25: SETPOINT 1 I<4 mA")
             if self.setpoint_2_low_mA:
-                print("- SETPOINT 2 I<4 mA")
+                print("- #26: SETPOINT 2 I<4 mA")
 
     class DeviceStatus:
         """Container for the Extended Device Status bits (H4)"""
@@ -194,7 +198,7 @@ class XylemHydrovarHVL(SerialDevice):
         device_is_preset                    = False  # bit 00
         device_is_ready_for_regulation      = False  # bit 01
         device_has_an_error                 = False  # bit 02
-        device_has_an_warning               = False  # bit 03
+        device_has_a_warning                = False  # bit 03
         external_ON_OFF_terminal_enabled    = False  # bit 04
         device_is_enabled_with_start_button = False  # bit 05
         motor_is_running                    = False  # bit 06
@@ -202,11 +206,47 @@ class XylemHydrovarHVL(SerialDevice):
         inverter_STOP_START                 = False  # bit 15
         # fmt: on
 
+        def report(self):
+            w = ".<38"  # Width specifier
+            print("DEVICE STATUS")
+            print("-------------")
+            # fmt: off
+            print(
+                f"{'- Device is preset':{w}s} {self.device_is_preset}"
+            )
+            print(
+                f"{'- Device is ready for regulation':{w}s} "
+                f"{self.device_is_ready_for_regulation}"
+            )
+            print(
+                f"{'- Device has an error':{w}s} {self.device_has_an_error}"
+            )
+            print(
+                f"{'- Device has a warning':{w}s} {self.device_has_a_warning}"
+            )
+            print(
+                f"{'- External ON/OFF terminal enabled':{w}s} "
+                f"{self.external_ON_OFF_terminal_enabled}"
+            )
+            print(
+                f"{'- Device is enabled with start button':{w}s} "
+                f"{self.device_is_enabled_with_start_button}"
+            )
+            print(
+                f"{'- Motor is running':{w}s} {self.motor_is_running}"
+            )
+            print(
+                f"{'- Solo-Run ON/OFF':{w}s} {self.solo_run_ON_OFF}"
+            )
+            print(
+                f"{'- Inverter STOP/START':{w}s} {self.inverter_STOP_START}"
+            )
+            # fmt: on
+
     def __init__(
         self,
         name: str = "HVL",
         long_name: str = "Xylem Hydrovar HVL variable speed drive",
-        # path_config: str = (os.getcwd() + "/config/settings_Hydrovar.txt"),
         connect_to_modbus_slave_address: int = 0x01,
     ):
         super().__init__(name=name, long_name=long_name)
@@ -345,65 +385,136 @@ class XylemHydrovarHVL(SerialDevice):
     def start_pump(self) -> bool:
         success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
         if data_val is not None:
-            self.state.pump_is_on = bool(data_val)
-            print(f"Pump turned {'ON' if self.state.pump_is_on else 'OFF'}")
+            val = bool(data_val)
+            self.state.pump_is_on = val
+            print(f"Pump turned {'ON' if val else 'OFF'}")
 
         return success
 
     def stop_pump(self) -> bool:
         success, data_val = self.RTU_write(HVLREG_STOP_START, 0)
         if data_val is not None:
-            self.state.pump_is_on = bool(data_val)
-            print(f"Pump turned {'ON' if self.state.pump_is_on else 'OFF'}")
+            val = bool(data_val)
+            self.state.pump_is_on = val
+            print(f"Pump turned {'ON' if val else 'OFF'}")
+
+        return success
+
+    def enable_pump(self) -> bool:
+        success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 1)
+        if data_val is not None:
+            val = bool(data_val)
+            self.state.pump_is_enabled = val
+            print(f"Pump is {'ENABLED' if val else 'DISABLED'}")
+
+        return success
+
+    def disable_pump(self) -> bool:
+        success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 0)
+        if data_val is not None:
+            val = bool(data_val)
+            self.state.pump_is_enabled = val
+            print(f"Pump is {'ENABLED' if val else 'DISABLED'}")
 
         return success
 
     def read_actual_pressure(self) -> bool:
         success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
         if data_val is not None:
-            self.state.actual_pressure = float(data_val) / 100
-            print(f"Actual pressure: {self.state.actual_pressure:.2f} bar")
+            val = float(data_val) / 100
+            self.state.actual_pressure = val
+            print(f"Actual pressure: {val:.2f} bar")
 
         return success
 
     def set_required_pressure(self, P_bar: float) -> bool:
+        """P820: Sets the digital required value 1 in bar."""
         # Limit pressure setpoint
-        MAX_PRESSURE = 1  # [bar]
+        MAX_PRESSURE = 1.5  # [bar]
         P_bar = max(float(P_bar), 0)
         P_bar = min(float(P_bar), MAX_PRESSURE)
 
         success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
-            self.state.required_pressure = float(data_val) / 100
-            print(f"Required pressure: {self.state.required_pressure:.2f} bar")
+            val = float(data_val) / 100
+            self.state.required_pressure = val
+            print(f"Set required pressure: {val:.2f} bar")
 
         return success
 
     def read_required_pressure(self) -> bool:
+        """P820: Reads the digital required value 1 in bar."""
         success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
         if data_val is not None:
-            self.state.required_pressure = float(data_val) / 100
-            print(f"Required pressure: {self.state.required_pressure:.2f} bar")
+            val = float(data_val) / 100
+            self.state.required_pressure = val
+            print(f"Read required pressure: {val:.2f} bar")
+
+        return success
+
+    def set_start_value(self, pct: float) -> bool:
+        """P04: This parameter defines, in percentage (0-100%) of the required
+        value (P02 REQUIRED VAL.), the start value after pump stops. If P02
+        REQUIRED VAL. is met and there is no more consumption, then the pump
+        stops. The pump starts again when the pressure drops below P04 START
+        VALUE. Value 100% makes this parameter not effective (100%=off)!
+        """
+        pct = max(pct, 0)
+        pct = min(pct, 100)
+        success, data_val = self.RTU_write(HVLREG_START_VALUE, int(pct))
+        if data_val is not None:
+            val = float(data_val)
+            self.state.start_value = val
+            print(f"Set start value: {val:.0f} %")
+
+        return success
+
+    def set_error_reset(self, flag: Union[int, bool]) -> bool:
+        """P615: Selects automatic reset of errors"""
+        success, data_val = self.RTU_write(HVLREG_ERROR_RESET, int(flag))
+        if data_val is not None:
+            val = int(data_val)
+            print(f"Set error reset: {val}")
 
         return success
 
     def read_error_status(self) -> bool:
         success, data_val = self.RTU_read(HVLREG_ERRORS_H3)
         if data_val is not None:
+            s = self.error_status  # Shorthand
             # fmt: off
-            self.error_status.overcurrent       = bool(data_val & (1 << 0))
-            self.error_status.overload          = bool(data_val & (1 << 1))
-            self.error_status.overvoltage       = bool(data_val & (1 << 2))
-            self.error_status.phase_loss        = bool(data_val & (1 << 3))
-            self.error_status.inverter_overheat = bool(data_val & (1 << 4))
-            self.error_status.motor_overheat    = bool(data_val & (1 << 5))
-            self.error_status.lack_of_water     = bool(data_val & (1 << 6))
-            self.error_status.minimum_threshold = bool(data_val & (1 << 7))
-            self.error_status.act_val_sensor_1  = bool(data_val & (1 << 8))
-            self.error_status.act_val_sensor_2  = bool(data_val & (1 << 9))
-            self.error_status.setpoint_1_low_mA = bool(data_val & (1 << 10))
-            self.error_status.setpoint_2_low_mA = bool(data_val & (1 << 11))
+            s.overcurrent       = bool(data_val & (1 << 0))
+            s.overload          = bool(data_val & (1 << 1))
+            s.overvoltage       = bool(data_val & (1 << 2))
+            s.phase_loss        = bool(data_val & (1 << 3))
+            s.inverter_overheat = bool(data_val & (1 << 4))
+            s.motor_overheat    = bool(data_val & (1 << 5))
+            s.lack_of_water     = bool(data_val & (1 << 6))
+            s.minimum_threshold = bool(data_val & (1 << 7))
+            s.act_val_sensor_1  = bool(data_val & (1 << 8))
+            s.act_val_sensor_2  = bool(data_val & (1 << 9))
+            s.setpoint_1_low_mA = bool(data_val & (1 << 10))
+            s.setpoint_2_low_mA = bool(data_val & (1 << 11))
             # fmt: on
-            self.error_status.report()
+            s.report()
+
+        return success
+
+    def read_device_status(self) -> bool:
+        success, data_val = self.RTU_read(HVLREG_DEV_STATUS_H4)
+        if data_val is not None:
+            s = self.device_status  # Shorthand
+            # fmt: off
+            s.device_is_preset                    = bool(data_val & (1 << 0))
+            s.device_is_ready_for_regulation      = bool(data_val & (1 << 1))
+            s.device_has_an_error                 = bool(data_val & (1 << 2))
+            s.device_has_a_warning                = bool(data_val & (1 << 3))
+            s.external_ON_OFF_terminal_enabled    = bool(data_val & (1 << 4))
+            s.device_is_enabled_with_start_button = bool(data_val & (1 << 5))
+            s.motor_is_running                    = bool(data_val & (1 << 6))
+            s.solo_run_ON_OFF                     = bool(data_val & (1 << 14))
+            s.inverter_STOP_START                 = bool(data_val & (1 << 15))
+            # fmt: on
+            s.report()
 
         return success
