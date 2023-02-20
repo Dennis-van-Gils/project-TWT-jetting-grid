@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
+from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL, HVL_Mode
 
 if __name__ == "__main__":
     # Path to the textfile containing the (last used) serial port
@@ -25,10 +25,8 @@ if __name__ == "__main__":
 
     hvl.set_error_reset(False)
 
-    hvl.read_error_status()
-    hvl.read_device_status()
+    hvl.set_mode(HVL_Mode.CONTROLLER)
     hvl.read_actual_value()
-    hvl.read_required_pressure()
 
     hvl.set_required_pressure(1)
     hvl.read_required_pressure()

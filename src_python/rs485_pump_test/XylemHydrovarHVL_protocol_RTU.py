@@ -152,11 +152,12 @@ class XylemHydrovarHVL(SerialDevice):
         """Container for the process and measurement variables"""
 
         # fmt: off
-        pump_is_on        = False   # (bool)
-        pump_is_enabled   = False   # (bool) P24
-        actual_value      = np.nan  # [bar] or [Hz], depends on `mode`
-        required_pressure = np.nan  # [bar] P820
-        mode              = HVL_Mode.UNINITIALIZED  # (HVL_Mode) P105
+        pump_is_on         = False   # (bool)
+        pump_is_enabled    = False   # (bool)                           P24
+        mode               = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
+        actual_value       = np.nan  # [bar] or [Hz], depends on `mode`
+        required_pressure  = 0.0     # [bar]                            P820
+        required_frequency = 0.0     # [Hz]                             P830
         # fmt: on
 
     class ErrorStatus:
@@ -455,15 +456,18 @@ class XylemHydrovarHVL(SerialDevice):
     # --------------------------------------------------------------------------
 
     def begin(self) -> bool:
-        """Read the necessary parameters of the HVL controller and store it in
-        the `state`, `error_status` and `device_status` members. This method
-        should be called once and immediately after a successful connection to
-        the HVL controller has been established.
+        """Stop the pump and read the necessary parameters of the HVL controller
+        and store it in the `state`, `error_status` and `device_status` members.
+        This method should be called once and immediately after a successful
+        connection to the HVL controller has been established.
         """
         success = True
+        success &= self.stop_pump()
         success &= self.read_mode()
         success &= self.read_device_status()
         success &= self.read_error_status()
+        success &= self.set_required_pressure(0)
+        success &= self.set_required_frequency(0)
 
         return success
 
@@ -577,7 +581,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def set_required_pressure(self, P_bar: float) -> bool:
-        """P820: Sets the digital required value 1 in bar."""
+        """P820: Set the digital required value 1 in bar."""
         # Limit pressure setpoint
         P_bar = max(float(P_bar), 0)
         P_bar = min(float(P_bar), MAX_PRESSURE_SETPOINT)
@@ -591,12 +595,34 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_required_pressure(self) -> bool:
-        """P820: Reads the digital required value 1 in bar."""
+        """P820: Read the digital required value 1 in bar."""
         success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.required_pressure = val
             print(f"Read required pressure: {val:.2f} bar")
+
+        return success
+
+    def set_required_frequency(self, f_Hz: float) -> bool:
+        """P830: Set the required frequency 1 for Actuator mode in Hz."""
+        success, data_val = self.RTU_write(
+            HVLREG_ACTUAT_FREQ_1, int(f_Hz * 100)
+        )
+        if data_val is not None:
+            val = float(data_val) / 100
+            self.state.required_frequency = val
+            print(f"Set required frequency: {val:.2f} Hz")
+
+        return success
+
+    def read_required_frequency(self) -> bool:
+        """P830: read the required frequency 1 for Actuator mode in Hz."""
+        success, data_val = self.RTU_read(HVLREG_ACTUAT_FREQ_1)
+        if data_val is not None:
+            val = float(data_val) / 100
+            self.state.required_frequency = val
+            print(f"Read required frequency: {val:.2f} Hz")
 
         return success
 
