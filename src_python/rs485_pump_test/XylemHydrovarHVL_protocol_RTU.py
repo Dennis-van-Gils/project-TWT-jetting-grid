@@ -5,10 +5,9 @@ variable speed drive (VSD) controller.
 
 This module supports just one slave device on the Modbus, not multiple. With
 just one slave device the communication handling gets way simpler as we don't
-have to figure out which reply message belongs to which slave device in case we
-would have multiple slave devices. Also, the query and reply parsing can now be
-handled inside of a single function, instead of having to handle this
-asynchronously across multiple functions.
+have to figure out which reply message belongs to which slave device. Also, the
+query and reply parsing can now be handled inside of a single function, instead
+of having to handle this asynchronously across multiple functions.
 
 Reference documents:
 (1) Hydrovar HVL 2.015 - 4.220 | Modbus Protocol & Parameters
@@ -20,7 +19,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "17-02-2023"
+__date__ = "20-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -34,8 +33,17 @@ from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_devices.BaseDevice import SerialDevice
 from crc import crc16
 
+# Software-limited maximum pressure setpoint (P820)
+MAX_PRESSURE_SETPOINT = 3  # [bar]
+
+# ------------------------------------------------------------------------------
+#   pretty_format_hex
+# ------------------------------------------------------------------------------
+
 
 def pretty_format_hex(byte_msg: bytes) -> str:
+    """Pretty format the passed `bytes` as a string containing hex values
+    grouped in pairs. E.g. bytes = b'\\x12\\xa2\\xff' returns '12 a2 ff'"""
     msg = ""
     for byte in byte_msg:
         msg += f"{byte:02x} "
@@ -45,6 +53,12 @@ def pretty_format_hex(byte_msg: bytes) -> str:
 # ------------------------------------------------------------------------------
 #   Enumerations
 # ------------------------------------------------------------------------------
+
+
+class HVL_Mode(IntEnum):
+    UNINITIALIZED = -1  # Call `XylemHydrovarHVL.begin()` first!
+    CONTROLLER = 0  # Regulate motor frequency to maintain a pressure setpoint
+    ACTUATOR = 3  # Fixed motor frequency
 
 
 class HVL_FuncCode(IntEnum):
@@ -73,41 +87,59 @@ class HVL_DType(IntEnum):
 
 
 class HVL_Register:
+    """Placeholder for a single register adress and its datum type and menu
+    index. To be populated from Table 5, ref (1).
+    """
+
     def __init__(
         self,
         address: int,
         datum_type: HVL_DType,
         menu_index: str = "",
     ):
-        self.address = address  # Modbus address as taken from Table 5, ref (1)
+        self.address = address
         self.datum_type = datum_type
         self.menu_index = menu_index
 
 
-# List of registers (incomplete list, just the bare necessities)
+# List of registers (incomplete list, just the bare necessities).
+# Taken from Table 5, ref. (1)
 # fmt: off
+
+# M00: Main menu
 HVLREG_STOP_START    = HVL_Register(0x0031, HVL_DType.U08, "")      # RW
 HVLREG_ACTUAL_VALUE  = HVL_Register(0x0032, HVL_DType.S16, "")      # R
-HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16, "P46")   # R
 HVLREG_EFF_REQ_VAL   = HVL_Register(0x0037, HVL_DType.U16, "P03")   # R
 HVLREG_START_VALUE   = HVL_Register(0x0038, HVL_DType.U08, "P04")   # RW
+
+# M20: Status
 HVLREG_ENABLE_DEVICE = HVL_Register(0x0061, HVL_DType.U08, "P24")   # RW
-HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08, "P1205") # RW
 
-# Pressure setpoint
-HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08, "P805")  # RW
-HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08, "P815")  # RW
-HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16, "P820")  # RW
-
-# Diagnostics
+# M40: Diagnostics
 HVLREG_TEMP_INVERTER = HVL_Register(0x0085, HVL_DType.S08, "P43")   # R
 HVLREG_CURR_INVERTER = HVL_Register(0x0087, HVL_DType.U16, "P44")   # R
 HVLREG_VOLT_INVERTER = HVL_Register(0x0088, HVL_DType.U16, "P45")   # R
+HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16, "P46")   # R
+
+# M100: Basic settings
+HVLREG_MODE          = HVL_Register(0x008b, HVL_DType.U08, "P105")  # RW
+
+# M600: Error
 HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08, "P615")  # RW
+
+# M800: Required values
+HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08, "P805")  # RW
+HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08, "P815")  # RW
+HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16, "P820")  # RW
+HVLREG_ACTUAT_FREQ_1 = HVL_Register(0x00ea, HVL_DType.U16, "P830")  # RW
+
+# M1200: RS-485 Interface
+HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08, "P1205") # RW
 
 # Special status bits
 HVLREG_ERRORS_H3     = HVL_Register(0x012d, HVL_DType.B2 , "")      # R
 HVLREG_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1 , "")      # R
+
 # fmt: on
 
 # ------------------------------------------------------------------------------
@@ -120,11 +152,11 @@ class XylemHydrovarHVL(SerialDevice):
         """Container for the process and measurement variables"""
 
         # fmt: off
-        pump_is_on        = False
-        actual_pressure   = np.nan  # [bar]
+        pump_is_on        = False   # (bool)
+        pump_is_enabled   = False   # (bool) P24
+        actual_value      = np.nan  # [bar] or [Hz], depends on `mode`
         required_pressure = np.nan  # [bar] P820
-        start_value       = np.nan  # [pct] P04
-        pump_is_enabled   = False   #       P24
+        mode              = HVL_Mode.UNINITIALIZED  # (HVL_Mode) P105
         # fmt: on
 
     class ErrorStatus:
@@ -244,6 +276,10 @@ class XylemHydrovarHVL(SerialDevice):
             )
             # fmt: on
 
+    # --------------------------------------------------------------------------
+    #   XylemHydrovarHVL
+    # --------------------------------------------------------------------------
+
     def __init__(
         self,
         name: str = "HVL",
@@ -296,23 +332,29 @@ class XylemHydrovarHVL(SerialDevice):
         """Send a 'read' RTU command over Modbus to the slave device.
 
         Args:
+            register (HVL_Register):
+                Modbus address to read from.
 
-        Returns:
+        Returns: (Tuple)
+            success (bool):
+                True if successful, False otherwise.
 
+            data_val (int | None):
+                Read data value as raw integer. `None` if unsuccessful.
         """
         # Construct 'read' command
-        # fmt: off
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
         byte_cmd[1] = HVL_FuncCode.READ
-        byte_cmd[2] = (register.address & 0xff00) >> 8  # address HI
-        byte_cmd[3] = register.address & 0x00ff         # address LO
-        byte_cmd[4] = 0x00                              # no. of points HI
+        byte_cmd[2] = (register.address & 0xFF00) >> 8  # address HI
+        byte_cmd[3] = register.address & 0x00FF  # address LO
+        byte_cmd[4] = 0x00  # no. of points HIs
+
         if register.datum_type == HVL_DType.B2:
-            byte_cmd[5] = 0x02                          # no. of points LO
+            byte_cmd[5] = 0x02  # no. of points LO
         else:
-            byte_cmd[5] = 0x01                          # no. of points LO
-        # fmt: on
+            byte_cmd[5] = 0x01  # no. of points LO
+
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
         # Send command and read reply
@@ -331,8 +373,11 @@ class XylemHydrovarHVL(SerialDevice):
                     + (reply[6])
                 )
             else:
-                pft("ERROR: Unsupported byte count")
-                sys.exit()
+                pft(
+                    f"ERROR: Unsupported byte count. Got {byte_count}, "
+                    "but only 2 and 4 are implemented."
+                )
+                return False, None
 
             if register.datum_type == HVL_DType.S08:
                 if data_val >= (1 << 7):
@@ -355,30 +400,39 @@ class XylemHydrovarHVL(SerialDevice):
         """Send a 'write' RTU command over Modbus to the slave device.
 
         Args:
+            register (HVL_Register):
+                Modbus address to write to.
 
-        Returns:
+            value (int):
+                Raw integer value to write to the Modbus address.
 
+        Returns: (Tuple)
+            success (bool):
+                True if successful, False otherwise.
+
+            data_val (int | None):
+                Obtained data value as raw integer. `None` if unsuccessful.
         """
         # Construct 'write' command
-        # fmt: off
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
         byte_cmd[1] = HVL_FuncCode.WRITE
         byte_cmd[2] = (register.address & 0xFF00) >> 8  # address HI
-        byte_cmd[3] = register.address & 0x00FF         # address LO
+        byte_cmd[3] = register.address & 0x00FF  # address LO
 
         if (register.datum_type == HVL_DType.U08) or (
             register.datum_type == HVL_DType.U16
         ):
-            byte_cmd[4] = (value & 0xFF00) >> 8         # data HI
-            byte_cmd[5] = value & 0x00FF                # data LO
+            byte_cmd[4] = (value & 0xFF00) >> 8  # data HI
+            byte_cmd[5] = value & 0x00FF  # data LO
         else:
-            # Not implemented (yet)
-            pft("ERROR: Datum type not implemented (yet)")
+            pft(
+                f"ERROR: Unsupported datum type. Got {register.datum_type}, "
+                "but only U08 and U16 are implemented."
+            )
             return False, None
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
-        # fmt: on
 
         # Send command and read reply
         success, reply = self.query(byte_cmd, returns_ascii=False)
@@ -397,8 +451,82 @@ class XylemHydrovarHVL(SerialDevice):
         return success, data_val
 
     # --------------------------------------------------------------------------
-    #
+    #   begin
     # --------------------------------------------------------------------------
+
+    def begin(self) -> bool:
+        """Read the necessary parameters of the HVL controller and store it in
+        the `state`, `error_status` and `device_status` members. This method
+        should be called once and immediately after a successful connection to
+        the HVL controller has been established.
+        """
+        success = True
+        success &= self.read_mode()
+        success &= self.read_device_status()
+        success &= self.read_error_status()
+
+        return success
+
+    # --------------------------------------------------------------------------
+    #   Implementations of RTU_read & RTU_write
+    # --------------------------------------------------------------------------
+
+    def read_mode(self) -> bool:
+        """P105: Read the operation mode of the HVL controller.
+
+        0: Controller (Default)     1 Hydrovar
+        1: Cascade Relay            1 Hydrovar and Premium Card
+        2: Cascade Serial           More than one pump
+        3: Actuator                 1 Hydrovar
+        4: Cascade Synchron         All pumps operate on the same frequency
+
+        The Actuator mode is used if the HYDROVAR is a standard VFD with:
+        • Fixed speed requirements or
+        • An external speed signal is connected.
+        """
+        success, data_val = self.RTU_read(HVLREG_MODE)
+        if data_val is not None:
+            try:
+                val = HVL_Mode(data_val)
+            except ValueError:
+                pft(
+                    f"ERROR: Unsupported HVL mode. Got {data_val}, "
+                    "but only 0: Controller and 3: Actuator are supported."
+                )
+                sys.exit(0)  # Severe error, hence exit
+            self.state.mode = val
+            print(f"Mode: {val}")
+
+        return success
+
+    def set_mode(self, hvl_mode: HVL_Mode) -> bool:
+        """P105: Set the operation mode of the HVL controller.
+
+        0: Controller (Default)     1 Hydrovar
+        1: Cascade Relay            1 Hydrovar and Premium Card
+        2: Cascade Serial           More than one pump
+        3: Actuator                 1 Hydrovar
+        4: Cascade Synchron         All pumps operate on the same frequency
+
+        The Actuator mode is used if the HYDROVAR is a standard VFD with:
+        • Fixed speed requirements or
+        • An external speed signal is connected.
+        """
+        try:
+            val = HVL_Mode(hvl_mode)
+        except ValueError:
+            pft(
+                f"ERROR: Unsupported HVL mode. Got {hvl_mode}, "
+                "but only 0: Controller and 3: Actuator are supported."
+            )
+            sys.exit(0)  # Severe error, hence exit
+        success, data_val = self.RTU_write(HVLREG_MODE, hvl_mode)
+        if data_val is not None:
+            val = HVL_Mode(data_val)
+            self.state.mode = val
+            print(f"Mode: {val}")
+
+        return success
 
     def start_pump(self) -> bool:
         success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
@@ -436,21 +564,23 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def read_actual_pressure(self) -> bool:
+    def read_actual_value(self) -> bool:
         success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
         if data_val is not None:
             val = float(data_val) / 100
-            self.state.actual_pressure = val
-            print(f"Actual pressure: {val:.2f} bar")
+            self.state.actual_value = val
+            if self.state.mode == HVL_Mode.CONTROLLER:
+                print(f"Actual pressure: {val:.2f} bar")
+            elif self.state.mode == HVL_Mode.ACTUATOR:
+                print(f"Actual frequency: {val:.2f} Hz")
 
         return success
 
     def set_required_pressure(self, P_bar: float) -> bool:
         """P820: Sets the digital required value 1 in bar."""
         # Limit pressure setpoint
-        MAX_PRESSURE = 1.5  # [bar]
         P_bar = max(float(P_bar), 0)
-        P_bar = min(float(P_bar), MAX_PRESSURE)
+        P_bar = min(float(P_bar), MAX_PRESSURE_SETPOINT)
 
         success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
@@ -482,7 +612,6 @@ class XylemHydrovarHVL(SerialDevice):
         success, data_val = self.RTU_write(HVLREG_START_VALUE, int(pct))
         if data_val is not None:
             val = float(data_val)
-            self.state.start_value = val
             print(f"Set start value: {val:.0f} %")
 
         return success

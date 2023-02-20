@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import sys
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
 
 if __name__ == "__main__":
@@ -18,12 +19,16 @@ if __name__ == "__main__":
     }
 
     if hvl.auto_connect(PATH_PORT):
-        hvl.set_error_reset(False)
+        hvl.begin()
+    else:
+        sys.exit(0)
 
-        hvl.read_error_status()
-        hvl.read_device_status()
-        hvl.read_actual_pressure()
-        hvl.read_required_pressure()
+    hvl.set_error_reset(False)
 
-        hvl.set_required_pressure(1)
-        hvl.read_required_pressure()
+    hvl.read_error_status()
+    hvl.read_device_status()
+    hvl.read_actual_value()
+    hvl.read_required_pressure()
+
+    hvl.set_required_pressure(1)
+    hvl.read_required_pressure()
