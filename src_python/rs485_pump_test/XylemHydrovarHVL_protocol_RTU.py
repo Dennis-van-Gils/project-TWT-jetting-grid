@@ -129,6 +129,7 @@ HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08, "P615")  # RW
 
 # M800: Required values
 HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08, "P805")  # RW
+HVLREG_C_REQ_VAL_2   = HVL_Register(0x00e6, HVL_DType.U08, "P810")  # RW
 HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08, "P815")  # RW
 HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16, "P820")  # RW
 HVLREG_ACTUAT_FREQ_1 = HVL_Register(0x00ea, HVL_DType.U16, "P830")  # RW
@@ -155,9 +156,14 @@ class XylemHydrovarHVL(SerialDevice):
         pump_is_on         = False   # (bool)
         pump_is_enabled    = False   # (bool)                           P24
         mode               = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
-        actual_value       = np.nan  # [bar] or [Hz], depends on `mode`
+        actual_value       = np.nan  # [bar]
         required_pressure  = 0.0     # [bar]                            P820
         required_frequency = 0.0     # [Hz]                             P830
+
+        diag_temp_inverter = np.nan  # ['C]                             P43
+        diag_curr_inverter = np.nan  # [A], not [% FS]                  P44
+        diag_volt_inverter = np.nan  # [V]                              P45
+        diag_output_freq   = np.nan  # [Hz]                             P46
         # fmt: on
 
     class ErrorStatus:
@@ -291,7 +297,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         # Default for RTU is 9600-8N1
         self.serial_settings = {
-            "baudrate": 9600,
+            "baudrate": 115200,
             "bytesize": 8,
             "parity": "N",
             "stopbits": 1,
@@ -437,6 +443,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         # Send command and read reply
         success, reply = self.query(byte_cmd, returns_ascii=False)
+        # print(pretty_format_hex(reply))
 
         # Parse the returned data value
         if success and isinstance(reply, bytes):
@@ -466,8 +473,8 @@ class XylemHydrovarHVL(SerialDevice):
         success &= self.read_mode()
         success &= self.read_device_status()
         success &= self.read_error_status()
-        success &= self.set_required_pressure(0)
-        success &= self.set_required_frequency(0)
+        success &= self.set_required_pressure(0)  # Set to lowest possible
+        success &= self.set_required_frequency(30)  # Set to lowest possible
 
         return success
 
@@ -487,6 +494,8 @@ class XylemHydrovarHVL(SerialDevice):
         The Actuator mode is used if the HYDROVAR is a standard VFD with:
         • Fixed speed requirements or
         • An external speed signal is connected.
+
+        Readings will be stored in class member `state`.
         """
         success, data_val = self.RTU_read(HVLREG_MODE)
         if data_val is not None:
@@ -515,6 +524,8 @@ class XylemHydrovarHVL(SerialDevice):
         The Actuator mode is used if the HYDROVAR is a standard VFD with:
         • Fixed speed requirements or
         • An external speed signal is connected.
+
+        Readings will be stored in class member `state`.
         """
         try:
             val = HVL_Mode(hvl_mode)
@@ -533,6 +544,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def start_pump(self) -> bool:
+        """Readings will be stored in class member `state`."""
         success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
         if data_val is not None:
             val = bool(data_val)
@@ -542,6 +554,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def stop_pump(self) -> bool:
+        """Readings will be stored in class member `state`."""
         success, data_val = self.RTU_write(HVLREG_STOP_START, 0)
         if data_val is not None:
             val = bool(data_val)
@@ -551,6 +564,9 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def enable_pump(self) -> bool:
+        """P24: Manually enable the device.
+        Readings will be stored in class member `state`.
+        """
         success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 1)
         if data_val is not None:
             val = bool(data_val)
@@ -560,6 +576,9 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def disable_pump(self) -> bool:
+        """P24: Manually disable the device.
+        Readings will be stored in class member `state`.
+        """
         success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 0)
         if data_val is not None:
             val = bool(data_val)
@@ -569,19 +588,21 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_actual_value(self) -> bool:
+        """Read the actual pressure in bar.
+        Readings will be stored in class member `state`.
+        """
         success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.actual_value = val
-            if self.state.mode == HVL_Mode.CONTROLLER:
-                print(f"Actual pressure: {val:.2f} bar")
-            elif self.state.mode == HVL_Mode.ACTUATOR:
-                print(f"Actual frequency: {val:.2f} Hz")
+            print(f"Actual pressure: {val:.2f} bar")
 
         return success
 
     def set_required_pressure(self, P_bar: float) -> bool:
-        """P820: Set the digital required value 1 in bar."""
+        """P820: Set the digital required value 1 in bar.
+        Readings will be stored in class member `state`.
+        """
         # Limit pressure setpoint
         P_bar = max(float(P_bar), 0)
         P_bar = min(float(P_bar), MAX_PRESSURE_SETPOINT)
@@ -595,7 +616,9 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_required_pressure(self) -> bool:
-        """P820: Read the digital required value 1 in bar."""
+        """P820: Read the digital required value 1 in bar.
+        Readings will be stored in class member `state`.
+        """
         success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
         if data_val is not None:
             val = float(data_val) / 100
@@ -605,24 +628,28 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def set_required_frequency(self, f_Hz: float) -> bool:
-        """P830: Set the required frequency 1 for Actuator mode in Hz."""
-        success, data_val = self.RTU_write(
-            HVLREG_ACTUAT_FREQ_1, int(f_Hz * 100)
-        )
+        """P830: Set the required frequency 1 for Actuator mode in Hz.
+        Readings will be stored in class member `state`.
+        """
+        # TODO: check for Modbus out-of-bounds write exception
+        # Second byte reads 0x86 in case of exception
+        success, data_val = self.RTU_write(HVLREG_ACTUAT_FREQ_1, int(f_Hz * 10))
         if data_val is not None:
-            val = float(data_val) / 100
+            val = float(data_val) / 10
             self.state.required_frequency = val
-            print(f"Set required frequency: {val:.2f} Hz")
+            print(f"Set required frequency: {val:.1f} Hz")
 
         return success
 
     def read_required_frequency(self) -> bool:
-        """P830: read the required frequency 1 for Actuator mode in Hz."""
+        """P830: Read the required frequency 1 for Actuator mode in Hz.
+        Readings will be stored in class member `state`.
+        """
         success, data_val = self.RTU_read(HVLREG_ACTUAT_FREQ_1)
         if data_val is not None:
-            val = float(data_val) / 100
+            val = float(data_val) / 10
             self.state.required_frequency = val
-            print(f"Read required frequency: {val:.2f} Hz")
+            print(f"Read required frequency: {val:.1f} Hz")
 
         return success
 
@@ -643,7 +670,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def set_error_reset(self, flag: Union[int, bool]) -> bool:
-        """P615: Selects automatic reset of errors"""
+        """P615: Select automatic reset of errors."""
         success, data_val = self.RTU_write(HVLREG_ERROR_RESET, int(flag))
         if data_val is not None:
             val = int(data_val)
@@ -652,6 +679,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_error_status(self) -> bool:
+        """Readings will be stored in class member `error_status`."""
         success, data_val = self.RTU_read(HVLREG_ERRORS_H3)
         if data_val is not None:
             s = self.error_status  # Shorthand
@@ -674,6 +702,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_device_status(self) -> bool:
+        """Readings will be stored in class member `device_status`."""
         success, data_val = self.RTU_read(HVLREG_DEV_STATUS_H4)
         if data_val is not None:
             s = self.device_status  # Shorthand
@@ -691,3 +720,44 @@ class XylemHydrovarHVL(SerialDevice):
             s.report()
 
         return success
+
+    def read_diagnostic_values(self) -> bool:
+        """P43, P44, P45, P46: Read out the diagnostic values of the inverter
+        (temperature, current and voltage) and the output frequency.
+        Readings will be stored in class member `state`.
+        """
+        success_1, data_val = self.RTU_read(HVLREG_TEMP_INVERTER)
+        if data_val is not None:
+            val = float(data_val)
+            self.state.diag_temp_inverter = val
+            print(f"Read inverter temperature: {val:5.0f} 'C")
+
+        success_2, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
+        if data_val is not None:
+            val = float(data_val) / 100
+            self.state.diag_curr_inverter = val
+            print(f"Read inverter current    : {val:5.2f} A")
+
+        success_3, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
+        if data_val is not None:
+            val = float(data_val)
+            self.state.diag_volt_inverter = val
+            print(f"Read inverter voltage    : {val:5.0f} V")
+
+        success_4, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
+        if data_val is not None:
+            val = float(data_val) / 10
+            self.state.diag_output_freq = val
+            print(f"Read output frequency    : {val:5.1f} Hz")
+
+        return success_1 and success_2 and success_3 and success_4
+
+    def use_digital_required_value_1(self) -> bool:
+        """P805, P810, P815: Set up the registers to make use of a digitally
+        supplied required value 1 and disable the required value 2."""
+
+        success_1, _ = self.RTU_write(HVLREG_C_REQ_VAL_1, 1)  # 1: Dig
+        success_2, _ = self.RTU_write(HVLREG_C_REQ_VAL_2, 0)  # 0: Off
+        success_3, _ = self.RTU_write(HVLREG_SW_REQ_VAL, 0)  # 0: Setp. 1
+
+        return success_1 and success_2 and success_3
