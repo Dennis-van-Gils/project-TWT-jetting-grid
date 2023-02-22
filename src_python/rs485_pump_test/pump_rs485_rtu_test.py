@@ -19,7 +19,6 @@ if __name__ == "__main__":
         "timeout": 0.2,
         "write_timeout": 0.2,
     }
-    hvl._query_wait_time = 0.05
 
     if hvl.auto_connect(PATH_PORT):
         hvl.begin()

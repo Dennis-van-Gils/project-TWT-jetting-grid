@@ -19,7 +19,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "20-02-2023"
+__date__ = "22-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 # TODO: Learn from https://github.com/pyhys/minimalmodbus/blob/master/minimalmodbus.py
@@ -92,19 +92,13 @@ class HVL_DType(IntEnum):
 
 
 class HVL_Register:
-    """Placeholder for a single register adress and its datum type and menu
-    index. To be populated from Table 5, ref (1).
+    """Placeholder for a single Modbus register adress and its datum type. To be
+    populated from Table 5, ref (1).
     """
 
-    def __init__(
-        self,
-        address: int,
-        datum_type: HVL_DType,
-        menu_index: str = "",
-    ):
+    def __init__(self, address: int, datum_type: HVL_DType):
         self.address = address
         self.datum_type = datum_type
-        self.menu_index = menu_index
 
 
 # List of registers (incomplete list, just the bare necessities).
@@ -112,39 +106,39 @@ class HVL_Register:
 # fmt: off
 
 # M00: Main menu
-HVLREG_STOP_START    = HVL_Register(0x0031, HVL_DType.U08, "")      # RW
-HVLREG_ACTUAL_VALUE  = HVL_Register(0x0032, HVL_DType.S16, "")      # R
-HVLREG_EFF_REQ_VAL   = HVL_Register(0x0037, HVL_DType.U16, "P03")   # R
-HVLREG_START_VALUE   = HVL_Register(0x0038, HVL_DType.U08, "P04")   # RW
+HVLREG_STOP_START    = HVL_Register(0x0031, HVL_DType.U08)  # RW    P-
+HVLREG_ACTUAL_VALUE  = HVL_Register(0x0032, HVL_DType.S16)  # R     P-
+HVLREG_EFF_REQ_VAL   = HVL_Register(0x0037, HVL_DType.U16)  # R     P03
+HVLREG_START_VALUE   = HVL_Register(0x0038, HVL_DType.U08)  # RW    P04
 
 # M20: Status
-HVLREG_ENABLE_DEVICE = HVL_Register(0x0061, HVL_DType.U08, "P24")   # RW
+HVLREG_ENABLE_DEVICE = HVL_Register(0x0061, HVL_DType.U08)  # RW    P24
 
 # M40: Diagnostics
-HVLREG_TEMP_INVERTER = HVL_Register(0x0085, HVL_DType.S08, "P43")   # R
-HVLREG_CURR_INVERTER = HVL_Register(0x0087, HVL_DType.U16, "P44")   # R
-HVLREG_VOLT_INVERTER = HVL_Register(0x0088, HVL_DType.U16, "P45")   # R
-HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16, "P46")   # R
+HVLREG_TEMP_INVERTER = HVL_Register(0x0085, HVL_DType.S08)  # R     P43
+HVLREG_CURR_INVERTER = HVL_Register(0x0087, HVL_DType.U16)  # R     P44
+HVLREG_VOLT_INVERTER = HVL_Register(0x0088, HVL_DType.U16)  # R     P45
+HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16)  # R     P46
 
 # M100: Basic settings
-HVLREG_MODE          = HVL_Register(0x008b, HVL_DType.U08, "P105")  # RW
+HVLREG_MODE          = HVL_Register(0x008b, HVL_DType.U08)  # RW    P105
 
 # M600: Error
-HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08, "P615")  # RW
+HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08)  # RW    P615
 
 # M800: Required values
-HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08, "P805")  # RW
-HVLREG_C_REQ_VAL_2   = HVL_Register(0x00e6, HVL_DType.U08, "P810")  # RW
-HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08, "P815")  # RW
-HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16, "P820")  # RW
-HVLREG_ACTUAT_FREQ_1 = HVL_Register(0x00ea, HVL_DType.U16, "P830")  # RW
+HVLREG_C_REQ_VAL_1   = HVL_Register(0x00e5, HVL_DType.U08)  # RW    P805
+HVLREG_C_REQ_VAL_2   = HVL_Register(0x00e6, HVL_DType.U08)  # RW    P810
+HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08)  # RW    P815
+HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16)  # RW    P820
+HVLREG_ACTUAT_FREQ_1 = HVL_Register(0x00ea, HVL_DType.U16)  # RW    P830
 
 # M1200: RS-485 Interface
-HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08, "P1205") # RW
+HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08)  # RW    P1205
 
 # Special status bits
-HVLREG_ERRORS_H3     = HVL_Register(0x012d, HVL_DType.B2 , "")      # R
-HVLREG_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1 , "")      # R
+HVLREG_ERRORS_H3     = HVL_Register(0x012d, HVL_DType.B2)   # R     P-
+HVLREG_DEV_STATUS_H4 = HVL_Register(0x01c1, HVL_DType.B1)   # R     P-
 
 # fmt: on
 
@@ -442,12 +436,13 @@ class XylemHydrovarHVL(SerialDevice):
     #   RTU_read
     # --------------------------------------------------------------------------
 
-    def RTU_read(self, register: HVL_Register) -> Tuple[bool, Union[int, None]]:
+    def RTU_read(self, hvlreg: HVL_Register) -> Tuple[bool, Union[int, None]]:
         """Send a 'read' RTU command over Modbus to the slave device.
 
         Args:
-            register (HVL_Register):
-                Modbus address to read from.
+            hvlreg (HVL_Register):
+                `HVL_Register` object containing Modbus address to read from and
+                its datum type.
 
         Returns: (Tuple)
             success (bool):
@@ -460,11 +455,11 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
         byte_cmd[1] = HVL_FuncCode.READ
-        byte_cmd[2] = (register.address & 0xFF00) >> 8  # address HI
-        byte_cmd[3] = register.address & 0x00FF  # address LO
+        byte_cmd[2] = (hvlreg.address & 0xFF00) >> 8  # address HI
+        byte_cmd[3] = hvlreg.address & 0x00FF  # address LO
         byte_cmd[4] = 0x00  # no. of points HIs
 
-        if register.datum_type == HVL_DType.B2:
+        if hvlreg.datum_type == HVL_DType.B2:
             byte_cmd[5] = 0x02  # no. of points LO
         else:
             byte_cmd[5] = 0x01  # no. of points LO
@@ -478,7 +473,7 @@ class XylemHydrovarHVL(SerialDevice):
             time.sleep(silent_period - time_since_last_msg)
 
         # Send command and read reply
-        if (register.datum_type == HVL_DType.B2):
+        if hvlreg.datum_type == HVL_DType.B2:
             N_expected_bytes = 9
         else:
             N_expected_bytes = 7
@@ -507,10 +502,10 @@ class XylemHydrovarHVL(SerialDevice):
                 )
                 return False, None
 
-            if register.datum_type == HVL_DType.S08:
+            if hvlreg.datum_type == HVL_DType.S08:
                 if data_val >= (1 << 7):
                     data_val = data_val - (1 << 8)
-            elif register.datum_type == HVL_DType.S16:
+            elif hvlreg.datum_type == HVL_DType.S16:
                 if data_val >= (1 << 15):
                     data_val = data_val - (1 << 16)
         else:
@@ -523,13 +518,14 @@ class XylemHydrovarHVL(SerialDevice):
     # --------------------------------------------------------------------------
 
     def RTU_write(
-        self, register: HVL_Register, value: int
+        self, hvlreg: HVL_Register, value: int
     ) -> Tuple[bool, Union[int, None]]:
         """Send a 'write' RTU command over Modbus to the slave device.
 
         Args:
-            register (HVL_Register):
-                Modbus address to write to.
+            hvlreg (HVL_Register):
+                `HVL_Register` object containing Modbus address to write to and
+                its datum type.
 
             value (int):
                 Raw integer value to write to the Modbus address.
@@ -545,17 +541,17 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
         byte_cmd[1] = HVL_FuncCode.WRITE
-        byte_cmd[2] = (register.address & 0xFF00) >> 8  # address HI
-        byte_cmd[3] = register.address & 0x00FF  # address LO
+        byte_cmd[2] = (hvlreg.address & 0xFF00) >> 8  # address HI
+        byte_cmd[3] = hvlreg.address & 0x00FF  # address LO
 
-        if (register.datum_type == HVL_DType.U08) or (
-            register.datum_type == HVL_DType.U16
+        if (hvlreg.datum_type == HVL_DType.U08) or (
+            hvlreg.datum_type == HVL_DType.U16
         ):
             byte_cmd[4] = (value & 0xFF00) >> 8  # data HI
             byte_cmd[5] = value & 0x00FF  # data LO
         else:
             pft(
-                f"ERROR: Unsupported datum type. Got {register.datum_type}, "
+                f"ERROR: Unsupported datum type. Got {hvlreg.datum_type}, "
                 "but only U08 and U16 are implemented."
             )
             return False, None
@@ -581,9 +577,9 @@ class XylemHydrovarHVL(SerialDevice):
         if success and isinstance(reply, bytes):
             data_val = (reply[4] << 8) + reply[5]
 
-            if register.datum_type == HVL_DType.S08:
+            if hvlreg.datum_type == HVL_DType.S08:
                 data_val = data_val - (1 << 8)
-            elif register.datum_type == HVL_DType.S16:
+            elif hvlreg.datum_type == HVL_DType.S16:
                 data_val = data_val - (1 << 16)
         else:
             data_val = None
