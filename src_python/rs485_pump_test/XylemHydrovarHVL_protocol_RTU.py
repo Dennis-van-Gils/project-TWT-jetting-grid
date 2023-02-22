@@ -28,6 +28,9 @@ __version__ = "1.0.0"
 import sys
 from typing import Tuple, Union
 from enum import IntEnum
+import time
+
+import serial
 
 import numpy as np
 
@@ -323,6 +326,9 @@ class XylemHydrovarHVL(SerialDevice):
         # Modbus slave address of the device (P1205)
         self.modbus_slave_address = connect_to_modbus_slave_address
 
+        # Modbus demands minimum time between messages
+        self._tick_last_msg = time.perf_counter()
+
     # --------------------------------------------------------------------------
     #   ID_validation_query
     # --------------------------------------------------------------------------
@@ -332,6 +338,105 @@ class XylemHydrovarHVL(SerialDevice):
         # validation
         success, data_val = self.RTU_read(HVLREG_ADDRESS)
         return success, data_val
+
+    # --------------------------------------------------------------------------
+    #   _silent_period
+    # --------------------------------------------------------------------------
+
+    def _calculate_silent_period(self) -> float:
+        """Calculate the silent period length between messages. It should
+        correspond to the time to send 3.5 characters.
+
+        Returns:
+            The number of seconds that should pass between each message on the
+            bus.
+        """
+        BITTIMES_PER_CHARACTERTIME = 11
+        MIN_SILENT_CHARACTERTIMES = 3.5
+        MIN_SILENT_TIME_SECONDS = 0.00175  # See Modbus standard
+
+        bittime = 1 / float(self.ser.baudrate)
+        return max(
+            bittime * BITTIMES_PER_CHARACTERTIME * MIN_SILENT_CHARACTERTIMES,
+            MIN_SILENT_TIME_SECONDS,
+        )
+
+    # --------------------------------------------------------------------------
+    #   query_bytes
+    # --------------------------------------------------------------------------
+
+    def query_bytes(
+        self,
+        msg: bytes,
+        N_bytes_to_read: int,
+        raises_on_timeout: bool = False,
+    ) -> Tuple[bool, Union[bytes, None]]:
+        """Send a bytes message to the serial device and subsequently read the
+        reply. Will block until reaching ``N_bytes_to_read`` or timeout.
+
+        Args:
+            msg (:obj:`bytes`):
+                Bytes to be sent to the serial device.
+
+            N_bytes_to_read (:obj:`int`):
+                Number of bytes to read.
+
+            raises_on_timeout (:obj:`bool`, optional):
+                Should an exception be raised when a write or read timeout
+                occurs?
+
+                Default: :const:`False`
+
+        Returns:
+            :obj:`tuple`:
+                success (:obj:`bool`):
+                    True if successful, False otherwise.
+
+                reply (:obj:`bytes` | :obj:`None`):
+                    Reply received from the device as bytes. :obj:`None` if
+                    unsuccessful.
+        """
+
+        # TODO: Move this method to inside of `dvg_devices::BaseDevice`
+        self.ser: serial.Serial
+
+        # Always ensure that a timeout exception is raised when coming from
+        # :meth:`connect_at_port`.
+        if self._force_query_to_raise_on_timeout:
+            raises_on_timeout = True
+
+        # Send query
+        if not self.write(msg, raises_on_timeout=raises_on_timeout):
+            return (False, None)  # --> leaving
+
+        # Read reply
+        try:
+            if N_bytes_to_read > 0:
+                reply = self.ser.read(N_bytes_to_read)
+            else:
+                reply = b""
+                self.ser.flush()
+        except serial.SerialException as err:
+            # Note: The Serial library does not throw an exception when it
+            # times out in `read`, only when it times out in `write`! We
+            # will check for zero received bytes as indication for a read
+            # timeout, later. See: https://stackoverflow.com/questions/10978224/serialtimeoutexception-in-python-not-working-as-expected
+            pft(err, 3)
+            return (False, None)  # --> leaving
+        except Exception as err:
+            pft(err, 3)
+            sys.exit(0)  # --> leaving
+
+        if (N_bytes_to_read > 0) and (len(reply) == 0):
+            if raises_on_timeout:
+                raise serial.SerialException(
+                    "Received 0 bytes. Read probably timed out."
+                )  # --> leaving
+            else:
+                pft("Received 0 bytes. Read probably timed out.", 3)
+                return (False, None)  # --> leaving
+
+        return (True, reply)
 
     # --------------------------------------------------------------------------
     #   RTU_read
@@ -366,8 +471,22 @@ class XylemHydrovarHVL(SerialDevice):
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
+        # Slow down message rate according to Modbus specification
+        silent_period = self._calculate_silent_period()
+        time_since_last_msg = time.perf_counter() - self._tick_last_msg
+        if time_since_last_msg < silent_period:
+            time.sleep(silent_period - time_since_last_msg)
+
         # Send command and read reply
-        success, reply = self.query(byte_cmd, returns_ascii=False)
+        if (register.datum_type == HVL_DType.B2):
+            N_expected_bytes = 9
+        else:
+            N_expected_bytes = 7
+        success, reply = self.query_bytes(
+            msg=byte_cmd,
+            N_bytes_to_read=N_expected_bytes,
+        )
+        self._tick_last_msg = time.perf_counter()
 
         # Parse the returned data value
         if success and isinstance(reply, bytes):
@@ -390,10 +509,10 @@ class XylemHydrovarHVL(SerialDevice):
 
             if register.datum_type == HVL_DType.S08:
                 if data_val >= (1 << 7):
-                    data_val = data_val - 1 << 8
+                    data_val = data_val - (1 << 8)
             elif register.datum_type == HVL_DType.S16:
                 if data_val >= (1 << 15):
-                    data_val = data_val - 1 << 16
+                    data_val = data_val - (1 << 16)
         else:
             data_val = None
 
@@ -443,8 +562,19 @@ class XylemHydrovarHVL(SerialDevice):
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
+        # Slow down message rate according to Modbus specification
+        silent_period = self._calculate_silent_period()
+        time_since_last_msg = time.perf_counter() - self._tick_last_msg
+        if time_since_last_msg < silent_period:
+            time.sleep(silent_period - time_since_last_msg)
+
         # Send command and read reply
-        success, reply = self.query(byte_cmd, returns_ascii=False)
+        N_expected_bytes = 8  # 'write' confirmation is always 8 bytes long
+        success, reply = self.query_bytes(
+            msg=byte_cmd,
+            N_bytes_to_read=N_expected_bytes,
+        )
+        self._tick_last_msg = time.perf_counter()
         # print(pretty_format_hex(reply))
 
         # Parse the returned data value
@@ -452,9 +582,9 @@ class XylemHydrovarHVL(SerialDevice):
             data_val = (reply[4] << 8) + reply[5]
 
             if register.datum_type == HVL_DType.S08:
-                data_val = data_val - 1 << 8
+                data_val = data_val - (1 << 8)
             elif register.datum_type == HVL_DType.S16:
-                data_val = data_val - 1 << 16
+                data_val = data_val - (1 << 16)
         else:
             data_val = None
 
