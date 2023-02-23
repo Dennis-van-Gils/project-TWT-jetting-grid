@@ -19,11 +19,9 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "22-02-2023"
+__date__ = "23-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
-# TODO: Learn from https://github.com/pyhys/minimalmodbus/blob/master/minimalmodbus.py
-# Specifically: def _communicate(self, request: bytes, number_of_bytes_to_read: int) -> bytes:
 
 import sys
 from typing import Tuple, Union
@@ -41,6 +39,23 @@ from crc import crc16
 # Software-limited maximum pressure setpoint (P820)
 MAX_PRESSURE_SETPOINT = 3  # [bar]
 
+
+# ------------------------------------------------------------------------------
+#   accurate_delay_ms
+# ------------------------------------------------------------------------------
+
+
+def accurate_delay_ms(delay):
+    """Accurate time delay in milliseconds, useful for delays < 10 ms.
+    The standard `time.sleep()` will not work reliably for such small time
+    delays and usually has a minimum delay of up to 10 to 20 ms depending
+    on the OS.
+    """
+    _ = time.perf_counter() + delay / 1000
+    while time.perf_counter() < _:
+        pass
+
+
 # ------------------------------------------------------------------------------
 #   pretty_format_hex
 # ------------------------------------------------------------------------------
@@ -48,7 +63,8 @@ MAX_PRESSURE_SETPOINT = 3  # [bar]
 
 def pretty_format_hex(byte_msg: bytes) -> str:
     """Pretty format the passed `bytes` as a string containing hex values
-    grouped in pairs. E.g. bytes = b'\\x12\\xa2\\xff' returns '12 a2 ff'"""
+    grouped in pairs. E.g. bytes = b'\\x12\\xa2\\xff' returns '12 a2 ff'.
+    """
     msg = ""
     for byte in byte_msg:
         msg += f"{byte:02x} "
@@ -334,12 +350,15 @@ class XylemHydrovarHVL(SerialDevice):
         return success, data_val
 
     # --------------------------------------------------------------------------
-    #   _silent_period
+    #   _calculate_silent_period
     # --------------------------------------------------------------------------
 
     def _calculate_silent_period(self) -> float:
         """Calculate the silent period length between messages. It should
         correspond to the time to send 3.5 characters.
+
+        Source:
+            https://github.com/pyhys/minimalmodbus/blob/master/minimalmodbus.py
 
         Returns:
             The number of seconds that should pass between each message on the
@@ -365,8 +384,9 @@ class XylemHydrovarHVL(SerialDevice):
         N_bytes_to_read: int,
         raises_on_timeout: bool = False,
     ) -> Tuple[bool, Union[bytes, None]]:
-        """Send a bytes message to the serial device and subsequently read the
-        reply. Will block until reaching ``N_bytes_to_read`` or timeout.
+        """Send a message as bytes to the serial device and subsequently read
+        the reply. Will block until reaching ``N_bytes_to_read`` or a read
+        timeout occurs.
 
         Args:
             msg (:obj:`bytes`):
@@ -384,15 +404,18 @@ class XylemHydrovarHVL(SerialDevice):
         Returns:
             :obj:`tuple`:
                 success (:obj:`bool`):
-                    True if successful, False otherwise.
+                    True when ``N_bytes_to_read`` bytes are indeed read within
+                    the timeout, False otherwise.
 
                 reply (:obj:`bytes` | :obj:`None`):
-                    Reply received from the device as bytes. :obj:`None` if
-                    unsuccessful.
-        """
+                    Reply received from the device as bytes.
 
-        # TODO: Move this method to inside of `dvg_devices::BaseDevice`
-        self.ser: serial.Serial
+                    If ``success`` is False and 0 bytes got returned from the
+                    device, then ``reply`` will be :obj:`None`.
+                    If ``success`` is False because the read timed out and too
+                    few bytes got returned, ``reply`` will contain the bytes
+                    read so far.
+        """
 
         # Always ensure that a timeout exception is raised when coming from
         # :meth:`connect_at_port`.
@@ -430,6 +453,15 @@ class XylemHydrovarHVL(SerialDevice):
                 pft("Received 0 bytes. Read probably timed out.", 3)
                 return (False, None)  # --> leaving
 
+        if N_bytes_to_read != len(reply):
+            if raises_on_timeout:
+                raise serial.SerialException(
+                    "Received too few bytes. Read probably timed out."
+                )  # --> leaving
+            else:
+                pft("Received too few bytes. Read probably timed out.", 3)
+                return (False, reply)  # --> leaving
+
         return (True, reply)
 
     # --------------------------------------------------------------------------
@@ -451,6 +483,10 @@ class XylemHydrovarHVL(SerialDevice):
             data_val (int | None):
                 Read data value as raw integer. `None` if unsuccessful.
         """
+        if not self.is_alive:
+            pft("Device is not connected yet or already closed.", 3)
+            return False, None  # --> leaving
+
         # Construct 'read' command
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
@@ -470,13 +506,14 @@ class XylemHydrovarHVL(SerialDevice):
         silent_period = self._calculate_silent_period()
         time_since_last_msg = time.perf_counter() - self._tick_last_msg
         if time_since_last_msg < silent_period:
-            time.sleep(silent_period - time_since_last_msg)
+            accurate_delay_ms((silent_period - time_since_last_msg) * 1000)
 
         # Send command and read reply
         if hvlreg.datum_type == HVL_DType.B2:
             N_expected_bytes = 9
         else:
             N_expected_bytes = 7
+
         success, reply = self.query_bytes(
             msg=byte_cmd,
             N_bytes_to_read=N_expected_bytes,
@@ -484,32 +521,38 @@ class XylemHydrovarHVL(SerialDevice):
         self._tick_last_msg = time.perf_counter()
 
         # Parse the returned data value
+        data_val = None
         if success and isinstance(reply, bytes):
-            byte_count = reply[2]
-            if byte_count == 2:
-                data_val = (reply[3] << 8) + reply[4]
-            elif byte_count == 4:  # HVL_DType.B2
-                data_val = (
-                    (reply[3] << 32)
-                    + (reply[4] << 16)
-                    + (reply[5] << 8)
-                    + (reply[6])
-                )
-            else:
-                pft(
-                    f"ERROR: Unsupported byte count. Got {byte_count}, "
-                    "but only 2 and 4 are implemented."
-                )
-                return False, None
+            if len(reply) == N_expected_bytes:
+                # All is correct
+                byte_count = reply[2]
+                if byte_count == 2:
+                    data_val = (reply[3] << 8) + reply[4]
+                elif byte_count == 4:  # HVL_DType.B2
+                    data_val = (
+                        (reply[3] << 32)
+                        + (reply[4] << 16)
+                        + (reply[5] << 8)
+                        + (reply[6])
+                    )
+                else:
+                    pft(
+                        f"Unsupported byte count. Got {byte_count}, "
+                        "but only 2 and 4 are implemented."
+                    )
+                    return False, None  # --> leaving
 
-            if hvlreg.datum_type == HVL_DType.S08:
-                if data_val >= (1 << 7):
-                    data_val = data_val - (1 << 8)
-            elif hvlreg.datum_type == HVL_DType.S16:
-                if data_val >= (1 << 15):
-                    data_val = data_val - (1 << 16)
-        else:
-            data_val = None
+                if hvlreg.datum_type == HVL_DType.S08:
+                    if data_val >= (1 << 7):
+                        data_val = data_val - (1 << 8)
+                elif hvlreg.datum_type == HVL_DType.S16:
+                    if data_val >= (1 << 15):
+                        data_val = data_val - (1 << 16)
+
+        if not success and isinstance(reply, bytes):
+            # Probably received a Modbus exception.
+            # TODO: Test for and parse Modbus exceptions.
+            print(f"Reply received: {pretty_format_hex(reply)}")
 
         return success, data_val
 
@@ -537,6 +580,10 @@ class XylemHydrovarHVL(SerialDevice):
             data_val (int | None):
                 Obtained data value as raw integer. `None` if unsuccessful.
         """
+        if not self.is_alive:
+            pft("Device is not connected yet or already closed.", 3)
+            return False, None  # --> leaving
+
         # Construct 'write' command
         byte_cmd = bytearray(8)
         byte_cmd[0] = self.modbus_slave_address
@@ -551,7 +598,7 @@ class XylemHydrovarHVL(SerialDevice):
             byte_cmd[5] = value & 0x00FF  # data LO
         else:
             pft(
-                f"ERROR: Unsupported datum type. Got {hvlreg.datum_type}, "
+                f"Unsupported datum type. Got {hvlreg.datum_type}, "
                 "but only U08 and U16 are implemented."
             )
             return False, None
@@ -562,27 +609,33 @@ class XylemHydrovarHVL(SerialDevice):
         silent_period = self._calculate_silent_period()
         time_since_last_msg = time.perf_counter() - self._tick_last_msg
         if time_since_last_msg < silent_period:
-            time.sleep(silent_period - time_since_last_msg)
+            accurate_delay_ms((silent_period - time_since_last_msg) * 1000)
 
         # Send command and read reply
-        N_expected_bytes = 8  # 'write' confirmation is always 8 bytes long
+        N_expected_bytes = 8  # Successful 'write' confirmation is 8 bytes long
+
         success, reply = self.query_bytes(
             msg=byte_cmd,
             N_bytes_to_read=N_expected_bytes,
         )
         self._tick_last_msg = time.perf_counter()
-        # print(pretty_format_hex(reply))
 
         # Parse the returned data value
+        data_val = None
         if success and isinstance(reply, bytes):
-            data_val = (reply[4] << 8) + reply[5]
+            if len(reply) == N_expected_bytes:
+                # All is correct
+                data_val = (reply[4] << 8) + reply[5]
 
-            if hvlreg.datum_type == HVL_DType.S08:
-                data_val = data_val - (1 << 8)
-            elif hvlreg.datum_type == HVL_DType.S16:
-                data_val = data_val - (1 << 16)
-        else:
-            data_val = None
+                if hvlreg.datum_type == HVL_DType.S08:
+                    data_val = data_val - (1 << 8)
+                elif hvlreg.datum_type == HVL_DType.S16:
+                    data_val = data_val - (1 << 16)
+
+        if not success and isinstance(reply, bytes):
+            # Probably received a Modbus exception.
+            # TODO: Test for and parse Modbus exceptions.
+            print(f"Reply received: {pretty_format_hex(reply)}")
 
         return success, data_val
 
@@ -631,7 +684,7 @@ class XylemHydrovarHVL(SerialDevice):
                 val = HVL_Mode(data_val)
             except ValueError:
                 pft(
-                    f"ERROR: Unsupported HVL mode. Got {data_val}, "
+                    f"Unsupported HVL mode. Got {data_val}, "
                     "but only 0: Controller and 3: Actuator are supported."
                 )
                 sys.exit(0)  # Severe error, hence exit
@@ -659,7 +712,7 @@ class XylemHydrovarHVL(SerialDevice):
             val = HVL_Mode(hvl_mode)
         except ValueError:
             pft(
-                f"ERROR: Unsupported HVL mode. Got {hvl_mode}, "
+                f"Unsupported HVL mode. Got {hvl_mode}, "
                 "but only 0: Controller and 3: Actuator are supported."
             )
             sys.exit(0)  # Severe error, hence exit
@@ -759,8 +812,8 @@ class XylemHydrovarHVL(SerialDevice):
         """P830: Set the required frequency 1 for Actuator mode in Hz.
         Readings will be stored in class member `state`.
         """
-        # TODO: check for Modbus out-of-bounds write exception
-        # Second byte reads 0x86 in case of exception
+        # TODO: Check for Modbus 'ILLEGAL DATA VALUE' exception
+        # Second reply byte reads 0x86 in that case
         success, data_val = self.RTU_write(HVLREG_ACTUAT_FREQ_1, int(f_Hz * 10))
         if data_val is not None:
             val = float(data_val) / 10
@@ -858,25 +911,25 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val)
             self.state.diag_temp_inverter = val
-            print(f"Read inverter temperature: {val:5.0f} 'C")
+            # print(f"Read inverter temperature: {val:5.0f} 'C")
 
         success_2, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.diag_curr_inverter = val
-            print(f"Read inverter current    : {val:5.2f} A")
+            # print(f"Read inverter current    : {val:5.2f} A")
 
         success_3, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.diag_volt_inverter = val
-            print(f"Read inverter voltage    : {val:5.0f} V")
+            # print(f"Read inverter voltage    : {val:5.0f} V")
 
         success_4, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.diag_output_freq = val
-            print(f"Read output frequency    : {val:5.1f} Hz")
+            # print(f"Read output frequency    : {val:5.1f} Hz")
 
         return success_1 and success_2 and success_3 and success_4
 
