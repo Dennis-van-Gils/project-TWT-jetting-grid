@@ -28,8 +28,6 @@ from typing import Tuple, Union
 from enum import IntEnum
 import time
 
-import serial
-
 import numpy as np
 
 from dvg_debug_functions import print_fancy_traceback as pft
@@ -373,96 +371,6 @@ class XylemHydrovarHVL(SerialDevice):
             bittime * BITTIMES_PER_CHARACTERTIME * MIN_SILENT_CHARACTERTIMES,
             MIN_SILENT_TIME_SECONDS,
         )
-
-    # --------------------------------------------------------------------------
-    #   query_bytes
-    # --------------------------------------------------------------------------
-
-    def query_bytes(
-        self,
-        msg: bytes,
-        N_bytes_to_read: int,
-        raises_on_timeout: bool = False,
-    ) -> Tuple[bool, Union[bytes, None]]:
-        """Send a message as bytes to the serial device and subsequently read
-        the reply. Will block until reaching ``N_bytes_to_read`` or a read
-        timeout occurs.
-
-        Args:
-            msg (:obj:`bytes`):
-                Bytes to be sent to the serial device.
-
-            N_bytes_to_read (:obj:`int`):
-                Number of bytes to read.
-
-            raises_on_timeout (:obj:`bool`, optional):
-                Should an exception be raised when a write or read timeout
-                occurs?
-
-                Default: :const:`False`
-
-        Returns:
-            :obj:`tuple`:
-                success (:obj:`bool`):
-                    True when ``N_bytes_to_read`` bytes are indeed read within
-                    the timeout, False otherwise.
-
-                reply (:obj:`bytes` | :obj:`None`):
-                    Reply received from the device as bytes.
-
-                    If ``success`` is False and 0 bytes got returned from the
-                    device, then ``reply`` will be :obj:`None`.
-                    If ``success`` is False because the read timed out and too
-                    few bytes got returned, ``reply`` will contain the bytes
-                    read so far.
-        """
-
-        # Always ensure that a timeout exception is raised when coming from
-        # :meth:`connect_at_port`.
-        if self._force_query_to_raise_on_timeout:
-            raises_on_timeout = True
-
-        # Send query
-        if not self.write(msg, raises_on_timeout=raises_on_timeout):
-            return (False, None)  # --> leaving
-
-        # Read reply
-        try:
-            if N_bytes_to_read > 0:
-                reply = self.ser.read(N_bytes_to_read)
-            else:
-                reply = b""
-                self.ser.flush()
-        except serial.SerialException as err:
-            # Note: The Serial library does not throw an exception when it
-            # times out in `read`, only when it times out in `write`! We
-            # will check for zero received bytes as indication for a read
-            # timeout, later. See: https://stackoverflow.com/questions/10978224/serialtimeoutexception-in-python-not-working-as-expected
-            pft(err, 3)
-            return (False, None)  # --> leaving
-        except Exception as err:
-            pft(err, 3)
-            sys.exit(0)  # --> leaving
-
-        if (N_bytes_to_read > 0) and (len(reply) == 0):
-            if raises_on_timeout:
-                raise serial.SerialException(
-                    "Received 0 bytes. Read probably timed out."
-                )  # --> leaving
-            else:
-                pft("Received 0 bytes. Read probably timed out.", 3)
-                return (False, None)  # --> leaving
-
-        if N_bytes_to_read != len(reply):
-            if raises_on_timeout:
-                raise serial.SerialException(
-                    "Received too few bytes. Read probably timed out."
-                )  # --> leaving
-            else:
-                pft("Received too few bytes. Read probably timed out.", 3)
-                return (False, reply)  # --> leaving
-
-        return (True, reply)
 
     # --------------------------------------------------------------------------
     #   RTU_read
