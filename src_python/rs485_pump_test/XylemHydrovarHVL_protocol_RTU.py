@@ -654,8 +654,9 @@ class XylemHydrovarHVL(SerialDevice):
         success &= self.read_mode()
         success &= self.read_device_status()
         success &= self.read_error_status()
+        success &= self.use_digital_required_value_1()
         success &= self.set_required_pressure(0)  # Set to lowest possible
-        success &= self.set_required_frequency(30)  # Set to lowest possible
+        success &= self.set_required_frequency(20)  # Set to lowest possible
 
         return success
 
@@ -911,25 +912,25 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val)
             self.state.diag_temp_inverter = val
-            # print(f"Read inverter temperature: {val:5.0f} 'C")
+            print(f"Read inverter temperature: {val:5.0f} 'C")
 
         success_2, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.diag_curr_inverter = val
-            # print(f"Read inverter current    : {val:5.2f} A")
+            print(f"Read inverter current    : {val:5.2f} A")
 
         success_3, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.diag_volt_inverter = val
-            # print(f"Read inverter voltage    : {val:5.0f} V")
+            print(f"Read inverter voltage    : {val:5.0f} V")
 
         success_4, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.diag_output_freq = val
-            # print(f"Read output frequency    : {val:5.1f} Hz")
+            print(f"Read output frequency    : {val:5.1f} Hz")
 
         return success_1 and success_2 and success_3 and success_4
 
