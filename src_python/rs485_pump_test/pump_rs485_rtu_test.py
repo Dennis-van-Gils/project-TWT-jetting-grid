@@ -41,4 +41,10 @@ if __name__ == "__main__":
     for i in range(N):
         hvl.read_diagnostic_values()
 
+    s = hvl.state
+    print(f"Read inverter temperature: {s.diag_temp_inverter:5.0f} 'C")
+    print(f"Read inverter current    : {s.diag_curr_inverter:5.2f} A")
+    print(f"Read inverter voltage    : {s.diag_volt_inverter:5.0f} V")
+    print(f"Read output frequency    : {s.diag_output_freq:5.1f} Hz")
+
     print(f"time per eval: {(perf_counter() - tick)*1000/N:.0f} ms")
