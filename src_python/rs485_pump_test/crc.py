@@ -48,7 +48,9 @@ auchCRCLo = [
 
 
 def crc16(bytes_in: bytes) -> Tuple[int, int]:
-    """Calculate the 16-bit CRC of a bytes array and return it."""
+    """Calculate and return the 16-bit CRC of the passed bytes sequence as
+    (CRC Hi, CRC Lo).
+    """
     CRCHi = 0xFF
     CRCLo = 0xFF
     for byte in bytes_in:
