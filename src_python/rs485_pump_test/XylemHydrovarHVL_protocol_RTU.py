@@ -19,7 +19,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "23-02-2023"
+__date__ = "24-02-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -137,6 +137,10 @@ HVLREG_OUTPUT_FREQ   = HVL_Register(0x0033, HVL_DType.S16)  # R     P46
 # M100: Basic settings
 HVLREG_MODE          = HVL_Register(0x008b, HVL_DType.U08)  # RW    P105
 
+# M200: Conf. inverter
+HVLREG_MAX_FREQ      = HVL_Register(0x009d, HVL_DType.U16)  # RW    P245
+HVLREG_MIN_FREQ      = HVL_Register(0x009e, HVL_DType.U16)  # RW    P250
+
 # M600: Error
 HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08)  # RW    P615
 
@@ -146,6 +150,9 @@ HVLREG_C_REQ_VAL_2   = HVL_Register(0x00e6, HVL_DType.U08)  # RW    P810
 HVLREG_SW_REQ_VAL    = HVL_Register(0x00e7, HVL_DType.U08)  # RW    P815
 HVLREG_REQ_VAL_1     = HVL_Register(0x00e8, HVL_DType.U16)  # RW    P820
 HVLREG_ACTUAT_FREQ_1 = HVL_Register(0x00ea, HVL_DType.U16)  # RW    P830
+
+# M1000: Test run
+HVLREG_TEST_RUN      = HVL_Register(0x00f9, HVL_DType.U08)  # RW    P1005
 
 # M1200: RS-485 Interface
 HVLREG_ADDRESS       = HVL_Register(0x010d, HVL_DType.U08)  # RW    P1205
@@ -169,9 +176,12 @@ class XylemHydrovarHVL(SerialDevice):
         pump_is_on         = False   # (bool)
         pump_is_enabled    = False   # (bool)                           P24
         mode               = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
-        actual_value       = np.nan  # [bar]
-        required_pressure  = 0.0     # [bar]                            P820
-        required_frequency = 0.0     # [Hz]                             P830
+        actual_pressure    = np.nan  # [bar]
+        wanted_pressure    = 0.0     # [bar]                            P820
+        wanted_frequency   = 0.0     # [Hz]                             P830
+
+        min_frequency      = np.nan  # [Hz]                             P250
+        max_frequency      = np.nan  # [Hz]                             P245
 
         diag_temp_inverter = np.nan  # ['C]                             P43
         diag_curr_inverter = np.nan  # [A], not [% FS]                  P44
@@ -552,19 +562,33 @@ class XylemHydrovarHVL(SerialDevice):
     # --------------------------------------------------------------------------
 
     def begin(self) -> bool:
-        """Stop the pump and read the necessary parameters of the HVL controller
-        and store it in the `state`, `error_status` and `device_status` members.
+        """Stop the pump, initialize to safe default parameters and read the
+        necessary parameters of the HVL controller and store it in the `state`,
+        `error_status` and `device_status` members.
+
         This method should be called once and immediately after a successful
         connection to the HVL controller has been established.
         """
         success = True
         success &= self.stop_pump()
+
         success &= self.read_mode()
+        success &= self.read_min_frequency()
+        success &= self.read_max_frequency()
+        success &= self.use_digital_required_value_1()
+
+        # Prevent test run scheduling of the pump
+        success &= self.set_test_run(0)
+
+        # Prevent auto-restart of the pump when pressure has dropped
+        success &= self.set_start_value(100)  # 100 == Off
+
+        # Set setpoints to lowest possible values for safety
+        success &= self.set_wanted_pressure(0)
+        success &= self.set_wanted_frequency(self.state.min_frequency)
+
         success &= self.read_device_status()
         success &= self.read_error_status()
-        success &= self.use_digital_required_value_1()
-        success &= self.set_required_pressure(0)  # Set to lowest possible
-        success &= self.set_required_frequency(20)  # Set to lowest possible
 
         return success
 
@@ -677,19 +701,19 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def read_actual_value(self) -> bool:
+    def read_actual_pressure(self) -> bool:
         """Read the actual pressure in bar.
         Readings will be stored in class member `state`.
         """
         success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
         if data_val is not None:
             val = float(data_val) / 100
-            self.state.actual_value = val
+            self.state.actual_pressure = val
             print(f"Actual pressure: {val:.2f} bar")
 
         return success
 
-    def set_required_pressure(self, P_bar: float) -> bool:
+    def set_wanted_pressure(self, P_bar: float) -> bool:
         """P820: Set the digital required value 1 in bar.
         Readings will be stored in class member `state`.
         """
@@ -700,46 +724,74 @@ class XylemHydrovarHVL(SerialDevice):
         success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
             val = float(data_val) / 100
-            self.state.required_pressure = val
-            print(f"Set required pressure: {val:.2f} bar")
+            self.state.wanted_pressure = val
+            print(f"Set wanted pressure: {val:.2f} bar")
 
         return success
 
-    def read_required_pressure(self) -> bool:
+    def read_wanted_pressure(self) -> bool:
         """P820: Read the digital required value 1 in bar.
         Readings will be stored in class member `state`.
         """
         success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
         if data_val is not None:
             val = float(data_val) / 100
-            self.state.required_pressure = val
-            print(f"Read required pressure: {val:.2f} bar")
+            self.state.wanted_pressure = val
+            print(f"Read wanted pressure: {val:.2f} bar")
 
         return success
 
-    def set_required_frequency(self, f_Hz: float) -> bool:
+    def read_min_frequency(self) -> bool:
+        """P250: Read the minimum frequency in Hz.
+        Readings will be stored in class member `state`.
+        """
+        success, data_val = self.RTU_read(HVLREG_MIN_FREQ)
+        if data_val is not None:
+            val = float(data_val) / 10
+            self.state.min_frequency = val
+            print(f"Read min frequency: {val:.1f} Hz")
+
+        return success
+
+    def read_max_frequency(self) -> bool:
+        """P245: Read the maximum frequency in Hz.
+        Readings will be stored in class member `state`.
+        """
+        success, data_val = self.RTU_read(HVLREG_MAX_FREQ)
+        if data_val is not None:
+            val = float(data_val) / 10
+            self.state.max_frequency = val
+            print(f"Read max frequency: {val:.1f} Hz")
+
+        return success
+
+    def set_wanted_frequency(self, f_Hz: float) -> bool:
         """P830: Set the required frequency 1 for Actuator mode in Hz.
         Readings will be stored in class member `state`.
         """
+        # Limit frequency setpoint
+        f_Hz = min(f_Hz, self.state.max_frequency)
+        f_Hz = max(f_Hz, self.state.min_frequency)
+
         # TODO: Check for Modbus 'ILLEGAL DATA VALUE' exception
         # Second reply byte reads 0x86 in that case
         success, data_val = self.RTU_write(HVLREG_ACTUAT_FREQ_1, int(f_Hz * 10))
         if data_val is not None:
             val = float(data_val) / 10
-            self.state.required_frequency = val
-            print(f"Set required frequency: {val:.1f} Hz")
+            self.state.wanted_frequency = val
+            print(f"Set wanted frequency: {val:.1f} Hz")
 
         return success
 
-    def read_required_frequency(self) -> bool:
+    def read_wanted_frequency(self) -> bool:
         """P830: Read the required frequency 1 for Actuator mode in Hz.
         Readings will be stored in class member `state`.
         """
         success, data_val = self.RTU_read(HVLREG_ACTUAT_FREQ_1)
         if data_val is not None:
             val = float(data_val) / 10
-            self.state.required_frequency = val
-            print(f"Read required frequency: {val:.1f} Hz")
+            self.state.wanted_frequency = val
+            print(f"Read wanted frequency: {val:.1f} Hz")
 
         return success
 
@@ -851,3 +903,15 @@ class XylemHydrovarHVL(SerialDevice):
         success_3, _ = self.RTU_write(HVLREG_SW_REQ_VAL, 0)  # 0: Setp. 1
 
         return success_1 and success_2 and success_3
+
+    def set_test_run(self, hours) -> bool:
+        """P1005: Controls the automatic test run, which starts up the pump
+        after the last stop, to prevent the pump from blocking (possible setting
+        are "Off" or "After 100 hrs".
+        """
+        # Limit hours
+        hours = min(hours, 100)
+        hours = max(hours, 0)
+        success, _ = self.RTU_write(HVLREG_TEST_RUN, hours)
+
+        return success
