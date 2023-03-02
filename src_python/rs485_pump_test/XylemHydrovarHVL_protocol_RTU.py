@@ -19,7 +19,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "24-02-2023"
+__date__ = "02-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -33,10 +33,6 @@ import numpy as np
 from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_devices.BaseDevice import SerialDevice
 from crc import crc16
-
-# Software-limited maximum pressure setpoint (P820)
-MAX_PRESSURE_SETPOINT = 3  # [bar]
-
 
 # ------------------------------------------------------------------------------
 #   accurate_delay_ms
@@ -315,6 +311,7 @@ class XylemHydrovarHVL(SerialDevice):
         name: str = "HVL",
         long_name: str = "Xylem Hydrovar HVL variable speed drive",
         connect_to_modbus_slave_address: int = 0x01,
+        max_pressure_setpoint_bar: float = 3,
     ):
         super().__init__(name=name, long_name=long_name)
 
@@ -335,6 +332,9 @@ class XylemHydrovarHVL(SerialDevice):
             valid_ID_broad=True,
             valid_ID_specific=connect_to_modbus_slave_address,
         )
+
+        # Software-limited maximum pressure setpoint
+        self.max_pressure_setpoint_bar = max_pressure_setpoint_bar
 
         # Container for the process and measurement variables
         self.state = self.State()
@@ -719,7 +719,7 @@ class XylemHydrovarHVL(SerialDevice):
         """
         # Limit pressure setpoint
         P_bar = max(float(P_bar), 0)
-        P_bar = min(float(P_bar), MAX_PRESSURE_SETPOINT)
+        P_bar = min(float(P_bar), self.max_pressure_setpoint_bar)
 
         success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
@@ -915,3 +915,51 @@ class XylemHydrovarHVL(SerialDevice):
         success, _ = self.RTU_write(HVLREG_TEST_RUN, hours)
 
         return success
+
+
+# -----------------------------------------------------------------------------
+#   Main: Will show a demo when run from the terminal
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    # Path to the textfile containing the (last used) serial port
+    PATH_PORT = "config/port_Hydrovar.txt"
+
+    hvl = XylemHydrovarHVL(
+        connect_to_modbus_slave_address=0x01,
+        max_pressure_setpoint_bar=3,
+    )
+    hvl.serial_settings = {
+        "baudrate": 115200,
+        "bytesize": 8,
+        "parity": "N",
+        "stopbits": 1,
+        "timeout": 0.2,
+        "write_timeout": 0.2,
+    }
+
+    if hvl.auto_connect(PATH_PORT):
+        hvl.begin()
+    else:
+        sys.exit(0)
+
+    hvl.set_error_reset(False)
+    hvl.set_mode(HVL_Mode.CONTROLLER)
+
+    # hvl.set_wanted_pressure(1)
+    # hvl.read_wanted_pressure()
+    hvl.read_actual_pressure()
+    print(f"Read actual pressure: {hvl.state.actual_pressure:.2f} bar")
+
+    tick = time.perf_counter()
+    N = 100
+    for i in range(N):
+        hvl.read_diagnostic_values()
+
+    s = hvl.state
+    print(f"Read inverter temperature: {s.diag_temp_inverter:5.0f} 'C")
+    print(f"Read inverter current    : {s.diag_curr_inverter:5.2f} A")
+    print(f"Read inverter voltage    : {s.diag_volt_inverter:5.0f} V")
+    print(f"Read output frequency    : {s.diag_output_freq:5.1f} Hz")
+
+    print(f"time per eval: {(time.perf_counter() - tick)*1000/N:.0f} ms")
