@@ -136,6 +136,7 @@ HVLREG_MODE          = HVL_Register(0x008b, HVL_DType.U08)  # RW    P105
 # M200: Conf. inverter
 HVLREG_MAX_FREQ      = HVL_Register(0x009d, HVL_DType.U16)  # RW    P245
 HVLREG_MIN_FREQ      = HVL_Register(0x009e, HVL_DType.U16)  # RW    P250
+HVLREG_MOTOR_NOM_CURR= HVL_Register(0x011a, HVL_DType.U32)  # R     P268
 
 # M600: Error
 HVLREG_ERROR_RESET   = HVL_Register(0x00d3, HVL_DType.U08)  # RW    P615
@@ -178,6 +179,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         min_frequency      = np.nan  # [Hz]                             P250
         max_frequency      = np.nan  # [Hz]                             P245
+        nominal_motor_current = np.nan  # [A]                           P268
 
         diag_temp_inverter = np.nan  # ['C]                             P43
         diag_curr_inverter = np.nan  # [A], not [% FS]                  P44
@@ -411,12 +413,22 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd[1] = HVL_FuncCode.READ
         byte_cmd[2] = (hvlreg.address & 0xFF00) >> 8  # address HI
         byte_cmd[3] = hvlreg.address & 0x00FF  # address LO
-        byte_cmd[4] = 0x00  # no. of points HIs
+        byte_cmd[4] = 0x00  # no. of points HI
 
-        if hvlreg.datum_type == HVL_DType.B2:
-            byte_cmd[5] = 0x02  # no. of points LO
+        # no. of points LO
+        # NOTE: A 'point' is a register. According to the ModBus specification,
+        # a single register is always 16 bits long.
+        # So 1 'point' == 1 register == 16 bits == 2 bytes !!!
+        if hvlreg.datum_type == HVL_DType.U32:
+            # U32 is 4 bytes by definition, but for some strange reason
+            # the HVL sees P268 (nominal motor current) as 8 bytes
+            # long?! Meaning 8 bytes == 4 'points'. Only 4 bytes follow in the
+            # reply though.
+            byte_cmd[5] = 0x04  # 4 registers == 64 bits
+        elif hvlreg.datum_type == HVL_DType.B2:
+            byte_cmd[5] = 0x02  # 2 registers == 32 bits
         else:
-            byte_cmd[5] = 0x01  # no. of points LO
+            byte_cmd[5] = 0x01  # 1 register == 16 bits
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
@@ -427,7 +439,9 @@ class XylemHydrovarHVL(SerialDevice):
             accurate_delay_ms((silent_period - time_since_last_msg) * 1000)
 
         # Send command and read reply
-        if hvlreg.datum_type == HVL_DType.B2:
+        if hvlreg.datum_type == HVL_DType.U32:
+            N_expected_bytes = 9
+        elif hvlreg.datum_type == HVL_DType.B2:
             N_expected_bytes = 9
         else:
             N_expected_bytes = 7
@@ -453,11 +467,22 @@ class XylemHydrovarHVL(SerialDevice):
                         + (reply[5] << 8)
                         + (reply[6])
                     )
+                elif byte_count == 8:  # HVL_DType.U32 ?!
+                    # U32 is 4 bytes by definition, but for some strange reason
+                    # the HVL reports P268 (nominal motor current) as 8 bytes
+                    # long?! Only 4 bytes follow though.
+                    data_val = (
+                        (reply[3] << 32)
+                        + (reply[4] << 16)
+                        + (reply[5] << 8)
+                        + (reply[6])
+                    )
                 else:
                     pft(
                         f"Unsupported byte count. Got {byte_count}, "
                         "but only 2 and 4 are implemented."
                     )
+                    print(f"Reply received: {pretty_format_hex(reply)}")
                     return False, None  # --> leaving
 
                 if hvlreg.datum_type == HVL_DType.S08:
@@ -765,6 +790,18 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
+    def read_nominal_motor_current(self) -> bool:
+        """P268: Read the nominal motor current in A.
+        Readings will be stored in class member `state`.
+        """
+        success, data_val = self.RTU_read(HVLREG_MOTOR_NOM_CURR)
+        if data_val is not None:
+            val = float(data_val) / 100
+            self.state.nominal_motor_current = val
+            print(f"Read nominal motor current: {val:.2f} A")
+
+        return success
+
     def set_wanted_frequency(self, f_Hz: float) -> bool:
         """P830: Set the required frequency 1 for Actuator mode in Hz.
         Readings will be stored in class member `state`.
@@ -951,15 +988,19 @@ if __name__ == "__main__":
     hvl.read_actual_pressure()
     print(f"Read actual pressure: {hvl.state.actual_pressure:.2f} bar")
 
+    hvl.read_nominal_motor_current()
+
+    sys.exit(0)
+
     tick = time.perf_counter()
     N = 100
     for i in range(N):
         hvl.read_diagnostic_values()
 
-    s = hvl.state
-    print(f"Read inverter temperature: {s.diag_temp_inverter:5.0f} 'C")
-    print(f"Read inverter current    : {s.diag_curr_inverter:5.2f} A")
-    print(f"Read inverter voltage    : {s.diag_volt_inverter:5.0f} V")
-    print(f"Read output frequency    : {s.diag_output_freq:5.1f} Hz")
+    state = hvl.state
+    print(f"Read inverter temperature: {state.diag_temp_inverter:5.0f} 'C")
+    print(f"Read inverter current    : {state.diag_curr_inverter:5.2f} A")
+    print(f"Read inverter voltage    : {state.diag_volt_inverter:5.0f} V")
+    print(f"Read output frequency    : {state.diag_output_freq:5.1f} Hz")
 
     print(f"time per eval: {(time.perf_counter() - tick)*1000/N:.0f} ms")
