@@ -10,7 +10,10 @@ if __name__ == "__main__":
     # Path to the textfile containing the (last used) serial port
     PATH_PORT = "config/port_Hydrovar.txt"
 
-    hvl = XylemHydrovarHVL(connect_to_modbus_slave_address=0x01)
+    hvl = XylemHydrovarHVL(
+        connect_to_modbus_slave_address=0x01,
+        max_pressure_setpoint_bar=3,
+    )
     hvl.serial_settings = {
         "baudrate": 115200,
         "bytesize": 8,
@@ -29,10 +32,10 @@ if __name__ == "__main__":
     hvl.use_digital_required_value_1()
 
     hvl.set_mode(HVL_Mode.CONTROLLER)
-    hvl.read_actual_value()
+    hvl.read_actual_pressure()
 
-    # hvl.set_required_pressure(1)
-    # hvl.read_required_pressure()
+    # hvl.set_wanted_pressure(1)
+    # hvl.read_wanted_pressure()
 
     hvl.read_diagnostic_values()
 
