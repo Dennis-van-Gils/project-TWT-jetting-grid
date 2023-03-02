@@ -176,7 +176,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
 
     def create_GUI(self):
-        # Jetting pump control
+        # Pump control
         p = {
             "alignment": QtCore.Qt.AlignmentFlag.AlignRight,
         }
@@ -239,6 +239,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         grid.addWidget(self.f_limits                   , i, 1)
         grid.addWidget(QtWid.QLabel("Hz")              , i, 2)      ; i+=1
         grid.addItem(QtWid.QSpacerItem(1, 10)          , i, 0)      ; i+=1
+        # fmt: on
 
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 0)
@@ -247,6 +248,39 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         self.grpb_control = QtWid.QGroupBox("Pump control")
         self.grpb_control.setLayout(grid)
+
+        # Inverter diagnostics
+        self.inverter_temp = QtWid.QLineEdit("nan", **p)
+        self.inverter_curr_A = QtWid.QLineEdit("nan", **p)
+        self.inverter_curr_pct = QtWid.QLineEdit("nan", **p)
+        self.inverter_volt = QtWid.QLineEdit("nan", **p)
+
+        # fmt: off
+        i = 0
+        grid = QtWid.QGridLayout()
+        grid.setVerticalSpacing(4)
+
+        grid.addWidget(QtWid.QLabel("Temperature")     , i, 0)
+        grid.addWidget(self.inverter_temp              , i, 1)
+        grid.addWidget(QtWid.QLabel("\u00b0C")         , i, 2)      ; i+=1
+        grid.addWidget(QtWid.QLabel("Current")         , i, 0)
+        grid.addWidget(self.inverter_curr_A            , i, 1)
+        grid.addWidget(QtWid.QLabel("A")               , i, 2)      ; i+=1
+        grid.addWidget(QtWid.QLabel("Current")         , i, 0)
+        grid.addWidget(self.inverter_curr_pct          , i, 1)
+        grid.addWidget(QtWid.QLabel("%")               , i, 2)      ; i+=1
+        grid.addWidget(QtWid.QLabel("Voltage")         , i, 0)
+        grid.addWidget(self.inverter_volt              , i, 1)
+        grid.addWidget(QtWid.QLabel("V")               , i, 2)      ; i+=1
+        # fmt: on
+
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 0)
+        grid.setColumnStretch(2, 1)
+        grid.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        self.grpb_inverter = QtWid.QGroupBox("Inverter")
+        self.grpb_inverter.setLayout(grid)
 
     def process_pbtn_pump_running(self):
         pass

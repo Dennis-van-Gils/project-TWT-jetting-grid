@@ -91,6 +91,7 @@ class MainWindow(QtWid.QWidget):
 
         hbox = QtWid.QHBoxLayout()
         hbox.addWidget(hvl_qdev.grpb_control)
+        hbox.addWidget(hvl_qdev.grpb_inverter)
         hbox.addWidget(
             self.pbtn_exit, alignment=QtCore.Qt.AlignmentFlag.AlignTop
         )
