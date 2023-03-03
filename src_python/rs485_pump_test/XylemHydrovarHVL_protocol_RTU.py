@@ -208,7 +208,7 @@ class XylemHydrovarHVL(SerialDevice):
         setpoint_2_low_mA = False  # bit 11, error 26
         # fmt: on
 
-        def report(self):
+        def has_error(self) -> bool:
             error_list = (
                 self.overcurrent,
                 self.overload,
@@ -224,7 +224,10 @@ class XylemHydrovarHVL(SerialDevice):
                 self.setpoint_2_low_mA,
             )
 
-            if not np.any(error_list, where=True):
+            return np.any(error_list, where=True)
+
+        def report(self):
+            if not self.has_error():
                 print("No errors")
                 return
 
@@ -359,7 +362,7 @@ class XylemHydrovarHVL(SerialDevice):
     def ID_validation_query(self) -> Tuple[bool, Union[int, None]]:
         # We're using a query on the Modbus slave address (P1205) as ID
         # validation
-        success, data_val = self.RTU_read(HVLREG_ADDRESS)
+        success, data_val = self._RTU_read(HVLREG_ADDRESS)
         return success, data_val
 
     # --------------------------------------------------------------------------
@@ -388,10 +391,10 @@ class XylemHydrovarHVL(SerialDevice):
         )
 
     # --------------------------------------------------------------------------
-    #   RTU_read
+    #   _RTU_read
     # --------------------------------------------------------------------------
 
-    def RTU_read(self, hvlreg: HVL_Register) -> Tuple[bool, Union[int, None]]:
+    def _RTU_read(self, hvlreg: HVL_Register) -> Tuple[bool, Union[int, None]]:
         """Send a 'read' RTU command over Modbus to the slave device.
 
         Args:
@@ -496,10 +499,10 @@ class XylemHydrovarHVL(SerialDevice):
         return success, data_val
 
     # --------------------------------------------------------------------------
-    #   RTU_write
+    #   _RTU_write
     # --------------------------------------------------------------------------
 
-    def RTU_write(
+    def _RTU_write(
         self, hvlreg: HVL_Register, value: int
     ) -> Tuple[bool, Union[int, None]]:
         """Send a 'write' RTU command over Modbus to the slave device.
@@ -613,7 +616,7 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     # --------------------------------------------------------------------------
-    #   Implementations of RTU_read & RTU_write
+    #   Implementations of _RTU_read & _RTU_write
     # --------------------------------------------------------------------------
 
     def read_hvl_mode(self) -> bool:
@@ -631,7 +634,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_MODE)
+        success, data_val = self._RTU_read(HVLREG_MODE)
         if data_val is not None:
             try:
                 val = HVL_Mode(data_val)
@@ -674,7 +677,7 @@ class XylemHydrovarHVL(SerialDevice):
                 "but only 0: Controller and 3: Actuator are supported."
             )
             sys.exit(0)  # Severe error, hence exit
-        success, data_val = self.RTU_write(HVLREG_MODE, hvl_mode)
+        success, data_val = self._RTU_write(HVLREG_MODE, hvl_mode)
         if data_val is not None:
             val = HVL_Mode(data_val)
             self.state.hvl_mode = val
@@ -689,7 +692,7 @@ class XylemHydrovarHVL(SerialDevice):
 
     def start_pump(self) -> bool:
         """Readings will be stored in class member `state`."""
-        success, data_val = self.RTU_write(HVLREG_STOP_START, 1)
+        success, data_val = self._RTU_write(HVLREG_STOP_START, 1)
         if data_val is not None:
             val = bool(data_val)
             self.state.pump_is_on = val
@@ -699,7 +702,7 @@ class XylemHydrovarHVL(SerialDevice):
 
     def stop_pump(self) -> bool:
         """Readings will be stored in class member `state`."""
-        success, data_val = self.RTU_write(HVLREG_STOP_START, 0)
+        success, data_val = self._RTU_write(HVLREG_STOP_START, 0)
         if data_val is not None:
             val = bool(data_val)
             self.state.pump_is_on = val
@@ -711,7 +714,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P24: Manually enable the device.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 1)
+        success, data_val = self._RTU_write(HVLREG_ENABLE_DEVICE, 1)
         if data_val is not None:
             val = bool(data_val)
             self.state.pump_is_enabled = val
@@ -723,7 +726,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P24: Manually disable the device.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_write(HVLREG_ENABLE_DEVICE, 0)
+        success, data_val = self._RTU_write(HVLREG_ENABLE_DEVICE, 0)
         if data_val is not None:
             val = bool(data_val)
             self.state.pump_is_enabled = val
@@ -735,7 +738,7 @@ class XylemHydrovarHVL(SerialDevice):
         """Read the actual pressure in bar.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_ACTUAL_VALUE)
+        success, data_val = self._RTU_read(HVLREG_ACTUAL_VALUE)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.actual_pressure = val
@@ -751,7 +754,7 @@ class XylemHydrovarHVL(SerialDevice):
         P_bar = max(float(P_bar), 0)
         P_bar = min(float(P_bar), self.max_pressure_setpoint_bar)
 
-        success, data_val = self.RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
+        success, data_val = self._RTU_write(HVLREG_REQ_VAL_1, int(P_bar * 100))
         if data_val is not None:
             val = float(data_val) / 100
             self.state.wanted_pressure = val
@@ -763,7 +766,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P820: Read the digital required value 1 in bar.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_REQ_VAL_1)
+        success, data_val = self._RTU_read(HVLREG_REQ_VAL_1)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.wanted_pressure = val
@@ -775,7 +778,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P250: Read the minimum frequency in Hz.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_MIN_FREQ)
+        success, data_val = self._RTU_read(HVLREG_MIN_FREQ)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.min_frequency = val
@@ -787,7 +790,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P245: Read the maximum frequency in Hz.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_MAX_FREQ)
+        success, data_val = self._RTU_read(HVLREG_MAX_FREQ)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.max_frequency = val
@@ -799,7 +802,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P268: Read the nominal motor current in A.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_MOTOR_NOM_CURR)
+        success, data_val = self._RTU_read(HVLREG_MOTOR_NOM_CURR)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.nom_motor_current = val
@@ -811,7 +814,7 @@ class XylemHydrovarHVL(SerialDevice):
         """Read the actual frequency of the inverter in Hz.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
+        success, data_val = self._RTU_read(HVLREG_OUTPUT_FREQ)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.actual_frequency = val
@@ -829,7 +832,9 @@ class XylemHydrovarHVL(SerialDevice):
 
         # TODO: Check for Modbus 'ILLEGAL DATA VALUE' exception
         # Second reply byte reads 0x86 in that case
-        success, data_val = self.RTU_write(HVLREG_ACTUAT_FREQ_1, int(f_Hz * 10))
+        success, data_val = self._RTU_write(
+            HVLREG_ACTUAT_FREQ_1, int(f_Hz * 10)
+        )
         if data_val is not None:
             val = float(data_val) / 10
             self.state.wanted_frequency = val
@@ -841,7 +846,7 @@ class XylemHydrovarHVL(SerialDevice):
         """P830: Read the required frequency 1 for Actuator mode in Hz.
         Readings will be stored in class member `state`.
         """
-        success, data_val = self.RTU_read(HVLREG_ACTUAT_FREQ_1)
+        success, data_val = self._RTU_read(HVLREG_ACTUAT_FREQ_1)
         if data_val is not None:
             val = float(data_val) / 10
             self.state.wanted_frequency = val
@@ -858,7 +863,7 @@ class XylemHydrovarHVL(SerialDevice):
         """
         pct = max(pct, 0)
         pct = min(pct, 100)
-        success, data_val = self.RTU_write(HVLREG_START_VALUE, int(pct))
+        success, data_val = self._RTU_write(HVLREG_START_VALUE, int(pct))
         if data_val is not None:
             val = float(data_val)
             print(f"Set start value: {val:.0f} %")
@@ -867,7 +872,7 @@ class XylemHydrovarHVL(SerialDevice):
 
     def set_error_reset(self, flag: Union[int, bool]) -> bool:
         """P615: Select automatic reset of errors."""
-        success, data_val = self.RTU_write(HVLREG_ERROR_RESET, int(flag))
+        success, data_val = self._RTU_write(HVLREG_ERROR_RESET, int(flag))
         if data_val is not None:
             val = int(data_val)
             print(f"Set error reset: {val}")
@@ -876,7 +881,7 @@ class XylemHydrovarHVL(SerialDevice):
 
     def read_error_status(self) -> bool:
         """Readings will be stored in class member `error_status`."""
-        success, data_val = self.RTU_read(HVLREG_ERRORS_H3)
+        success, data_val = self._RTU_read(HVLREG_ERRORS_H3)
         if data_val is not None:
             s = self.error_status  # Shorthand
             # fmt: off
@@ -899,7 +904,7 @@ class XylemHydrovarHVL(SerialDevice):
 
     def read_device_status(self) -> bool:
         """Readings will be stored in class member `device_status`."""
-        success, data_val = self.RTU_read(HVLREG_DEV_STATUS_H4)
+        success, data_val = self._RTU_read(HVLREG_DEV_STATUS_H4)
         if data_val is not None:
             s = self.device_status  # Shorthand
             # fmt: off
@@ -922,19 +927,19 @@ class XylemHydrovarHVL(SerialDevice):
         and voltage) of the inverter.
         Readings will be stored in class member `state`.
         """
-        success_1, data_val = self.RTU_read(HVLREG_TEMP_INVERTER)
+        success_1, data_val = self._RTU_read(HVLREG_TEMP_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.inverter_temp = val
             # print(f"Read inverter temperature: {val:5.0f} 'C")
 
-        success_2, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
+        success_2, data_val = self._RTU_read(HVLREG_VOLT_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.inverter_volt = val
             # print(f"Read inverter voltage    : {val:5.0f} V")
 
-        success_3, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
+        success_3, data_val = self._RTU_read(HVLREG_CURR_INVERTER)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.inverter_curr_A = val
@@ -950,9 +955,9 @@ class XylemHydrovarHVL(SerialDevice):
         """P805, P810, P815: Set up the registers to make use of a digitally
         supplied required value 1 and disable the required value 2."""
 
-        success_1, _ = self.RTU_write(HVLREG_C_REQ_VAL_1, 1)  # 1: Dig
-        success_2, _ = self.RTU_write(HVLREG_C_REQ_VAL_2, 0)  # 0: Off
-        success_3, _ = self.RTU_write(HVLREG_SW_REQ_VAL, 0)  # 0: Setp. 1
+        success_1, _ = self._RTU_write(HVLREG_C_REQ_VAL_1, 1)  # 1: Dig
+        success_2, _ = self._RTU_write(HVLREG_C_REQ_VAL_2, 0)  # 0: Off
+        success_3, _ = self._RTU_write(HVLREG_SW_REQ_VAL, 0)  # 0: Setp. 1
 
         return success_1 and success_2 and success_3
 
@@ -964,7 +969,7 @@ class XylemHydrovarHVL(SerialDevice):
         # Limit hours
         hours = min(hours, 100)
         hours = max(hours, 0)
-        success, _ = self.RTU_write(HVLREG_TEST_RUN, hours)
+        success, _ = self._RTU_write(HVLREG_TEST_RUN, hours)
 
         return success
 
