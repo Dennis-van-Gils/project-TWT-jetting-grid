@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "02-03-2023"
+__date__ = "03-03-2023"
 __version__ = "1.0.0"
 
 import os
@@ -95,11 +95,11 @@ class MainWindow(QtWid.QWidget):
 
         p = {"alignment": QtCore.Qt.AlignmentFlag.AlignTop}
         hbox = QtWid.QHBoxLayout()
-        hbox.addWidget(hvl_qdev.grpb_control)
+        hbox.addWidget(hvl_qdev.qgrp_control)
 
         vbox = QtWid.QVBoxLayout()
-        vbox.addWidget(hvl_qdev.grpb_inverter)
-        vbox.addWidget(hvl_qdev.grpb_error_status)
+        vbox.addWidget(hvl_qdev.qgrp_inverter)
+        vbox.addWidget(hvl_qdev.qgrp_error_status)
 
         hbox.addLayout(vbox)
         hbox.addWidget(self.pbtn_exit, **p)
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     PATH_PORT = "config/port_Hydrovar.txt"
 
     # The state of the pump is polled with this time interval
-    DAQ_INTERVAL_MS = 50  # [ms]
+    DAQ_INTERVAL_MS = 200  # [ms]
 
     # --------------------------------------------------------------------------
     #   Connect to Xylem Hydrovar HVL pump

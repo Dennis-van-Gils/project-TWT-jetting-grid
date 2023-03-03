@@ -184,9 +184,10 @@ class XylemHydrovarHVL(SerialDevice):
         max_frequency      = np.nan  # [Hz]                             P245
         nom_motor_current  = np.nan  # [A]                              P268
 
-        diag_temp_inverter = np.nan  # ['C]                             P43
-        diag_curr_inverter = np.nan  # [A], not [% FS]                  P44
-        diag_volt_inverter = np.nan  # [V]                              P45
+        inverter_temp      = np.nan  # ['C]                             P43
+        inverter_volt      = np.nan  # [V]                              P45
+        inverter_curr_A    = np.nan  # [A]                              P44
+        inverter_curr_pct  = np.nan  # [% FS]     derived: P44 / P268 * 100
         # fmt: on
 
     class ErrorStatus:
@@ -924,20 +925,24 @@ class XylemHydrovarHVL(SerialDevice):
         success_1, data_val = self.RTU_read(HVLREG_TEMP_INVERTER)
         if data_val is not None:
             val = float(data_val)
-            self.state.diag_temp_inverter = val
+            self.state.inverter_temp = val
             # print(f"Read inverter temperature: {val:5.0f} 'C")
 
-        success_2, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
-        if data_val is not None:
-            val = float(data_val) / 100
-            self.state.diag_curr_inverter = val
-            # print(f"Read inverter current    : {val:5.2f} A")
-
-        success_3, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
+        success_2, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
         if data_val is not None:
             val = float(data_val)
-            self.state.diag_volt_inverter = val
+            self.state.inverter_volt = val
             # print(f"Read inverter voltage    : {val:5.0f} V")
+
+        success_3, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
+        if data_val is not None:
+            val = float(data_val) / 100
+            self.state.inverter_curr_A = val
+            self.state.inverter_curr_pct = (
+                val / self.state.nom_motor_current * 100
+            )
+            # print(f"Read inverter current    : {val:5.2f} A")
+            # print(f"Read inverter current    : {self.state.inverter_curr_pct:5.1f} %")
 
         return success_1 and success_2 and success_3
 
@@ -994,9 +999,10 @@ if __name__ == "__main__":
     hvl.device_status.report()
     hvl.error_status.report()
     hvl.read_inverter_diagnostics()
-    print(f"Read inverter temperature: {hvl.state.diag_temp_inverter:5.0f} 'C")
-    print(f"Read inverter current    : {hvl.state.diag_curr_inverter:5.2f} A")
-    print(f"Read inverter voltage    : {hvl.state.diag_volt_inverter:5.0f} V")
+    print(f"Read inverter temperature: {hvl.state.inverter_temp:5.0f} 'C")
+    print(f"Read inverter voltage    : {hvl.state.inverter_volt:5.0f} V")
+    print(f"Read inverter current    : {hvl.state.inverter_curr_A:5.2f} A")
+    print(f"Read inverter current    : {hvl.state.inverter_curr_pct:5.1f} %")
     hvl.read_actual_pressure()
     print(f"Actual pressure : {hvl.state.actual_pressure:4.2f} bar")
     hvl.read_actual_frequency()
