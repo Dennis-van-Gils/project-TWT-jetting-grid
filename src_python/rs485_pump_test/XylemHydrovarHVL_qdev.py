@@ -8,7 +8,7 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
 __date__ = "02-03-2023"
 __version__ = "1.0.0"
-# pylint: disable=invalid-name, broad-except
+# pylint: disable=invalid-name, broad-except, multiple-statements
 
 import os
 import sys
