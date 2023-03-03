@@ -903,7 +903,9 @@ class XylemHydrovarHVL(SerialDevice):
         return success
 
     def read_device_status(self) -> bool:
-        """Readings will be stored in class member `device_status`."""
+        """Readings will be stored in class member `device_status`. Also, class
+        members `state.pump_is_on` and `state.pump_is_enabled` will be updated.
+        """
         success, data_val = self._RTU_read(HVLREG_DEV_STATUS_H4)
         if data_val is not None:
             s = self.device_status  # Shorthand
@@ -918,7 +920,13 @@ class XylemHydrovarHVL(SerialDevice):
             s.solo_run_ON_OFF                     = bool(data_val & (1 << 14))
             s.inverter_STOP_START                 = bool(data_val & (1 << 15))
             # fmt: on
-            # s.report()
+            s.report()
+
+            # TODO: Test this: What are the differences between
+            # `device_is_enabled_with_start_button` vs `external_ON_OFF_terminal_enabled`?
+            # `motor_is_running` vs `inverter_STOP_START`
+            self.state.pump_is_on = s.motor_is_running
+            self.state.pump_is_enabled = s.device_is_enabled_with_start_button
 
         return success
 

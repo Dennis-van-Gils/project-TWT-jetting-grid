@@ -336,6 +336,19 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
                     self.rbtn_mode_frequency.setChecked(True)
 
             # Pump control
+            if state.pump_is_enabled:
+                self.pbtn_pump_running.setEnabled(True)
+                if state.pump_is_on:
+                    self.pbtn_pump_running.setChecked(True)
+                    self.pbtn_pump_running.setText("Pump is ON")
+                else:
+                    self.pbtn_pump_running.setChecked(False)
+                    self.pbtn_pump_running.setText("Pump is OFF")
+            else:
+                self.pbtn_pump_running.setEnabled(False)
+                self.pbtn_pump_running.setChecked(False)
+                self.pbtn_pump_running.setText("Pump is DISABLED")
+
             self.qled_P_actual.setText(f"{state.actual_pressure:.2f}")
             self.qled_f_actual.setText(f"{state.actual_frequency:.1f}")
 
