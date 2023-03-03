@@ -70,9 +70,8 @@ elif QT_LIB == PYSIDE6:
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
-from dvg_pyqt_controls import create_Toggle_button
 from dvg_debug_functions import dprint, print_fancy_traceback as pft
-
+from dvg_pyqt_controls import create_Toggle_button, SS_TEXTBOX_ERRORS
 from dvg_qdeviceio import QDeviceIO, DAQ_TRIGGER
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
 
@@ -176,10 +175,15 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
 
     def create_GUI(self):
-        # Pump control
+        # Textbox widths for fitting N characters using the current font
+        ex8 = 8 + 8 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
         p = {
             "alignment": QtCore.Qt.AlignmentFlag.AlignRight,
+            "minimumWidth": ex8,
+            "maximumWidth": ex8,
         }
+
+        # Pump control
         self.pbtn_pump_running = create_Toggle_button("Not running")
         self.pbtn_pump_running.clicked.connect(self.process_pbtn_pump_running)
         self.rbtn_mode_pressure = QtWid.QRadioButton("Regulate pressure")
@@ -250,10 +254,10 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         self.grpb_control.setLayout(grid)
 
         # Inverter diagnostics
-        self.inverter_temp = QtWid.QLineEdit("nan", **p)
-        self.inverter_curr_A = QtWid.QLineEdit("nan", **p)
-        self.inverter_curr_pct = QtWid.QLineEdit("nan", **p)
-        self.inverter_volt = QtWid.QLineEdit("nan", **p)
+        self.inverter_temp = QtWid.QLineEdit("nan", **p, readOnly=True)
+        self.inverter_curr_A = QtWid.QLineEdit("nan", **p, readOnly=True)
+        self.inverter_curr_pct = QtWid.QLineEdit("nan", **p, readOnly=True)
+        self.inverter_volt = QtWid.QLineEdit("nan", **p, readOnly=True)
 
         # fmt: off
         i = 0
@@ -263,15 +267,15 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         grid.addWidget(QtWid.QLabel("Temperature")     , i, 0)
         grid.addWidget(self.inverter_temp              , i, 1)
         grid.addWidget(QtWid.QLabel("\u00b0C")         , i, 2)      ; i+=1
+        grid.addWidget(QtWid.QLabel("Voltage")         , i, 0)
+        grid.addWidget(self.inverter_volt              , i, 1)
+        grid.addWidget(QtWid.QLabel("V")               , i, 2)      ; i+=1
         grid.addWidget(QtWid.QLabel("Current")         , i, 0)
         grid.addWidget(self.inverter_curr_A            , i, 1)
         grid.addWidget(QtWid.QLabel("A")               , i, 2)      ; i+=1
         grid.addWidget(QtWid.QLabel("Current")         , i, 0)
         grid.addWidget(self.inverter_curr_pct          , i, 1)
         grid.addWidget(QtWid.QLabel("%")               , i, 2)      ; i+=1
-        grid.addWidget(QtWid.QLabel("Voltage")         , i, 0)
-        grid.addWidget(self.inverter_volt              , i, 1)
-        grid.addWidget(QtWid.QLabel("V")               , i, 2)      ; i+=1
         # fmt: on
 
         grid.setColumnStretch(0, 0)
@@ -281,6 +285,19 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         self.grpb_inverter = QtWid.QGroupBox("Inverter")
         self.grpb_inverter.setLayout(grid)
+
+        # Error status
+        self.error_status = QtWid.QPlainTextEdit()
+        self.error_status.setStyleSheet(SS_TEXTBOX_ERRORS)
+        self.error_status.setReadOnly(True)
+
+        grid = QtWid.QGridLayout()
+        grid.setVerticalSpacing(4)
+        grid.addWidget(self.error_status, 0, 0)
+        grid.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        self.grpb_error_status = QtWid.QGroupBox("Error status")
+        self.grpb_error_status.setLayout(grid)
 
     def process_pbtn_pump_running(self):
         pass

@@ -66,7 +66,11 @@ elif QT_LIB == PYSIDE6:
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
-from dvg_pyqt_controls import SS_TEXTBOX_READ_ONLY, SS_GROUP
+from dvg_pyqt_controls import (
+    SS_GROUP,
+    SS_HOVER,
+    SS_TEXTBOX_READ_ONLY,
+)
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
 from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
 
@@ -89,17 +93,21 @@ class MainWindow(QtWid.QWidget):
         self.pbtn_exit.clicked.connect(self.close)
         self.pbtn_exit.setMinimumHeight(30)
 
+        p = {"alignment": QtCore.Qt.AlignmentFlag.AlignTop}
         hbox = QtWid.QHBoxLayout()
         hbox.addWidget(hvl_qdev.grpb_control)
-        hbox.addWidget(hvl_qdev.grpb_inverter)
-        hbox.addWidget(
-            self.pbtn_exit, alignment=QtCore.Qt.AlignmentFlag.AlignTop
-        )
+
+        vbox = QtWid.QVBoxLayout()
+        vbox.addWidget(hvl_qdev.grpb_inverter)
+        vbox.addWidget(hvl_qdev.grpb_error_status)
+
+        hbox.addLayout(vbox)
+        hbox.addWidget(self.pbtn_exit, **p)
         hbox.addStretch(1)
 
-        vbox = QtWid.QVBoxLayout(self)
-        vbox.addLayout(hbox)
-        vbox.addStretch(1)
+        vbox_final = QtWid.QVBoxLayout(self)
+        vbox_final.addLayout(hbox)
+        vbox_final.addStretch(1)
 
 
 # ------------------------------------------------------------------------------
@@ -152,7 +160,7 @@ if __name__ == "__main__":
 
     app = QtWid.QApplication(sys.argv)
     app.setFont(QtGui.QFont("Arial", 9))
-    app.setStyleSheet(SS_TEXTBOX_READ_ONLY + SS_GROUP)
+    app.setStyleSheet(SS_TEXTBOX_READ_ONLY + SS_GROUP + SS_HOVER)
     app.aboutToQuit.connect(about_to_quit)
 
     # --------------------------------------------------------------------------
@@ -160,7 +168,9 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
 
     hvl_qdev = XylemHydrovarHVL_qdev(
-        dev=hvl, DAQ_interval_ms=DAQ_INTERVAL_MS, debug=DEBUG
+        dev=hvl,
+        DAQ_interval_ms=DAQ_INTERVAL_MS,
+        debug=DEBUG,
     )
     hvl_qdev.start()
 
