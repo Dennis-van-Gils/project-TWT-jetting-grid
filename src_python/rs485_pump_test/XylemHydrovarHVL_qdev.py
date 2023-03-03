@@ -109,7 +109,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         self,
         dev: XylemHydrovarHVL,
         DAQ_trigger=DAQ_TRIGGER.INTERNAL_TIMER,
-        DAQ_interval_ms=100,
+        DAQ_interval_ms=200,
         DAQ_timer_type=QtCore.Qt.TimerType.PreciseTimer,
         critical_not_alive_count=3,
         debug=False,
@@ -120,32 +120,32 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         self.create_worker_DAQ(
             DAQ_trigger=DAQ_trigger,
-            DAQ_function=self.DAQ_function,
+            DAQ_function=self._DAQ_function,
             DAQ_interval_ms=DAQ_interval_ms,
             DAQ_timer_type=DAQ_timer_type,
             critical_not_alive_count=critical_not_alive_count,
             debug=debug,
         )
-        self.create_worker_jobs(jobs_function=self.jobs_function, debug=debug)
+        self.create_worker_jobs(jobs_function=self._jobs_function, debug=debug)
 
-        self.create_GUI()
-        self.signal_DAQ_updated.connect(self.update_GUI)
+        self._create_GUI()
+        self.signal_DAQ_updated.connect(self._update_GUI)
         # self.signal_connection_lost.connect(self.update_GUI)
         # self.signal_GUI_input_field_update.connect(self.update_GUI_input_field)
 
-        self.update_GUI()
+        self._update_GUI()
         # self.update_GUI_input_field()
 
     # --------------------------------------------------------------------------
-    #   DAQ_function
+    #   _DAQ_function
     # --------------------------------------------------------------------------
 
-    def DAQ_function(self):
+    def _DAQ_function(self):
         """Every DAQ time step, read the actual pressure and inverter frequency,
         device status and error status. Every N'th time step, read the inverter
         diagnostics.
         """
-        DEBUG_local = True
+        DEBUG_local = False
         if DEBUG_local:
             tick = time.perf_counter()
 
@@ -167,10 +167,10 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         return True
 
     # --------------------------------------------------------------------------
-    #   jobs_function
+    #   _jobs_function
     # --------------------------------------------------------------------------
 
-    def jobs_function(self, func, args):
+    def _jobs_function(self, func, args):
         if func == "signal_GUI_input_field_update":
             # Special instruction
             self.signal_GUI_input_field_update.emit(*args)
@@ -183,10 +183,10 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
                 pft(err)
 
     # --------------------------------------------------------------------------
-    #   create GUI
+    #   _create_GUI
     # --------------------------------------------------------------------------
 
-    def create_GUI(self):
+    def _create_GUI(self):
         # Textbox widths for fitting N characters using the current font
         ex8 = 8 + 8 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
         p = {
@@ -197,7 +197,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         # Pump control
         self.pbtn_pump_running = create_Toggle_button("Not running")
-        self.pbtn_pump_running.clicked.connect(self.process_pbtn_pump_running)
+        self.pbtn_pump_running.clicked.connect(self._process_pbtn_pump_running)
         self.rbtn_mode_pressure = QtWid.QRadioButton("Regulate pressure")
         self.rbtn_mode_frequency = QtWid.QRadioButton("Fixed frequency")
         self.qled_P_wanted = QtWid.QLineEdit("nan", **p)
@@ -301,30 +301,31 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         self.qgrp_inverter.setLayout(grid)
 
         # Error status
-        self.error_status = QtWid.QPlainTextEdit()
-        self.error_status.setStyleSheet(SS_TEXTBOX_ERRORS)
-        self.error_status.setReadOnly(True)
+        self.qpte_error_status = QtWid.QPlainTextEdit()
+        self.qpte_error_status.setStyleSheet(SS_TEXTBOX_ERRORS)
 
         grid = QtWid.QGridLayout()
         grid.setVerticalSpacing(4)
-        grid.addWidget(self.error_status, 0, 0)
+        grid.addWidget(self.qpte_error_status, 0, 0)
         grid.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
         self.qgrp_error_status = QtWid.QGroupBox("Error status")
         self.qgrp_error_status.setLayout(grid)
 
     # --------------------------------------------------------------------------
-    #   update_GUI
+    #   _update_GUI
     # --------------------------------------------------------------------------
 
     @Slot()
-    def update_GUI(self):
+    def _update_GUI(self):
         """NOTE: 'self.dev.mutex' is not being locked, because we are only
         reading 'state' for displaying purposes. We can do this because 'state'
         members are written and read atomicly.
         Not locking the mutex might speed up the program.
         """
-        state = self.dev.state  # Shorthand
+        # Shorthand
+        state = self.dev.state
+        error_status = self.dev.error_status
 
         if self.dev.is_alive:
             if self.update_counter_DAQ == 1:
@@ -334,9 +335,11 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
                 if state.hvl_mode == HVL_Mode.ACTUATOR:
                     self.rbtn_mode_frequency.setChecked(True)
 
+            # Pump control
             self.qled_P_actual.setText(f"{state.actual_pressure:.2f}")
             self.qled_f_actual.setText(f"{state.actual_frequency:.1f}")
 
+            # Inverter diagnostics
             self.qled_inverter_temp.setText(f"{state.inverter_temp:.0f}")
             self.qled_inverter_volt.setText(f"{state.inverter_volt:.0f}")
             self.qled_inverter_curr_A.setText(f"{state.inverter_curr_A:.2f}")
@@ -344,6 +347,44 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
                 f"{state.inverter_curr_pct:.0f}"
             )
 
+            # Error status
+            if error_status.has_error:
+                error_text = ""
+                if error_status.overcurrent:
+                    error_text += "#11: OVERCURRENT\n"
+                if error_status.overload:
+                    error_text += "#12: OVERLOAD"
+                if error_status.overvoltage:
+                    error_text += "#13: OVERVOLTAGE"
+                if error_status.phase_loss:
+                    error_text += "#16: PHASE LOSS"
+                if error_status.inverter_overheat:
+                    error_text += "#14: INVERTER OVERHEAT"
+                if error_status.motor_overheat:
+                    error_text += "#15: MOTOR OVERHEAT"
+                if error_status.lack_of_water:
+                    error_text += "#21: LACK OF WATER"
+                if error_status.minimum_threshold:
+                    error_text += "#22: MINIMUM THRESHOLD"
+                if error_status.act_val_sensor_1:
+                    error_text += "#23: ACT VAL SENSOR 1"
+                if error_status.act_val_sensor_2:
+                    error_text += "#24: ACT VAL SENSOR 2"
+                if error_status.setpoint_1_low_mA:
+                    error_text += "#25: SETPOINT 1 I<4 mA"
+                if error_status.setpoint_2_low_mA:
+                    error_text += "#26: SETPOINT 2 I<4 mA"
+                self.qpte_error_status.setReadOnly(True)
+                self.qpte_error_status.setPlainText(error_text)
+            else:
+                if self.dev.device_status.device_has_a_warning:
+                    self.qpte_error_status.setReadOnly(True)
+                    self.qpte_error_status.setPlainText("WARNING!!!")
+                else:
+                    self.qpte_error_status.setReadOnly(False)
+                    self.qpte_error_status.setPlainText("No errors")
+
+            # Update counter
             self.qlbl_update_counter.setText(f"{self.update_counter_DAQ}")
         else:
             self.qgrp_control.setEnabled(False)
@@ -355,5 +396,5 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     #   GUI functions
     # --------------------------------------------------------------------------
 
-    def process_pbtn_pump_running(self):
+    def _process_pbtn_pump_running(self):
         pass
