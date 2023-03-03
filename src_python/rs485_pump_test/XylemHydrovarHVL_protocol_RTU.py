@@ -172,19 +172,21 @@ class XylemHydrovarHVL(SerialDevice):
         # fmt: off
         pump_is_on         = False   # (bool)
         pump_is_enabled    = False   # (bool)                           P24
-        mode               = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
+        hvl_mode           = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
+
         actual_pressure    = np.nan  # [bar]
         wanted_pressure    = 0.0     # [bar]                            P820
+
+        actual_frequency   = np.nan  # [Hz]                             P46
         wanted_frequency   = 0.0     # [Hz]                             P830
 
         min_frequency      = np.nan  # [Hz]                             P250
         max_frequency      = np.nan  # [Hz]                             P245
-        nominal_motor_current = np.nan  # [A]                           P268
+        nom_motor_current  = np.nan  # [A]                              P268
 
         diag_temp_inverter = np.nan  # ['C]                             P43
         diag_curr_inverter = np.nan  # [A], not [% FS]                  P44
         diag_volt_inverter = np.nan  # [V]                              P45
-        diag_output_freq   = np.nan  # [Hz]                             P46
         # fmt: on
 
     class ErrorStatus:
@@ -413,22 +415,17 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd[1] = HVL_FuncCode.READ
         byte_cmd[2] = (hvlreg.address & 0xFF00) >> 8  # address HI
         byte_cmd[3] = hvlreg.address & 0x00FF  # address LO
+
+        # NOTE: A 'point' is a single register. According to the ModBus
+        # specification a single register is always 2 bytes == 16 bits long.
+        # 1 point == 1 register == 2 bytes == 16 bits
         byte_cmd[4] = 0x00  # no. of points HI
 
         # no. of points LO
-        # NOTE: A 'point' is a register. According to the ModBus specification,
-        # a single register is always 16 bits long.
-        # So 1 'point' == 1 register == 16 bits == 2 bytes !!!
-        if hvlreg.datum_type == HVL_DType.U32:
-            # U32 is 4 bytes by definition, but for some strange reason
-            # the HVL sees P268 (nominal motor current) as 8 bytes
-            # long?! Meaning 8 bytes == 4 'points'. Only 4 bytes follow in the
-            # reply though.
-            byte_cmd[5] = 0x04  # 4 registers == 64 bits
-        elif hvlreg.datum_type == HVL_DType.B2:
-            byte_cmd[5] = 0x02  # 2 registers == 32 bits
+        if hvlreg.datum_type in (HVL_DType.U32, HVL_DType.B2):
+            byte_cmd[5] = 0x02  # 2 points == 32 bits
         else:
-            byte_cmd[5] = 0x01  # 1 register == 16 bits
+            byte_cmd[5] = 0x01  # 1 point == 16 bits
 
         byte_cmd[6:] = crc16(byte_cmd[:6])
 
@@ -439,38 +436,36 @@ class XylemHydrovarHVL(SerialDevice):
             accurate_delay_ms((silent_period - time_since_last_msg) * 1000)
 
         # Send command and read reply
-        if hvlreg.datum_type == HVL_DType.U32:
-            N_expected_bytes = 9
-        elif hvlreg.datum_type == HVL_DType.B2:
-            N_expected_bytes = 9
+        if hvlreg.datum_type in (HVL_DType.U32, HVL_DType.B2):
+            N_expected_reply_bytes = 9
         else:
-            N_expected_bytes = 7
+            N_expected_reply_bytes = 7
 
         success, reply = self.query_bytes(
             msg=byte_cmd,
-            N_bytes_to_read=N_expected_bytes,
+            N_bytes_to_read=N_expected_reply_bytes,
         )
         self._tick_last_msg = time.perf_counter()
 
         # Parse the returned data value
         data_val = None
         if success and isinstance(reply, bytes):
-            if len(reply) == N_expected_bytes:
+            if len(reply) == N_expected_reply_bytes:
                 # All is correct
                 byte_count = reply[2]
                 if byte_count == 2:
                     data_val = (reply[3] << 8) + reply[4]
-                elif byte_count == 4:  # HVL_DType.B2
+                elif byte_count == 4:  # HVL_DType.U32, HVL_DType.B2
                     data_val = (
                         (reply[3] << 32)
                         + (reply[4] << 16)
                         + (reply[5] << 8)
                         + (reply[6])
                     )
-                elif byte_count == 8:  # HVL_DType.U32 ?!
-                    # U32 is 4 bytes by definition, but for some strange reason
-                    # the HVL reports P268 (nominal motor current) as 8 bytes
-                    # long?! Only 4 bytes follow though.
+                elif byte_count == 8 and hvlreg == HVLREG_MOTOR_NOM_CURR:
+                    # HVL reports P268 (nominal motor current) as 8 bytes long,
+                    # although it is listed in the manual as 32 bits == 4 bytes
+                    # long. Only 4 bytes follow though. Very strange.
                     data_val = (
                         (reply[3] << 32)
                         + (reply[4] << 16)
@@ -534,9 +529,7 @@ class XylemHydrovarHVL(SerialDevice):
         byte_cmd[2] = (hvlreg.address & 0xFF00) >> 8  # address HI
         byte_cmd[3] = hvlreg.address & 0x00FF  # address LO
 
-        if (hvlreg.datum_type == HVL_DType.U08) or (
-            hvlreg.datum_type == HVL_DType.U16
-        ):
+        if hvlreg.datum_type in (HVL_DType.U08, HVL_DType.U16):
             byte_cmd[4] = (value & 0xFF00) >> 8  # data HI
             byte_cmd[5] = value & 0x00FF  # data LO
         else:
@@ -555,18 +548,18 @@ class XylemHydrovarHVL(SerialDevice):
             accurate_delay_ms((silent_period - time_since_last_msg) * 1000)
 
         # Send command and read reply
-        N_expected_bytes = 8  # Successful 'write' confirmation is 8 bytes long
+        N_expected_reply_bytes = 8  # Successful 'write' reply is 8 bytes long
 
         success, reply = self.query_bytes(
             msg=byte_cmd,
-            N_bytes_to_read=N_expected_bytes,
+            N_bytes_to_read=N_expected_reply_bytes,
         )
         self._tick_last_msg = time.perf_counter()
 
         # Parse the returned data value
         data_val = None
         if success and isinstance(reply, bytes):
-            if len(reply) == N_expected_bytes:
+            if len(reply) == N_expected_reply_bytes:
                 # All is correct
                 data_val = (reply[4] << 8) + reply[5]
 
@@ -597,9 +590,10 @@ class XylemHydrovarHVL(SerialDevice):
         success = True
         success &= self.stop_pump()
 
-        success &= self.read_mode()
+        success &= self.read_hvl_mode()
         success &= self.read_min_frequency()
         success &= self.read_max_frequency()
+        success &= self.read_nominal_motor_current()
         success &= self.use_digital_required_value_1()
 
         # Prevent test run scheduling of the pump
@@ -621,7 +615,7 @@ class XylemHydrovarHVL(SerialDevice):
     #   Implementations of RTU_read & RTU_write
     # --------------------------------------------------------------------------
 
-    def read_mode(self) -> bool:
+    def read_hvl_mode(self) -> bool:
         """P105: Read the operation mode of the HVL controller.
 
         0: Controller (Default)     1 Hydrovar
@@ -646,12 +640,17 @@ class XylemHydrovarHVL(SerialDevice):
                     "but only 0: Controller and 3: Actuator are supported."
                 )
                 sys.exit(0)  # Severe error, hence exit
-            self.state.mode = val
-            print(f"Mode: {val}")
+            self.state.hvl_mode = val
+            print("Read HVL mode:", val.name, end="")
+            print(
+                " | Regulate pressure"
+                if val == HVL_Mode.CONTROLLER
+                else " | Fixed frequency"
+            )
 
         return success
 
-    def set_mode(self, hvl_mode: HVL_Mode) -> bool:
+    def set_hvl_mode(self, hvl_mode: HVL_Mode) -> bool:
         """P105: Set the operation mode of the HVL controller.
 
         0: Controller (Default)     1 Hydrovar
@@ -677,8 +676,13 @@ class XylemHydrovarHVL(SerialDevice):
         success, data_val = self.RTU_write(HVLREG_MODE, hvl_mode)
         if data_val is not None:
             val = HVL_Mode(data_val)
-            self.state.mode = val
-            print(f"Mode: {val}")
+            self.state.hvl_mode = val
+            print("Set HVL mode:", val.name, end="")
+            print(
+                " | Regulate pressure"
+                if val == HVL_Mode.CONTROLLER
+                else " | Fixed frequency"
+            )
 
         return success
 
@@ -734,7 +738,7 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val) / 100
             self.state.actual_pressure = val
-            print(f"Actual pressure: {val:.2f} bar")
+            # print(f"Actual pressure : {val:4.2f} bar")
 
         return success
 
@@ -750,7 +754,7 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val) / 100
             self.state.wanted_pressure = val
-            print(f"Set wanted pressure: {val:.2f} bar")
+            print(f"Set wanted pressure : {val:4.2f} bar")
 
         return success
 
@@ -762,7 +766,7 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val) / 100
             self.state.wanted_pressure = val
-            print(f"Read wanted pressure: {val:.2f} bar")
+            print(f"Read wanted pressure: {val:4.2f} bar")
 
         return success
 
@@ -797,8 +801,20 @@ class XylemHydrovarHVL(SerialDevice):
         success, data_val = self.RTU_read(HVLREG_MOTOR_NOM_CURR)
         if data_val is not None:
             val = float(data_val) / 100
-            self.state.nominal_motor_current = val
+            self.state.nom_motor_current = val
             print(f"Read nominal motor current: {val:.2f} A")
+
+        return success
+
+    def read_actual_frequency(self) -> bool:
+        """Read the actual frequency of the inverter in Hz.
+        Readings will be stored in class member `state`.
+        """
+        success, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
+        if data_val is not None:
+            val = float(data_val) / 10
+            self.state.actual_frequency = val
+            # print(f"Actual frequency: {val:4.1f} Hz")
 
         return success
 
@@ -816,7 +832,7 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val) / 10
             self.state.wanted_frequency = val
-            print(f"Set wanted frequency: {val:.1f} Hz")
+            print(f"Set wanted frequency: {val:4.1f} Hz")
 
         return success
 
@@ -828,7 +844,7 @@ class XylemHydrovarHVL(SerialDevice):
         if data_val is not None:
             val = float(data_val) / 10
             self.state.wanted_frequency = val
-            print(f"Read wanted frequency: {val:.1f} Hz")
+            print(f"Read wanted frequency: {val:4.1f} Hz")
 
         return success
 
@@ -876,7 +892,7 @@ class XylemHydrovarHVL(SerialDevice):
             s.setpoint_1_low_mA = bool(data_val & (1 << 10))
             s.setpoint_2_low_mA = bool(data_val & (1 << 11))
             # fmt: on
-            s.report()
+            # s.report()
 
         return success
 
@@ -896,40 +912,34 @@ class XylemHydrovarHVL(SerialDevice):
             s.solo_run_ON_OFF                     = bool(data_val & (1 << 14))
             s.inverter_STOP_START                 = bool(data_val & (1 << 15))
             # fmt: on
-            s.report()
+            # s.report()
 
         return success
 
-    def read_diagnostic_values(self) -> bool:
-        """P43, P44, P45, P46: Read out the diagnostic values of the inverter
-        (temperature, current and voltage) and the output frequency.
+    def read_inverter_diagnostics(self) -> bool:
+        """P43, P44, P45: Read out the diagnostic values (temperature, current
+        and voltage) of the inverter.
         Readings will be stored in class member `state`.
         """
         success_1, data_val = self.RTU_read(HVLREG_TEMP_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.diag_temp_inverter = val
-            print(f"Read inverter temperature: {val:5.0f} 'C")
+            # print(f"Read inverter temperature: {val:5.0f} 'C")
 
         success_2, data_val = self.RTU_read(HVLREG_CURR_INVERTER)
         if data_val is not None:
             val = float(data_val) / 100
             self.state.diag_curr_inverter = val
-            print(f"Read inverter current    : {val:5.2f} A")
+            # print(f"Read inverter current    : {val:5.2f} A")
 
         success_3, data_val = self.RTU_read(HVLREG_VOLT_INVERTER)
         if data_val is not None:
             val = float(data_val)
             self.state.diag_volt_inverter = val
-            print(f"Read inverter voltage    : {val:5.0f} V")
+            # print(f"Read inverter voltage    : {val:5.0f} V")
 
-        success_4, data_val = self.RTU_read(HVLREG_OUTPUT_FREQ)
-        if data_val is not None:
-            val = float(data_val) / 10
-            self.state.diag_output_freq = val
-            print(f"Read output frequency    : {val:5.1f} Hz")
-
-        return success_1 and success_2 and success_3 and success_4
+        return success_1 and success_2 and success_3
 
     def use_digital_required_value_1(self) -> bool:
         """P805, P810, P815: Set up the registers to make use of a digitally
@@ -980,27 +990,29 @@ if __name__ == "__main__":
     else:
         sys.exit(0)
 
-    hvl.set_error_reset(False)
-    hvl.set_mode(HVL_Mode.CONTROLLER)
+    # Report
+    hvl.device_status.report()
+    hvl.error_status.report()
+    hvl.read_inverter_diagnostics()
+    print(f"Read inverter temperature: {hvl.state.diag_temp_inverter:5.0f} 'C")
+    print(f"Read inverter current    : {hvl.state.diag_curr_inverter:5.2f} A")
+    print(f"Read inverter voltage    : {hvl.state.diag_volt_inverter:5.0f} V")
+    hvl.read_actual_pressure()
+    print(f"Actual pressure : {hvl.state.actual_pressure:4.2f} bar")
+    hvl.read_actual_frequency()
+    print(f"Actual frequency: {hvl.state.actual_frequency:4.1f} Hz")
 
+    # hvl.set_error_reset(False)
+    # hvl.set_mode(HVL_Mode.CONTROLLER)
     # hvl.set_wanted_pressure(1)
     # hvl.read_wanted_pressure()
-    hvl.read_actual_pressure()
-    print(f"Read actual pressure: {hvl.state.actual_pressure:.2f} bar")
 
-    hvl.read_nominal_motor_current()
+    # sys.exit(0)
 
-    sys.exit(0)
-
-    tick = time.perf_counter()
+    # Determine ModBus message round-trip time
+    print("Determining ModBus round-trip time...")
     N = 100
+    tick = time.perf_counter()
     for i in range(N):
-        hvl.read_diagnostic_values()
-
-    state = hvl.state
-    print(f"Read inverter temperature: {state.diag_temp_inverter:5.0f} 'C")
-    print(f"Read inverter current    : {state.diag_curr_inverter:5.2f} A")
-    print(f"Read inverter voltage    : {state.diag_volt_inverter:5.0f} V")
-    print(f"Read output frequency    : {state.diag_output_freq:5.1f} Hz")
-
-    print(f"time per eval: {(time.perf_counter() - tick)*1000/N:.0f} ms")
+        hvl.read_actual_pressure()
+    print(f"  {(time.perf_counter() - tick)*1000/N:.0f} ms")
