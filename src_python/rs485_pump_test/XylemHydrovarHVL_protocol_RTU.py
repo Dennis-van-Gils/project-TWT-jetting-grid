@@ -926,7 +926,7 @@ class XylemHydrovarHVL(SerialDevice):
             # `device_is_enabled_with_start_button` vs `external_ON_OFF_terminal_enabled`?
             # `motor_is_running` vs `inverter_STOP_START`
             self.state.pump_is_on = s.motor_is_running
-            self.state.pump_is_enabled = s.device_is_enabled_with_start_button
+            self.state.pump_is_enabled = s.external_ON_OFF_terminal_enabled
 
         return success
 
