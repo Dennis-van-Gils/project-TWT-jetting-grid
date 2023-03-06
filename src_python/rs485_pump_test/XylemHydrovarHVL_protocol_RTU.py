@@ -19,7 +19,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "02-03-2023"
+__date__ = "06-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -592,7 +592,7 @@ class XylemHydrovarHVL(SerialDevice):
         connection to the HVL controller has been established.
         """
         success = True
-        success &= self.stop_pump()
+        success &= self.pump_stop()
 
         success &= self.read_hvl_mode()
         success &= self.read_min_frequency()
@@ -690,7 +690,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def start_pump(self) -> bool:
+    def pump_start(self) -> bool:
         """Readings will be stored in class member `state`."""
         success, data_val = self._RTU_write(HVLREG_STOP_START, 1)
         if data_val is not None:
@@ -700,7 +700,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def stop_pump(self) -> bool:
+    def pump_stop(self) -> bool:
         """Readings will be stored in class member `state`."""
         success, data_val = self._RTU_write(HVLREG_STOP_START, 0)
         if data_val is not None:
@@ -710,7 +710,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def enable_pump(self) -> bool:
+    def pump_enable(self) -> bool:
         """P24: Manually enable the device.
         Readings will be stored in class member `state`.
         """
@@ -722,7 +722,7 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def disable_pump(self) -> bool:
+    def pump_disable(self) -> bool:
         """P24: Manually disable the device.
         Readings will be stored in class member `state`.
         """
@@ -920,7 +920,7 @@ class XylemHydrovarHVL(SerialDevice):
             s.solo_run_ON_OFF                     = bool(data_val & (1 << 14))
             s.inverter_STOP_START                 = bool(data_val & (1 << 15))
             # fmt: on
-            s.report()
+            # s.report()
 
             # TODO: Test this: What are the differences between
             # `device_is_enabled_with_start_button` vs `external_ON_OFF_terminal_enabled`?
