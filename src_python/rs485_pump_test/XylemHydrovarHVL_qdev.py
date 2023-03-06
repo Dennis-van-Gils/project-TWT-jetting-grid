@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """PyQt/Pyside module to provide multithreaded communication and periodical data
-acquisition for a Xylem Hydrovar HVL variable speed drive (VSD) controller.
+acquisition for a Xylem Hydrovar HVL variable speed pump controller.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
