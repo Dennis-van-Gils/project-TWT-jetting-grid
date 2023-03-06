@@ -6,13 +6,14 @@ acquisition for a Xylem Hydrovar HVL variable speed drive (VSD) controller.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "03-03-2023"
+__date__ = "06-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, broad-except, multiple-statements
 
 import os
 import sys
 import time
+from enum import IntEnum
 
 # Mechanism to support both PyQt and PySide
 # -----------------------------------------
@@ -75,6 +76,13 @@ from dvg_pyqt_controls import create_Toggle_button, SS_TEXTBOX_ERRORS
 from dvg_qdeviceio import QDeviceIO, DAQ_TRIGGER
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL, HVL_Mode
 
+# Enumeration
+class GUI_input_fields(IntEnum):
+    ALL = 0
+    P_WANTED = 1
+    F_WANTED = 2
+    HVL_MODE = 3
+
 
 class XylemHydrovarHVL_qdev(QDeviceIO):
     """Manages multithreaded communication and periodical data acquisition for
@@ -130,11 +138,11 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         self._create_GUI()
         self.signal_DAQ_updated.connect(self._update_GUI)
-        # self.signal_connection_lost.connect(self.update_GUI)
-        # self.signal_GUI_input_field_update.connect(self.update_GUI_input_field)
+        self.signal_connection_lost.connect(self._update_GUI)
+        self.signal_GUI_input_field_update.connect(self._update_GUI_input_field)
 
         self._update_GUI()
-        # self.update_GUI_input_field()
+        self._update_GUI_input_field()
 
     # --------------------------------------------------------------------------
     #   _DAQ_function
@@ -196,8 +204,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         }
 
         # Pump control
-        self.pbtn_pump_running = create_Toggle_button("Not running")
-        self.pbtn_pump_running.clicked.connect(self._process_pbtn_pump_running)
+        self.pbtn_pump_onoff = create_Toggle_button("OFFLINE")
         self.rbtn_mode_pressure = QtWid.QRadioButton("Regulate pressure")
         self.rbtn_mode_frequency = QtWid.QRadioButton("Fixed frequency")
         self.qled_P_wanted = QtWid.QLineEdit("nan", **p)
@@ -217,12 +224,22 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         )
         self.qlbl_update_counter = QtWid.QLabel("0")
 
+        self.pbtn_pump_onoff.clicked.connect(self._process_pbtn_pump_onoff)
+        self.rbtn_mode_pressure.clicked.connect(self._process_rbtn_mode)
+        self.rbtn_mode_frequency.clicked.connect(self._process_rbtn_mode)
+        self.qled_P_wanted.editingFinished.connect(
+            self._send_P_wanted_from_textbox
+        )
+        self.qled_f_wanted.editingFinished.connect(
+            self._send_f_wanted_from_textbox
+        )
+
         # fmt: off
         i = 0
         grid = QtWid.QGridLayout()
         grid.setVerticalSpacing(4)
 
-        grid.addWidget(self.pbtn_pump_running          , i, 0, 1, 3); i+=1
+        grid.addWidget(self.pbtn_pump_onoff            , i, 0, 1, 3); i+=1
         grid.addItem(QtWid.QSpacerItem(1, 10)          , i, 0)      ; i+=1
 
         grid.addWidget(QtWid.QLabel("<b>Mode</b>")     , i, 0, 1, 3); i+=1
@@ -323,91 +340,157 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         members are written and read atomicly.
         Not locking the mutex might speed up the program.
         """
+
+        if not self.dev.is_alive:
+            self.qgrp_control.setEnabled(False)
+            self.qgrp_inverter.setEnabled(False)
+            self.qgrp_error_status.setEnabled(False)
+            self.pbtn_pump_onoff.setText("OFFLINE")
+            return
+
         # Shorthand
         state = self.dev.state
         error_status = self.dev.error_status
 
-        if self.dev.is_alive:
-            if self.update_counter_DAQ == 1:
-                # At startup
-                if state.hvl_mode == HVL_Mode.CONTROLLER:
-                    self.rbtn_mode_pressure.setChecked(True)
-                if state.hvl_mode == HVL_Mode.ACTUATOR:
-                    self.rbtn_mode_frequency.setChecked(True)
-
-            # Pump control
-            if state.pump_is_enabled:
-                self.pbtn_pump_running.setEnabled(True)
-                if state.pump_is_on:
-                    self.pbtn_pump_running.setChecked(True)
-                    self.pbtn_pump_running.setText("Pump is ON")
-                else:
-                    self.pbtn_pump_running.setChecked(False)
-                    self.pbtn_pump_running.setText("Pump is OFF")
+        # Pump control
+        if state.pump_is_enabled:
+            self.pbtn_pump_onoff.setEnabled(True)
+            if state.pump_is_on:
+                self.pbtn_pump_onoff.setChecked(True)
+                self.pbtn_pump_onoff.setText("Pump is ON")
             else:
-                self.pbtn_pump_running.setEnabled(False)
-                self.pbtn_pump_running.setChecked(False)
-                self.pbtn_pump_running.setText("Pump is DISABLED")
-
-            self.qled_P_actual.setText(f"{state.actual_pressure:.2f}")
-            self.qled_f_actual.setText(f"{state.actual_frequency:.1f}")
-
-            # Inverter diagnostics
-            self.qled_inverter_temp.setText(f"{state.inverter_temp:.0f}")
-            self.qled_inverter_volt.setText(f"{state.inverter_volt:.0f}")
-            self.qled_inverter_curr_A.setText(f"{state.inverter_curr_A:.2f}")
-            self.qled_inverter_curr_pct.setText(
-                f"{state.inverter_curr_pct:.0f}"
-            )
-
-            # Error status
-            if error_status.has_error:
-                error_text = ""
-                if error_status.overcurrent:
-                    error_text += "#11: OVERCURRENT\n"
-                if error_status.overload:
-                    error_text += "#12: OVERLOAD"
-                if error_status.overvoltage:
-                    error_text += "#13: OVERVOLTAGE"
-                if error_status.phase_loss:
-                    error_text += "#16: PHASE LOSS"
-                if error_status.inverter_overheat:
-                    error_text += "#14: INVERTER OVERHEAT"
-                if error_status.motor_overheat:
-                    error_text += "#15: MOTOR OVERHEAT"
-                if error_status.lack_of_water:
-                    error_text += "#21: LACK OF WATER"
-                if error_status.minimum_threshold:
-                    error_text += "#22: MINIMUM THRESHOLD"
-                if error_status.act_val_sensor_1:
-                    error_text += "#23: ACT VAL SENSOR 1"
-                if error_status.act_val_sensor_2:
-                    error_text += "#24: ACT VAL SENSOR 2"
-                if error_status.setpoint_1_low_mA:
-                    error_text += "#25: SETPOINT 1 I<4 mA"
-                if error_status.setpoint_2_low_mA:
-                    error_text += "#26: SETPOINT 2 I<4 mA"
-                self.qpte_error_status.setReadOnly(True)
-                self.qpte_error_status.setPlainText(error_text)
-            else:
-                if self.dev.device_status.device_has_a_warning:
-                    self.qpte_error_status.setReadOnly(True)
-                    self.qpte_error_status.setPlainText("WARNING!!!")
-                else:
-                    self.qpte_error_status.setReadOnly(False)
-                    self.qpte_error_status.setPlainText("No errors")
-
-            # Update counter
-            self.qlbl_update_counter.setText(f"{self.update_counter_DAQ}")
+                self.pbtn_pump_onoff.setChecked(False)
+                self.pbtn_pump_onoff.setText("Pump is OFF")
         else:
-            self.qgrp_control.setEnabled(False)
-            self.qgrp_inverter.setEnabled(False)
-            self.qgrp_error_status.setEnabled(False)
-            self.pbtn_pump_running.setText("OFFLINE")
+            self.pbtn_pump_onoff.setEnabled(False)
+            self.pbtn_pump_onoff.setChecked(False)
+            self.pbtn_pump_onoff.setText("Pump is DISABLED")
+
+        self.qled_P_actual.setText(f"{state.actual_pressure:.2f}")
+        self.qled_f_actual.setText(f"{state.actual_frequency:.1f}")
+
+        # Inverter diagnostics
+        self.qled_inverter_temp.setText(f"{state.inverter_temp:.0f}")
+        self.qled_inverter_volt.setText(f"{state.inverter_volt:.0f}")
+        self.qled_inverter_curr_A.setText(f"{state.inverter_curr_A:.2f}")
+        self.qled_inverter_curr_pct.setText(f"{state.inverter_curr_pct:.0f}")
+
+        # Error status
+        if error_status.has_error():
+            error_text = ""
+            if error_status.overcurrent:
+                error_text += "#11: OVERCURRENT\n"
+            if error_status.overload:
+                error_text += "#12: OVERLOAD"
+            if error_status.overvoltage:
+                error_text += "#13: OVERVOLTAGE"
+            if error_status.phase_loss:
+                error_text += "#16: PHASE LOSS"
+            if error_status.inverter_overheat:
+                error_text += "#14: INVERTER OVERHEAT"
+            if error_status.motor_overheat:
+                error_text += "#15: MOTOR OVERHEAT"
+            if error_status.lack_of_water:
+                error_text += "#21: LACK OF WATER"
+            if error_status.minimum_threshold:
+                error_text += "#22: MINIMUM THRESHOLD"
+            if error_status.act_val_sensor_1:
+                error_text += "#23: ACT VAL SENSOR 1"
+            if error_status.act_val_sensor_2:
+                error_text += "#24: ACT VAL SENSOR 2"
+            if error_status.setpoint_1_low_mA:
+                error_text += "#25: SETPOINT 1 I<4 mA"
+            if error_status.setpoint_2_low_mA:
+                error_text += "#26: SETPOINT 2 I<4 mA"
+            self.qpte_error_status.setReadOnly(True)
+            self.qpte_error_status.setPlainText(error_text)
+        else:
+            if self.dev.device_status.device_has_a_warning:
+                self.qpte_error_status.setReadOnly(True)
+                self.qpte_error_status.setPlainText("WARNING!!!")
+            else:
+                self.qpte_error_status.setReadOnly(False)
+                self.qpte_error_status.setPlainText("No errors")
+
+        # Update counter
+        self.qlbl_update_counter.setText(f"{self.update_counter_DAQ}")
+
+    # --------------------------------------------------------------------------
+    #   _update_GUI_input_field
+    # --------------------------------------------------------------------------
+
+    @Slot()
+    @Slot(int)
+    def _update_GUI_input_field(self, GUI_input_field=GUI_input_fields.ALL):
+        if GUI_input_field == GUI_input_fields.P_WANTED:
+            self.qled_P_wanted.setText(f"{self.dev.state.wanted_pressure:.2f}")
+
+        elif GUI_input_field == GUI_input_fields.F_WANTED:
+            self.qled_f_wanted.setText(f"{self.dev.state.wanted_frequency:.1f}")
+
+        elif GUI_input_field == GUI_input_fields.HVL_MODE:
+            if self.dev.state.hvl_mode == HVL_Mode.CONTROLLER:
+                self.rbtn_mode_pressure.setChecked(True)
+            if self.dev.state.hvl_mode == HVL_Mode.ACTUATOR:
+                self.rbtn_mode_frequency.setChecked(True)
+
+        else:
+            self.qled_P_wanted.setText(f"{self.dev.state.wanted_pressure:.2f}")
+            self.qled_f_wanted.setText(f"{self.dev.state.wanted_frequency:.1f}")
+            if self.dev.state.hvl_mode == HVL_Mode.CONTROLLER:
+                self.rbtn_mode_pressure.setChecked(True)
+            if self.dev.state.hvl_mode == HVL_Mode.ACTUATOR:
+                self.rbtn_mode_frequency.setChecked(True)
 
     # --------------------------------------------------------------------------
     #   GUI functions
     # --------------------------------------------------------------------------
 
-    def _process_pbtn_pump_running(self):
-        pass
+    @Slot()
+    def _process_pbtn_pump_onoff(self):
+        if self.dev.state.pump_is_on:
+            self.send(self.dev.pump_stop)
+        else:
+            self.send(self.dev.pump_start)
+
+    @Slot()
+    def _send_P_wanted_from_textbox(self):
+        try:
+            P_bar = float(self.qled_P_wanted.text())
+        except (TypeError, ValueError):
+            P_bar = 0.0
+        except Exception as err:
+            raise err
+
+        self.add_to_jobs_queue(self.dev.set_wanted_pressure, P_bar)
+        self.add_to_jobs_queue(
+            "signal_GUI_input_field_update", GUI_input_fields.P_WANTED
+        )
+        self.process_jobs_queue()
+
+    @Slot()
+    def _send_f_wanted_from_textbox(self):
+        try:
+            f_Hz = float(self.qled_f_wanted.text())
+        except (TypeError, ValueError):
+            f_Hz = self.dev.state.min_frequency
+        except Exception as err:
+            raise err
+
+        self.add_to_jobs_queue(self.dev.set_wanted_frequency, f_Hz)
+        self.add_to_jobs_queue(
+            "signal_GUI_input_field_update", GUI_input_fields.F_WANTED
+        )
+        self.process_jobs_queue()
+
+    @Slot()
+    def _process_rbtn_mode(self):
+        if self.rbtn_mode_pressure.isChecked():
+            self.add_to_jobs_queue(self.dev.set_hvl_mode, HVL_Mode.CONTROLLER)
+        elif self.rbtn_mode_frequency.isChecked():
+            self.add_to_jobs_queue(self.dev.set_hvl_mode, HVL_Mode.ACTUATOR)
+
+        self.add_to_jobs_queue(
+            "signal_GUI_input_field_update", GUI_input_fields.HVL_MODE
+        )
+        self.process_jobs_queue()
