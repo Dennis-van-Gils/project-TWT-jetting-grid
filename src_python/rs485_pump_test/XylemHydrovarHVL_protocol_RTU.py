@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Modbus RTU protocol (RS485) function library for a Xylem Hydrovar HVL
-variable speed drive (VSD) controller.
+variable speed pump controller.
 
-This module supports just one slave device on the Modbus, not multiple. With
-just one slave device the communication handling gets way simpler as we don't
-have to figure out which reply message belongs to which slave device. Also, the
-query and reply parsing can now be handled inside of a single function, instead
-of having to handle this asynchronously across multiple functions.
+This module supports just one slave device on the Modbus, not multiple.
+
+When this module is directly run from the terminal a demo will be shown.
 
 Reference documents:
 (1) Hydrovar HVL 2.015 - 4.220 | Modbus Protocol & Parameters
@@ -32,7 +30,7 @@ import numpy as np
 
 from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_devices.BaseDevice import SerialDevice
-from crc import crc16
+from CRC_tools import pretty_hex, crc16
 
 # ------------------------------------------------------------------------------
 #   accurate_delay_ms
@@ -48,21 +46,6 @@ def accurate_delay_ms(delay):
     _ = time.perf_counter() + delay / 1000
     while time.perf_counter() < _:
         pass
-
-
-# ------------------------------------------------------------------------------
-#   pretty_format_hex
-# ------------------------------------------------------------------------------
-
-
-def pretty_format_hex(byte_msg: bytes) -> str:
-    """Pretty format the passed `bytes` as a string containing hex values
-    grouped in pairs. E.g. bytes = b'\\x12\\xa2\\xff' returns '12 a2 ff'.
-    """
-    msg = ""
-    for byte in byte_msg:
-        msg += f"{byte:02x} "
-    return msg.strip()
 
 
 # ------------------------------------------------------------------------------
@@ -278,36 +261,18 @@ class XylemHydrovarHVL(SerialDevice):
             print("DEVICE STATUS")
             print("-------------")
             # fmt: off
-            print(
-                f"{'- Device is preset':{w}s} {self.device_is_preset}"
-            )
-            print(
-                f"{'- Device is ready for regulation':{w}s} "
-                f"{self.device_is_ready_for_regulation}"
-            )
-            print(
-                f"{'- Device has an error':{w}s} {self.device_has_an_error}"
-            )
-            print(
-                f"{'- Device has a warning':{w}s} {self.device_has_a_warning}"
-            )
-            print(
-                f"{'- External ON/OFF terminal enabled':{w}s} "
-                f"{self.external_ON_OFF_terminal_enabled}"
-            )
-            print(
-                f"{'- Device is enabled with start button':{w}s} "
-                f"{self.device_is_enabled_with_start_button}"
-            )
-            print(
-                f"{'- Motor is running':{w}s} {self.motor_is_running}"
-            )
-            print(
-                f"{'- Solo-Run ON/OFF':{w}s} {self.solo_run_ON_OFF}"
-            )
-            print(
-                f"{'- Inverter STOP/START':{w}s} {self.inverter_STOP_START}"
-            )
+            print(f"{'- Device is preset':{w}s} {self.device_is_preset}")
+            print(f"{'- Device is ready for regulation':{w}s} "
+                  f"{self.device_is_ready_for_regulation}")
+            print(f"{'- Device has an error':{w}s} {self.device_has_an_error}")
+            print(f"{'- Device has a warning':{w}s} {self.device_has_a_warning}")
+            print(f"{'- External ON/OFF terminal enabled':{w}s} "
+                  f"{self.external_ON_OFF_terminal_enabled}")
+            print(f"{'- Device is enabled with start button':{w}s} "
+                  f"{self.device_is_enabled_with_start_button}")
+            print(f"{'- Motor is running':{w}s} {self.motor_is_running}")
+            print(f"{'- Solo-Run ON/OFF':{w}s} {self.solo_run_ON_OFF}")
+            print(f"{'- Inverter STOP/START':{w}s} {self.inverter_STOP_START}")
             # fmt: on
 
     # --------------------------------------------------------------------------
@@ -317,7 +282,7 @@ class XylemHydrovarHVL(SerialDevice):
     def __init__(
         self,
         name: str = "HVL",
-        long_name: str = "Xylem Hydrovar HVL variable speed drive",
+        long_name: str = "Xylem Hydrovar HVL pump controller",
         connect_to_modbus_slave_address: int = 0x01,
         max_pressure_setpoint_bar: float = 3,
     ):
@@ -481,7 +446,7 @@ class XylemHydrovarHVL(SerialDevice):
                         f"Unsupported byte count. Got {byte_count}, "
                         "but only 2 and 4 are implemented."
                     )
-                    print(f"Reply received: {pretty_format_hex(reply)}")
+                    print(f"Reply received: {pretty_hex(reply)}")
                     return False, None  # --> leaving
 
                 if hvlreg.datum_type == HVL_DType.S08:
@@ -494,7 +459,7 @@ class XylemHydrovarHVL(SerialDevice):
         if not success and isinstance(reply, bytes):
             # Probably received a Modbus exception.
             # TODO: Test for and parse Modbus exceptions.
-            print(f"Reply received: {pretty_format_hex(reply)}")
+            print(f"Reply received: {pretty_hex(reply)}")
 
         return success, data_val
 
@@ -575,7 +540,7 @@ class XylemHydrovarHVL(SerialDevice):
         if not success and isinstance(reply, bytes):
             # Probably received a Modbus exception.
             # TODO: Test for and parse Modbus exceptions.
-            print(f"Reply received: {pretty_format_hex(reply)}")
+            print(f"Reply received: {pretty_hex(reply)}")
 
         return success, data_val
 

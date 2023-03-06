@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Cyclic Redundancy Check (CRC) tools
+"""
+__author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
+__date__ = "06-03-2023"
+__version__ = "1.0.0"
 # pylint: disable=invalid-name
 
 from typing import Tuple
@@ -47,6 +54,13 @@ auchCRCLo = [
 # fmt: on
 
 
+def pretty_hex(bytes_in: bytes, delimiter=" ") -> str:
+    """Pretty format and return the passed `bytes_in` as a string containing hex
+    values grouped in pairs. E.g. b'\\x02\\xa2\\xff' returns '02 a2 ff'.
+    """
+    return delimiter.join(f"{byte:02x}" for byte in bytes_in)
+
+
 def crc16(bytes_in: bytes) -> Tuple[int, int]:
     """Calculate and return the 16-bit CRC of the passed bytes sequence as
     (CRC Hi, CRC Lo).
@@ -62,10 +76,16 @@ def crc16(bytes_in: bytes) -> Tuple[int, int]:
 
 
 if __name__ == "__main__":
-    # Should result in 0xb8e2
-    ans = crc16(b"\x01\x03\x02\x02\x08")
-    print(hex((ans[0]) << 8 | ans[1]))
+    # Test 1
+    test_bytes = b"\x01\x03\x02\x02\x08"
+    crc_out = crc16(test_bytes)
+    print(f"Bytes in        : 0x {pretty_hex(test_bytes)}")
+    print("Expected   CRC16: 0x b8 e2")
+    print(f"Calculated CRC16: 0x {crc_out[0]:02x} {crc_out[1]:02x}\n")
 
-    # Should result in 0x25c5
-    ans = crc16(b"\x01\x03\x00\x32\x00\x01")
-    print(hex((ans[0]) << 8 | ans[1]))
+    # Test 2
+    test_bytes = b"\x01\x03\x00\x32\x00\x01"
+    crc_out = crc16(test_bytes)
+    print(f"Bytes in        : 0x {pretty_hex(test_bytes)}")
+    print("Expected   CRC16: 0x 25 c5")
+    print(f"Calculated CRC16: 0x {crc_out[0]:02x} {crc_out[1]:02x}")
