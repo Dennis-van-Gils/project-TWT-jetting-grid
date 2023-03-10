@@ -6,7 +6,7 @@ acquisition for a Xylem Hydrovar HVL variable speed pump controller.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "06-03-2023"
+__date__ = "10-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, broad-except, multiple-statements
 
@@ -485,11 +485,45 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
     @Slot()
     def _process_rbtn_mode(self):
-        if self.rbtn_mode_pressure.isChecked():
-            self.add_to_jobs_queue(self.dev.set_hvl_mode, HVL_Mode.CONTROLLER)
-        elif self.rbtn_mode_frequency.isChecked():
-            self.add_to_jobs_queue(self.dev.set_hvl_mode, HVL_Mode.ACTUATOR)
+        # Very elaborate logic scheme here, but necessary to have the
+        # confirmation dialog work all right.
 
+        # Figure out the request
+        if self.rbtn_mode_pressure.isChecked():
+            reqs_mode = HVL_Mode.CONTROLLER
+            reqs_mode_str = "regulate pressure"
+        else:
+            reqs_mode = HVL_Mode.ACTUATOR
+            reqs_mode_str = "fixed frequency"
+
+        if self.dev.state.hvl_mode == reqs_mode:
+            # Actually no change requested
+            return
+
+        # Ask user to confirm request
+        reply = QtWid.QMessageBox.question(
+            self.qgrp_control,
+            "Confirm mode change",
+            f"Change the mode to `{reqs_mode_str}`?",
+            QtWid.QMessageBox.StandardButton.Yes
+            | QtWid.QMessageBox.StandardButton.No,
+        )
+
+        # Canceled by user
+        if reply == QtWid.QMessageBox.StandardButton.No:
+            self.rbtn_mode_pressure.setChecked(
+                self.dev.state.hvl_mode == HVL_Mode.CONTROLLER
+            )
+            self.rbtn_mode_frequency.setChecked(
+                self.dev.state.hvl_mode == HVL_Mode.ACTUATOR
+            )
+            return
+
+        # Eager mode change
+        self.dev.state.hvl_mode = reqs_mode
+
+        # Send and confirm mode change coming back from the pump
+        self.add_to_jobs_queue(self.dev.set_hvl_mode, reqs_mode)
         self.add_to_jobs_queue(
             "signal_GUI_input_field_update", GUI_input_fields.HVL_MODE
         )

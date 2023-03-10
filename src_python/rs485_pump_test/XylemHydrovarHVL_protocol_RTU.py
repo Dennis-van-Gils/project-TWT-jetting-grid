@@ -17,7 +17,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "06-03-2023"
+__date__ = "10-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -54,7 +54,6 @@ def accurate_delay_ms(delay):
 
 
 class HVL_Mode(IntEnum):
-    UNINITIALIZED = -1  # Call `XylemHydrovarHVL.begin()` first!
     CONTROLLER = 0  # Regulate motor frequency to maintain a pressure setpoint
     ACTUATOR = 3  # Fixed motor frequency
 
@@ -155,7 +154,7 @@ class XylemHydrovarHVL(SerialDevice):
         # fmt: off
         pump_is_on         = False   # (bool)
         pump_is_enabled    = False   # (bool)                           P24
-        hvl_mode           = HVL_Mode.UNINITIALIZED  # (HVL_Mode)       P105
+        hvl_mode           = HVL_Mode.CONTROLLER  # (HVL_Mode)          P105
 
         actual_pressure    = np.nan  # [bar]
         wanted_pressure    = 0.0     # [bar]                            P820
