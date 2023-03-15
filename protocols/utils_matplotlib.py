@@ -4,7 +4,12 @@
 """
 __author__ = "Dennis van Gils"
 
+from sys import platform
 import matplotlib
+
+if platform == "darwin":
+    # OS X
+    matplotlib.use("TkAgg")
 
 
 def move_figure(f, x, y):
