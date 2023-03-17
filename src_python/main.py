@@ -5,7 +5,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "24-10-2022"
+__date__ = "17-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 
