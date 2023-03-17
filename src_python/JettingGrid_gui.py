@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""jetting_grid_gui.py
+"""JettingGrid_gui.py
 
 Manages the graphical user interface
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "24-10-2022"
+__date__ = "17-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda
 
@@ -47,7 +47,7 @@ if QT_LIB is None:
 
 if QT_LIB is None:
     this_file = __file__.split(os.sep)[-1]
-    raise Exception(
+    raise ImportError(
         f"{this_file} requires PyQt5, PyQt6, PySide2 or PySide6; "
         "none of these packages could be imported."
     )
