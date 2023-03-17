@@ -220,9 +220,10 @@ class MainWindow(QtWid.QWidget):
             + controls.SS_HOVER
         )
 
-        # Textbox widths for fitting N characters using the current font
-        ex8 = 8 + 8 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
-        ex26 = 8 + 26 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
+        # Change the font size
+        self.main_font = QtGui.QFont(QtGui.QGuiApplication.font().family(), 9)
+        self.setFont(self.main_font)  # Keep
+        QtGui.QGuiApplication.setFont(self.main_font)  # Keep
 
         # -------------------------
         #   Top frame
@@ -360,7 +361,8 @@ class MainWindow(QtWid.QWidget):
         p = {
             "readOnly": True,
             "alignment": QtCore.Qt.AlignmentFlag.AlignRight,
-            "maximumWidth": ex8,
+            "maximumWidth": controls.e8(6),
+            "minimumWidth": controls.e8(6),
         }
         self.qlin_P_pump = QtWid.QLineEdit(**p)
         self.qlin_P_1 = QtWid.QLineEdit(**p)
@@ -396,8 +398,8 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
 
         self.qtxt_comments = QtWid.QTextEdit()
-        self.qtxt_comments.setMinimumHeight(60)
-        self.qtxt_comments.setMaximumWidth(ex26)
+        self.qtxt_comments.setMinimumHeight(controls.e8(26))
+        self.qtxt_comments.setMaximumWidth(controls.e8(26))
         grid = QtWid.QGridLayout()
         grid.addWidget(self.qtxt_comments, 0, 0)
 
