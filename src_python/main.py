@@ -7,7 +7,7 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "24-10-2022"
 __version__ = "1.0"
-# pylint: disable=bare-except, broad-except, missing-function-docstring
+# pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 
 import os
 import sys
@@ -25,7 +25,7 @@ PYQT6 = "PyQt6"
 PYSIDE2 = "PySide2"
 PYSIDE6 = "PySide6"
 QT_LIB_ORDER = [PYQT5, PYSIDE2, PYSIDE6, PYQT6]
-QT_LIB = os.getenv("PYQTGRAPH_QT_LIB")
+QT_LIB = None
 
 # Parse optional cli argument to enfore a QT_LIB
 # cli example: python benchmark.py pyside6
@@ -36,7 +36,6 @@ if len(sys.argv) > 1:
             QT_LIB = lib
             break
 
-# pylint: disable=import-error, no-name-in-module, c-extension-no-member
 if QT_LIB is None:
     for lib in QT_LIB_ORDER:
         if lib in sys.modules:
@@ -60,6 +59,7 @@ if QT_LIB is None:
     )
 
 # fmt: off
+# pylint: disable=import-error, no-name-in-module
 if QT_LIB == PYQT5:
     from PyQt5 import QtCore, QtWidgets as QtWid           # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
@@ -76,13 +76,9 @@ elif QT_LIB == PYSIDE6:
     from PySide6 import QtCore, QtWidgets as QtWid         # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
     #from PySide6.QtCore import Signal                      # type: ignore
+# pylint: enable=import-error, no-name-in-module
 # fmt: on
 
-QT_VERSION = (
-    QtCore.QT_VERSION_STR if QT_LIB in (PYQT5, PYQT6) else QtCore.__version__
-)
-
-# pylint: enable=import-error, no-name-in-module, c-extension-no-member
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
@@ -163,6 +159,7 @@ def DAQ_function() -> bool:
 
     # Parse readings into separate state variables
     try:
+        # pylint: disable=unbalanced-tuple-unpacking
         (
             state.pres_1_mA,
             state.pres_2_mA,
@@ -173,6 +170,7 @@ def DAQ_function() -> bool:
             state.pres_3_bar,
             state.pres_4_bar,
         ) = reply
+        # pylint: enable=unbalanced-tuple-unpacking
     except Exception as err:
         pft(err)
         dprint(f"'{ard.name}' reports IOError @ {str_cur_date} {str_cur_time}")
