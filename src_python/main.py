@@ -7,7 +7,7 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "24-10-2022"
 __version__ = "1.0"
-# pylint: disable=bare-except, broad-except
+# pylint: disable=bare-except, broad-except, missing-function-docstring
 
 import os
 import sys
@@ -54,7 +54,7 @@ if QT_LIB is None:
 
 if QT_LIB is None:
     this_file = __file__.split(os.sep)[-1]
-    raise Exception(
+    raise ImportError(
         f"{this_file} requires PyQt5, PyQt6, PySide2 or PySide6; "
         "none of these packages could be imported."
     )
@@ -123,11 +123,8 @@ def notify_connection_lost():
 
     window.qlbl_title.setText("! ! !    LOST CONNECTION    ! ! !")
     str_cur_date, str_cur_time = current_date_time_strings()
-    str_msg = "%s %s\nLost connection to Arduino." % (
-        str_cur_date,
-        str_cur_time,
-    )
-    print("\nCRITICAL ERROR @ %s" % str_msg)
+    str_msg = f"{str_cur_date} {str_cur_time}\nLost connection to Arduino."
+    print("\nCRITICAL ERROR @ {str_msg}")
     reply = QtWid.QMessageBox.warning(
         window, "CRITICAL ERROR", str_msg, QtWid.QMessageBox.Ok
     )
@@ -160,7 +157,7 @@ def DAQ_function() -> bool:
 
     # Query the Arduino for its state
     success, reply = ard.query_ascii_values("?", delimiter="\t")
-    if not (success):
+    if not success:
         dprint(f"'{ard.name}' reports IOError @ {str_cur_date} {str_cur_time}")
         return False
 
@@ -227,13 +224,12 @@ def write_data_to_log():
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-
     # Connect to Arduino
     ard = Arduino(name="Ard", connect_to_specific_ID="TWT jetting grid")
     ard.serial_settings["baudrate"] = 115200
     ard.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
 
-    if not (ard.is_alive):
+    if not ard.is_alive:
         print("\nCheck connection and try resetting the Arduino.\n")
         # print("Exiting...\n")
         # sys.exit(0)
