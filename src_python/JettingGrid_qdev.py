@@ -7,7 +7,7 @@ Manages multi-threaded communication with the Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "24-10-2022"
+__date__ = "17-03-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -21,14 +21,14 @@ class JettingGrid_qdev(QDeviceIO):
         def __init__(self):
             # Actual readings of the Arduino
             self.time = np.nan  # [s]
-            self.pres_1_mA = np.nan  # [mA]
-            self.pres_2_mA = np.nan  # [mA]
-            self.pres_3_mA = np.nan  # [mA]
-            self.pres_4_mA = np.nan  # [mA]
-            self.pres_1_bar = np.nan  # [bar]
-            self.pres_2_bar = np.nan  # [bar]
-            self.pres_3_bar = np.nan  # [bar]
-            self.pres_4_bar = np.nan  # [bar]
+            self.P_1_mA = np.nan  # [mA]
+            self.P_2_mA = np.nan  # [mA]
+            self.P_3_mA = np.nan  # [mA]
+            self.P_4_mA = np.nan  # [mA]
+            self.P_1_bar = np.nan  # [bar]
+            self.P_2_bar = np.nan  # [bar]
+            self.P_3_bar = np.nan  # [bar]
+            self.P_4_bar = np.nan  # [bar]
 
     # --------------------------------------------------------------------------
     #   JettingGrid_qdev
@@ -57,4 +57,3 @@ class JettingGrid_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
     #   Arduino communication functions
     # --------------------------------------------------------------------------
-

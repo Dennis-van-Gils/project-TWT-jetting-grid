@@ -212,9 +212,6 @@ class MainWindow(QtWid.QWidget):
         self.logger = logger
         self.debug = debug
 
-        # Shorthands
-        state = self.ard_qdev.state
-
         self.setWindowTitle("Jetting grid")
         self.setGeometry(350, 60, 1200, 900)
         self.setStyleSheet(
@@ -225,7 +222,7 @@ class MainWindow(QtWid.QWidget):
 
         # Textbox widths for fitting N characters using the current font
         ex8 = 8 + 8 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
-        ex10 = 8 + 10 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
+        ex26 = 8 + 26 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
 
         # -------------------------
         #   Top frame
@@ -316,35 +313,39 @@ class MainWindow(QtWid.QWidget):
         capacity = round(
             CHART_HISTORY_TIME * 1e3 / ard_qdev.worker_DAQ._DAQ_interval_ms
         )
-        PEN_01 = pg.mkPen(controls.COLOR_PEN_TURQUOISE, width=3)
+        PEN_01 = pg.mkPen(controls.COLOR_PEN_RED, width=3)
         PEN_02 = pg.mkPen(controls.COLOR_PEN_YELLOW, width=3)
-        PEN_03 = pg.mkPen(controls.COLOR_PEN_PINK, width=3)
-        PEN_04 = pg.mkPen(controls.COLOR_PEN_BLUE, width=3)
+        PEN_03 = pg.mkPen(controls.COLOR_PEN_GREEN, width=3)
+        PEN_04 = pg.mkPen(controls.COLOR_PEN_TURQUOISE, width=3)
+        PEN_05 = pg.mkPen(controls.COLOR_PEN_PINK, width=3)
 
-        self.curve_pres_1 = HistoryChartCurve(
+        self.curve_P_pump = HistoryChartCurve(
             capacity=capacity,
-            linked_curve=self.pi_pres.plot(pen=PEN_01, name="P_1"),
+            linked_curve=self.pi_pres.plot(pen=PEN_01, name="P_pump"),
         )
-        self.curve_pres_2 = HistoryChartCurve(
+        self.curve_P_1 = HistoryChartCurve(
             capacity=capacity,
-            linked_curve=self.pi_pres.plot(pen=PEN_02, name="P_2"),
+            linked_curve=self.pi_pres.plot(pen=PEN_02, name="P_1"),
         )
-        self.curve_pres_3 = HistoryChartCurve(
+        self.curve_P_2 = HistoryChartCurve(
             capacity=capacity,
-            linked_curve=self.pi_pres.plot(pen=PEN_03, name="P_3"),
+            linked_curve=self.pi_pres.plot(pen=PEN_03, name="P_2"),
         )
-        self.curve_pres_4 = HistoryChartCurve(
+        self.curve_P_3 = HistoryChartCurve(
             capacity=capacity,
-            linked_curve=self.pi_pres.plot(pen=PEN_04, name="P_4"),
+            linked_curve=self.pi_pres.plot(pen=PEN_04, name="P_3"),
         )
-
-        # TODO: Add pump velocity and setpoint plots & curves
+        self.curve_P_4 = HistoryChartCurve(
+            capacity=capacity,
+            linked_curve=self.pi_pres.plot(pen=PEN_05, name="P_4"),
+        )
 
         self.curves_pres = [
-            self.curve_pres_1,
-            self.curve_pres_2,
-            self.curve_pres_3,
-            self.curve_pres_4,
+            self.curve_P_pump,
+            self.curve_P_1,
+            self.curve_P_2,
+            self.curve_P_3,
+            self.curve_P_4,
         ]
         self.curves = self.curves_pres
 
@@ -361,21 +362,24 @@ class MainWindow(QtWid.QWidget):
             "alignment": QtCore.Qt.AlignmentFlag.AlignRight,
             "maximumWidth": ex8,
         }
-        self.qlin_pres_1 = QtWid.QLineEdit(**p)
-        self.qlin_pres_2 = QtWid.QLineEdit(**p)
-        self.qlin_pres_3 = QtWid.QLineEdit(**p)
-        self.qlin_pres_4 = QtWid.QLineEdit(**p)
+        self.qlin_P_pump = QtWid.QLineEdit(**p)
+        self.qlin_P_1 = QtWid.QLineEdit(**p)
+        self.qlin_P_2 = QtWid.QLineEdit(**p)
+        self.qlin_P_3 = QtWid.QLineEdit(**p)
+        self.qlin_P_4 = QtWid.QLineEdit(**p)
 
         # fmt: off
         legend_1.grid.setHorizontalSpacing(6)
-        legend_1.grid.addWidget(self.qlin_pres_1   , 0, 2)
+        legend_1.grid.addWidget(self.qlin_P_pump   , 0, 2)
         legend_1.grid.addWidget(QtWid.QLabel("bar"), 0, 3)
-        legend_1.grid.addWidget(self.qlin_pres_2   , 1, 2)
+        legend_1.grid.addWidget(self.qlin_P_1      , 1, 2)
         legend_1.grid.addWidget(QtWid.QLabel("bar"), 1, 3)
-        legend_1.grid.addWidget(self.qlin_pres_3   , 2, 2)
+        legend_1.grid.addWidget(self.qlin_P_2      , 2, 2)
         legend_1.grid.addWidget(QtWid.QLabel("bar"), 2, 3)
-        legend_1.grid.addWidget(self.qlin_pres_4   , 3, 2)
+        legend_1.grid.addWidget(self.qlin_P_3      , 3, 2)
         legend_1.grid.addWidget(QtWid.QLabel("bar"), 3, 3)
+        legend_1.grid.addWidget(self.qlin_P_4      , 4, 2)
+        legend_1.grid.addWidget(QtWid.QLabel("bar"), 4, 3)
         legend_1.grid.setColumnStretch(0, 0)
         legend_1.grid.setColumnStretch(1, 0)
         # fmt: on
@@ -393,6 +397,7 @@ class MainWindow(QtWid.QWidget):
 
         self.qtxt_comments = QtWid.QTextEdit()
         self.qtxt_comments.setMinimumHeight(60)
+        self.qtxt_comments.setMaximumWidth(ex26)
         grid = QtWid.QGridLayout()
         grid.addWidget(self.qtxt_comments, 0, 0)
 
@@ -455,10 +460,11 @@ class MainWindow(QtWid.QWidget):
         #  Round up bottom frame
         # -------------------------
 
+        p = {"alignment": QtCore.Qt.AlignmentFlag.AlignLeft}
         vbox = QtWid.QVBoxLayout()
         vbox.addWidget(qgrp_readings)
-        vbox.addWidget(qgrp_comments)
-        vbox.addWidget(qgrp_charts)
+        vbox.addWidget(qgrp_comments, **p)
+        vbox.addWidget(qgrp_charts, **p)
 
         grid_bot = QtWid.QGridLayout()
         grid_bot.addWidget(self.gw, 0, 0)
@@ -526,10 +532,11 @@ class MainWindow(QtWid.QWidget):
             else ""
         )
 
-        self.qlin_pres_1.setText(f"{state.pres_1_bar:.3f}")
-        self.qlin_pres_2.setText(f"{state.pres_2_bar:.3f}")
-        self.qlin_pres_3.setText(f"{state.pres_3_bar:.3f}")
-        self.qlin_pres_4.setText(f"{state.pres_4_bar:.3f}")
+        self.qlin_P_pump.setText(f"{state.P_1_bar:.3f}")
+        self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
+        self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
+        self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")
+        self.qlin_P_4.setText(f"{state.P_4_bar:.3f}")
 
         if self.debug:
             tprint("update_charts")

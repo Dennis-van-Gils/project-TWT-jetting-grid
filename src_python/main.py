@@ -161,14 +161,14 @@ def DAQ_function() -> bool:
     try:
         # pylint: disable=unbalanced-tuple-unpacking
         (
-            state.pres_1_mA,
-            state.pres_2_mA,
-            state.pres_3_mA,
-            state.pres_4_mA,
-            state.pres_1_bar,
-            state.pres_2_bar,
-            state.pres_3_bar,
-            state.pres_4_bar,
+            state.P_1_mA,
+            state.P_2_mA,
+            state.P_3_mA,
+            state.P_4_mA,
+            state.P_1_bar,
+            state.P_2_bar,
+            state.P_3_bar,
+            state.P_4_bar,
         ) = reply
         # pylint: enable=unbalanced-tuple-unpacking
     except Exception as err:
@@ -180,10 +180,10 @@ def DAQ_function() -> bool:
     state.time = time.perf_counter()
 
     # Add readings to chart histories
-    window.curve_pres_1.appendData(state.time, state.pres_1_bar)
-    window.curve_pres_2.appendData(state.time, state.pres_2_bar)
-    window.curve_pres_3.appendData(state.time, state.pres_3_bar)
-    window.curve_pres_4.appendData(state.time, state.pres_4_bar)
+    window.curve_pres_1.appendData(state.time, state.P_1_bar)
+    window.curve_pres_2.appendData(state.time, state.P_2_bar)
+    window.curve_pres_3.appendData(state.time, state.P_3_bar)
+    window.curve_pres_4.appendData(state.time, state.P_4_bar)
 
     # Logging to file
     window.logger.update()
@@ -205,15 +205,15 @@ def write_header_to_log():
     logger.write(window.qtxt_comments.toPlainText())
     logger.write("\n\n[DATA]\n")
     logger.write("[s]\t[bar]\t[bar]\t[bar]\t[bar]\n")
-    logger.write("time\tpres_1\tpres_2\tpres_3\tpres_4\n")
+    logger.write("time\tP_1\tP_2\tP_3\tP_4\n")
 
 
 def write_data_to_log():
     state = ard_qdev.state  # Shorthand
     logger.write(
         f"{logger.elapsed():.2f}\t"
-        f"{state.pres_1_bar:.3f}\t{state.pres_2_bar:.3f}\t"
-        f"{state.pres_3_bar:.3f}\t{state.pres_4_bar:.3f}\n"
+        f"{state.P_1_bar:.3f}\t{state.P_2_bar:.3f}\t"
+        f"{state.P_3_bar:.3f}\t{state.P_4_bar:.3f}\n"
     )
 
 
