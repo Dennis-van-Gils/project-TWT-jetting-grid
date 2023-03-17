@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""jetting_grid_qdev.py
+"""JettingGrid_qdev.py
 
 Manages multi-threaded communication with the Arduino
 """
