@@ -113,6 +113,7 @@ def current_date_time_strings():
 def stop_running():
     app.processEvents()
     ard_qdev.quit()
+    hvl_qdev.quit()
     logger.close()
 
 
@@ -183,10 +184,10 @@ def DAQ_function() -> bool:
     state.time = time.perf_counter()
 
     # Add readings to chart histories
-    window.curve_pres_1.appendData(state.time, state.P_1_bar)
-    window.curve_pres_2.appendData(state.time, state.P_2_bar)
-    window.curve_pres_3.appendData(state.time, state.P_3_bar)
-    window.curve_pres_4.appendData(state.time, state.P_4_bar)
+    window.curve_P_1.appendData(state.time, state.P_1_bar)
+    window.curve_P_2.appendData(state.time, state.P_2_bar)
+    window.curve_P_3.appendData(state.time, state.P_3_bar)
+    window.curve_P_4.appendData(state.time, state.P_4_bar)
 
     # Logging to file
     window.logger.update()
