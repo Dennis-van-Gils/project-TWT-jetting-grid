@@ -215,7 +215,7 @@ class MainWindow(QtWid.QWidget):
         self.debug = debug
 
         self.setWindowTitle("Jetting grid")
-        self.setGeometry(350, 60, 1200, 900)
+        self.setGeometry(150, 60, 1200, 900)
         self.setStyleSheet(
             controls.SS_TEXTBOX_READ_ONLY
             + controls.SS_GROUP
