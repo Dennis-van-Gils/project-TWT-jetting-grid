@@ -7,7 +7,7 @@ Manages the graphical user interface
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-03-2023"
+__date__ = "22-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
@@ -112,7 +112,7 @@ from dvg_pyqtgraph_threadsafe import (
 
 from dvg_devices.Arduino_protocol_serial import Arduino
 from JettingGrid_qdev import JettingGrid_qdev
-
+from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
 
 # Default settings for graphs
 # pg.setConfigOptions(leftButtonPan=False)
@@ -200,6 +200,7 @@ class MainWindow(QtWid.QWidget):
         self,
         ard: Arduino,
         ard_qdev: JettingGrid_qdev,
+        hvl_qdev: XylemHydrovarHVL_qdev,
         logger: FileLogger,
         debug: bool = False,
         parent=None,
@@ -209,6 +210,7 @@ class MainWindow(QtWid.QWidget):
 
         self.ard = ard
         self.ard_qdev = ard_qdev
+        self.hvl_qdev = hvl_qdev
         self.logger = logger
         self.debug = debug
 
@@ -297,6 +299,17 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
         #   Bottom frame
         # -------------------------
+
+        #  Pump control
+        # -------------------------
+
+        hvl_qdev.qpte_error_status.setMaximumWidth(controls.e8(22))
+        hvl_qdev.qpte_error_status.setMinimumWidth(controls.e8(22))
+
+        vbox_pump = QtWid.QVBoxLayout()
+        vbox_pump.addWidget(hvl_qdev.qgrp_control)
+        vbox_pump.addWidget(hvl_qdev.qgrp_inverter)
+        vbox_pump.addWidget(hvl_qdev.qgrp_error_status)
 
         #  Charts
         # -------------------------
@@ -463,16 +476,18 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
 
         p = {"alignment": QtCore.Qt.AlignmentFlag.AlignLeft}
-        vbox = QtWid.QVBoxLayout()
-        vbox.addWidget(qgrp_readings)
-        vbox.addWidget(qgrp_comments, **p)
-        vbox.addWidget(qgrp_charts, **p)
+        vbox_readings = QtWid.QVBoxLayout()
+        vbox_readings.addWidget(qgrp_readings)
+        vbox_readings.addWidget(qgrp_comments, **p)
+        vbox_readings.addWidget(qgrp_charts, **p)
 
         grid_bot = QtWid.QGridLayout()
-        grid_bot.addWidget(self.gw, 0, 0)
-        grid_bot.addLayout(vbox, 0, 1)
-        grid_bot.setColumnStretch(0, 1)
-        grid_bot.setColumnStretch(1, 0)
+        grid_bot.addLayout(vbox_pump, 0, 0)
+        grid_bot.addWidget(self.gw, 0, 1)
+        grid_bot.addLayout(vbox_readings, 0, 2)
+        grid_bot.setColumnStretch(0, 0)
+        grid_bot.setColumnStretch(1, 1)
+        grid_bot.setColumnStretch(2, 0)
 
         # -------------------------
         #   Round up full window

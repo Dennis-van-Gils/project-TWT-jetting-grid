@@ -5,7 +5,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-03-2023"
+__date__ = "22-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 
@@ -88,6 +88,9 @@ from dvg_pyqt_filelogger import FileLogger
 from dvg_devices.Arduino_protocol_serial import Arduino
 from JettingGrid_qdev import JettingGrid_qdev
 from JettingGrid_gui import MainWindow
+
+from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
+from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
 
 # ------------------------------------------------------------------------------
 #   current_date_time_strings
@@ -222,7 +225,10 @@ def write_data_to_log():
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # Connect to Arduino
+    # --------------------------------------------------------------------------
+    #   Connect to Jetting Grid Arduino
+    # --------------------------------------------------------------------------
+
     ard = Arduino(name="Ard", connect_to_specific_ID="TWT jetting grid")
     ard.serial_settings["baudrate"] = 115200
     ard.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
@@ -232,6 +238,34 @@ if __name__ == "__main__":
         # print("Exiting...\n")
         # sys.exit(0)
 
+    # --------------------------------------------------------------------------
+    #   Connect to Xylem Hydrovar HVL pump
+    # --------------------------------------------------------------------------
+
+    hvl = XylemHydrovarHVL(
+        connect_to_modbus_slave_address=0x01,
+        max_pressure_setpoint_bar=3,
+    )
+    hvl.serial_settings = {
+        "baudrate": 115200,
+        "bytesize": 8,
+        "parity": "N",
+        "stopbits": 1,
+        "timeout": 0.2,
+        "write_timeout": 0.2,
+    }
+
+    if hvl.auto_connect("config/port_Hydrovar.txt"):
+        hvl.begin()
+
+    # --------------------------------------------------------------------------
+    #   Create application
+    # --------------------------------------------------------------------------
+
+    QtCore.QThread.currentThread().setObjectName("MAIN")  # For DEBUG info
+    app = QtWid.QApplication(sys.argv)
+    app.aboutToQuit.connect(about_to_quit)
+
     # Set up multi-threaded communication: Creates workers and threads
     ard_qdev = JettingGrid_qdev(
         dev=ard,
@@ -239,6 +273,13 @@ if __name__ == "__main__":
         DAQ_interval_ms=DAQ_INTERVAL_MS,
         debug=DEBUG,
     )
+
+    hvl_qdev = XylemHydrovarHVL_qdev(
+        dev=hvl,
+        DAQ_interval_ms=DAQ_INTERVAL_MS,
+        debug=DEBUG,
+    )
+
     ard_qdev.signal_connection_lost.connect(notify_connection_lost)
 
     # File logger
@@ -247,14 +288,11 @@ if __name__ == "__main__":
         write_data_function=write_data_to_log,
     )
 
-    # Create application and main window
-    QtCore.QThread.currentThread().setObjectName("MAIN")  # For DEBUG info
-    app = QtWid.QApplication(sys.argv)
-    app.aboutToQuit.connect(about_to_quit)
-    window = MainWindow(ard, ard_qdev, logger, DEBUG)
+    window = MainWindow(ard, ard_qdev, hvl_qdev, logger, DEBUG)
 
     # Start threads
     ard_qdev.start()
+    hvl_qdev.start()
 
     # Start the main GUI event loop
     window.show()
