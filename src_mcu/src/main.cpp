@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-02-2023
+ * @date    23-03-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -189,7 +189,7 @@ void set_LED_matrix_data_fixed_grid() {
       }
     }
   }
-  leds[p2led(P{0, 0})] = CRGB(0, 32, 0); // Center (0, 0)
+  leds[p2led(P{0, 0})] = CRGB(0, 64, 0); // Center (0, 0)
 }
 
 /*------------------------------------------------------------------------------
@@ -706,7 +706,7 @@ void loop() {
 
   EVERY_N_MILLIS(500) {
     // Blink the 'alive' status LEDs
-    leds[255] = alive_blinker ? alive_blinker_color : CRGB::Black;
+    leds[p2led(P{-8, -8})] = alive_blinker ? alive_blinker_color : CRGB::Black;
     onboard_led[0] = alive_blinker ? alive_blinker_color : CRGB::Black;
     alive_blinker = !alive_blinker;
   }
