@@ -184,6 +184,7 @@ def DAQ_function() -> bool:
     state.time = time.perf_counter()
 
     # Add readings to chart histories
+    window.curve_P_pump.appendData(state.time, hvl_qdev.dev.state.actual_pressure)
     window.curve_P_1.appendData(state.time, state.P_1_bar)
     window.curve_P_2.appendData(state.time, state.P_2_bar)
     window.curve_P_3.appendData(state.time, state.P_3_bar)
