@@ -281,7 +281,7 @@ const RT_Click_Calibration R_CLICK_4_CALIB{3.98, 19.83, 828, 3981};
 // moving average by using oversampling and subsequent low-pass filtering as
 // data-acquisition (DAQ) routine.
 const uint32_t DAQ_DT = 10000; // Desired oversampling interval [µs]
-const float DAQ_LP = 10.;      // Low-pass filter cut-off frequency [Hz]
+const float DAQ_LP = 2.;       // Low-pass filter cut-off frequency [Hz]
 
 /*------------------------------------------------------------------------------
   OMEGA pressure sensors, type PXM309-007GI
