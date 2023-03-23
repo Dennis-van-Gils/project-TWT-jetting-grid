@@ -32,10 +32,10 @@ uint8_t p2valve(P p) {
 }
 
 uint8_t p2led(P p) {
-  int8_t tmp_x = p.x - PCS_X_MIN;
-  int8_t tmp_y = PCS_Y_MAX - p.y;
-  if ((tmp_x < 0) || (tmp_x >= NUMEL_PCS_AXIS) || //
-      (tmp_y < 0) || (tmp_y >= NUMEL_PCS_AXIS)) {
+  int8_t tmp_x = PCS_X_MAX - p.x + 1;
+  int8_t tmp_y = PCS_Y_MAX - p.y + 1;
+  if ((tmp_x < 0) || (tmp_x >= NUMEL_LED_AXIS) || //
+      (tmp_y < 0) || (tmp_y >= NUMEL_LED_AXIS)) {
     snprintf(buf, BUF_LEN,
              "CRITICAL: Out-of-bounds index (%d, %d) in `p2led()`", p.x, p.y);
     halt(2, buf);
