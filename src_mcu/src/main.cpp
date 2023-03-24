@@ -185,7 +185,7 @@ void set_LED_matrix_data_fixed_grid() {
   for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
     for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
       if ((x + y) % 2 == 0) {
-        leds[p2led(P{x, y})] = CRGB(64, 64, 64);
+        leds[p2led(P{x, y})] = CRGB(12, 12, 12);
       }
     }
   }
@@ -215,7 +215,7 @@ State state_idle(fun_idle__ent, fun_idle__upd);
 FiniteStateMachine fsm(state_idle);
 
 void fun_idle__ent() {
-  Serial.println("State: Idling...");
+  // Serial.println("State: Idling...");
   alive_blinker_color = CRGB::Yellow;
 }
 
@@ -233,7 +233,7 @@ void fun_run_program__upd();
 State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 void fun_run_program__ent() {
-  Serial.println("State: Running protocol program...");
+  // Serial.println("State: Running protocol program...");
   alive_blinker_color = CRGB::Green;
 
   // Clear all valve leds
@@ -479,7 +479,7 @@ void setup() {
 
   // Reached the end of setup, so now show the fixed grid in the LED matrix
   FastLED.clearData();
-  set_LED_matrix_data_fixed_grid(); // DEBUG: Taken out momentarily
+  // set_LED_matrix_data_fixed_grid();
   FastLED.show();
 
   if (DEBUG) {
@@ -526,8 +526,8 @@ void loop() {
           // TODO: Capture into function
           cp_mgr.clear_masks();
           cp_mgr.send_masks();
-            for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
-          leds[p2led(valve2p(idx_valve + 1))] = 0;
+          for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
+            leds[p2led(valve2p(idx_valve + 1))] = 0;
           }
           fsm.transitionTo(state_idle);
 

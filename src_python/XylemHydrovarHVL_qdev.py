@@ -6,7 +6,7 @@ acquisition for a Xylem Hydrovar HVL variable speed pump controller.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "10-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, broad-except, multiple-statements
 
@@ -50,19 +50,19 @@ if QT_LIB is None:
 # fmt: off
 # pylint: disable=import-error, no-name-in-module, unused-import
 if QT_LIB == PYQT5:
-    from PyQt5 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
+    from PyQt5 import QtCore, QtWidgets as QtWid           # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
     from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYQT6:
-    from PyQt6 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
+    from PyQt6 import QtCore, QtWidgets as QtWid           # type: ignore
     from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
     from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYSIDE2:
-    from PySide2 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
+    from PySide2 import QtCore, QtWidgets as QtWid         # type: ignore
     from PySide2.QtCore import Slot                        # type: ignore
     from PySide2.QtCore import Signal                      # type: ignore
 elif QT_LIB == PYSIDE6:
-    from PySide6 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
+    from PySide6 import QtCore, QtWidgets as QtWid         # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
     from PySide6.QtCore import Signal                      # type: ignore
 # pylint: enable=import-error, no-name-in-module, unused-import
@@ -72,9 +72,15 @@ elif QT_LIB == PYSIDE6:
 # -----------------------------------------------
 
 from dvg_debug_functions import dprint, print_fancy_traceback as pft
-from dvg_pyqt_controls import create_Toggle_button, SS_TEXTBOX_ERRORS
+from dvg_pyqt_controls import (
+    e8,
+    create_Toggle_button,
+    create_tiny_LED,
+    SS_TEXTBOX_ERRORS,
+)
 from dvg_qdeviceio import QDeviceIO, DAQ_TRIGGER
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL, HVL_Mode
+
 
 # Enumeration
 class GUI_input_fields(IntEnum):
@@ -112,6 +118,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     """
 
     signal_GUI_input_field_update = Signal(int)
+    signal_pump_just_stopped_and_reached_standstill = Signal()
 
     def __init__(
         self,
@@ -144,14 +151,28 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         self._update_GUI()
         self._update_GUI_input_field()
 
+        # Mechanism to detect that the pump has received a stop command and has
+        # reached full standstill.
+        # ----------------------------------------------------------------------
+        # Below flag is True as soon as the `pump stop` command is send. It will
+        # reset to False as soon as full standstill is achieved, after which
+        # signal `signal_pump_just_stopped_and_reached_standstill` will be
+        # emitted.
+        self.pump_is_stopping = False
+
     # --------------------------------------------------------------------------
     #   _DAQ_function
     # --------------------------------------------------------------------------
 
     def _DAQ_function(self):
-        """Every DAQ time step, read the actual pressure and inverter frequency,
-        device status and error status. Every N'th time step, read the inverter
-        diagnostics.
+        """Every DAQ time step, read the following:
+        - error status
+        - device status
+        - actual pressure
+        - actual inverter frequency
+
+        Every N'th DAQ time step, read the following:
+        - inverter diagnostics
         """
         DEBUG_local = False
         if DEBUG_local:
@@ -164,6 +185,16 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
 
         if (self.update_counter_DAQ % 5) == 0:
             success &= self.dev.read_inverter_diagnostics()
+
+        if self.pump_is_stopping:
+            if self.dev.state.pump_is_running:
+                # Pump is still coasting down
+                pass
+            else:
+                # Reached standstill
+                self.pump_is_stopping = False
+                self.signal_pump_just_stopped_and_reached_standstill.emit()
+                print("Pump reached standstill")
 
         if not success:
             return False
@@ -195,16 +226,15 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
 
     def _create_GUI(self):
-        # Textbox widths for fitting N characters using the current font
-        ex8 = 8 + 8 * QtGui.QFontMetrics(QtGui.QFont()).averageCharWidth()
         p = {
             "alignment": QtCore.Qt.AlignmentFlag.AlignRight,
-            "minimumWidth": ex8,
-            "maximumWidth": ex8,
+            "minimumWidth": e8(8),
+            "maximumWidth": e8(8),
         }
 
         # Pump control
         self.pbtn_pump_onoff = create_Toggle_button("OFFLINE")
+        self.indicator_pump_running = create_tiny_LED()
         self.rbtn_mode_pressure = QtWid.QRadioButton("Regulate pressure")
         self.rbtn_mode_frequency = QtWid.QRadioButton("Fixed frequency")
         self.qled_P_wanted = QtWid.QLineEdit("nan", **p)
@@ -240,6 +270,8 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         grid.setVerticalSpacing(4)
 
         grid.addWidget(self.pbtn_pump_onoff            , i, 0, 1, 3); i+=1
+        grid.addWidget(QtWid.QLabel("Pump running?")   , i, 0, 1, 2)
+        grid.addWidget(self.indicator_pump_running     , i, 2)      ; i+=1
         grid.addItem(QtWid.QSpacerItem(1, 10)          , i, 0)      ; i+=1
 
         grid.addWidget(QtWid.QLabel("<b>Mode</b>")     , i, 0, 1, 3); i+=1
@@ -295,7 +327,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
         grid = QtWid.QGridLayout()
         grid.setVerticalSpacing(4)
 
-        grid.addWidget(QtWid.QLabel("Temperature")     , i, 0)
+        grid.addWidget(QtWid.QLabel("Temp.")           , i, 0)
         grid.addWidget(self.qled_inverter_temp         , i, 1)
         grid.addWidget(QtWid.QLabel("\u00b0C")         , i, 2)      ; i+=1
         grid.addWidget(QtWid.QLabel("Voltage")         , i, 0)
@@ -366,6 +398,7 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
             self.pbtn_pump_onoff.setChecked(False)
             self.pbtn_pump_onoff.setText("Pump is DISABLED")
 
+        self.indicator_pump_running.setChecked(state.pump_is_running)
         self.qled_P_actual.setText(f"{state.actual_pressure:.2f}")
         self.qled_f_actual.setText(f"{state.actual_frequency:.1f}")
 
@@ -449,9 +482,9 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
     @Slot()
     def _process_pbtn_pump_onoff(self):
         if self.dev.state.pump_is_on:
-            self.send(self.dev.pump_stop)
+            self.send_pump_stop()
         else:
-            self.send(self.dev.pump_start)
+            self.send_pump_start()
 
     @Slot()
     def _send_P_wanted_from_textbox(self):
@@ -528,3 +561,24 @@ class XylemHydrovarHVL_qdev(QDeviceIO):
             "signal_GUI_input_field_update", GUI_input_fields.HVL_MODE
         )
         self.process_jobs_queue()
+
+    # --------------------------------------------------------------------------
+    #   Worker communication functions
+    # --------------------------------------------------------------------------
+
+    @Slot()
+    def send_pump_start(self):
+        """Schedule a 'pump start' as soon as possible."""
+        self.send(self.dev.pump_start)
+
+        # React as fast as possible
+        QtWid.QApplication.processEvents()
+
+    @Slot()
+    def send_pump_stop(self):
+        """Schedule a 'pump stop' as soon as possible."""
+        self.send(self.dev.pump_stop)
+        self.pump_is_stopping = True
+
+        # React as fast as possible
+        QtWid.QApplication.processEvents()

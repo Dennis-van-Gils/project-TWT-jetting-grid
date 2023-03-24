@@ -5,7 +5,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "22-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 
@@ -60,21 +60,17 @@ if QT_LIB is None:
 # fmt: off
 # pylint: disable=import-error, no-name-in-module
 if QT_LIB == PYQT5:
-    from PyQt5 import QtCore, QtWidgets as QtWid           # type: ignore
+    from PyQt5 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
-    #from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYQT6:
-    from PyQt6 import QtCore, QtWidgets as QtWid           # type: ignore
+    from PyQt6 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
-    #from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYSIDE2:
-    from PySide2 import QtCore, QtWidgets as QtWid         # type: ignore
+    from PySide2 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide2.QtCore import Slot                        # type: ignore
-    #from PySide2.QtCore import Signal                      # type: ignore
 elif QT_LIB == PYSIDE6:
-    from PySide6 import QtCore, QtWidgets as QtWid         # type: ignore
+    from PySide6 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
-    #from PySide6.QtCore import Signal                      # type: ignore
 # pylint: enable=import-error, no-name-in-module
 # fmt: on
 
@@ -196,6 +192,13 @@ def DAQ_function() -> bool:
     return True
 
 
+@Slot()
+def pump_has_reached_standstill():
+    if ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol:
+        ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol = False
+        ard_qdev.send_stop_protocol()
+
+
 # ------------------------------------------------------------------------------
 #   File logger
 # ------------------------------------------------------------------------------
@@ -265,6 +268,7 @@ if __name__ == "__main__":
 
     QtCore.QThread.currentThread().setObjectName("MAIN")  # For DEBUG info
     app = QtWid.QApplication(sys.argv)
+    app.setFont(QtGui.QFont(QtGui.QGuiApplication.font().family(), 9))
     app.aboutToQuit.connect(about_to_quit)
 
     # Set up multi-threaded communication: Creates workers and threads
@@ -277,10 +281,13 @@ if __name__ == "__main__":
 
     hvl_qdev = XylemHydrovarHVL_qdev(
         dev=hvl,
-        DAQ_interval_ms=200, # Do not set lower than 200 ms, because round-trip time is ~ 120 ms
+        DAQ_interval_ms=200,  # Do not set lower than 200 ms, because round-trip time is ~ 120 ms
         debug=DEBUG,
     )
 
+    hvl_qdev.signal_pump_just_stopped_and_reached_standstill.connect(
+        pump_has_reached_standstill
+    )
     ard_qdev.signal_connection_lost.connect(notify_connection_lost)
 
     # File logger

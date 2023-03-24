@@ -17,7 +17,7 @@ Reference documents:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "10-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name
 
@@ -152,8 +152,9 @@ class XylemHydrovarHVL(SerialDevice):
         """Container for the process and measurement variables"""
 
         # fmt: off
-        pump_is_on         = False   # (bool)
-        pump_is_enabled    = False   # (bool)                           P24
+        pump_is_on         = False   # (bool)   Excludes coasting down
+        pump_is_running    = False   # (bool)   True with any physical movement
+        pump_is_enabled    = False   # (bool)   Inverter input terminal 18
         hvl_mode           = HVL_Mode.CONTROLLER  # (HVL_Mode)          P105
 
         actual_pressure    = np.nan  # [bar]
@@ -209,6 +210,8 @@ class XylemHydrovarHVL(SerialDevice):
             return np.any(error_list, where=True)
 
         def report(self):
+            """Report the last read error status to the terminal."""
+
             if not self.has_error():
                 print("No errors")
                 return
@@ -241,7 +244,22 @@ class XylemHydrovarHVL(SerialDevice):
                 print("- #26: SETPOINT 2 I<4 mA")
 
     class DeviceStatus:
-        """Container for the Extended Device Status bits (H4)"""
+        """Container for the Extended Device Status bits (H4).
+
+        Explanation
+        -----------
+        external_ON_OFF_terminal_enabled:
+          Directly linked to the inverter input terminal 18 'ON_OFF'. Will in
+          effect enable or disable running the pump.
+
+        device_is_enabled_with_start_button:
+          Gets set by ModBus commands 'pump stop' and 'pump start'. Immediate
+          response.
+
+        motor_is_running:
+          Autonomously set by the inverter as long as movement of the motor
+          drive shaft is detected. Includes coasting up and down.
+        """
 
         # fmt: off
         device_is_preset                    = False  # bit 00
@@ -256,6 +274,8 @@ class XylemHydrovarHVL(SerialDevice):
         # fmt: on
 
         def report(self):
+            """Report the last read device status to the terminal."""
+
             w = ".<38"  # Width specifier
             print("DEVICE STATUS")
             print("-------------")
@@ -558,6 +578,9 @@ class XylemHydrovarHVL(SerialDevice):
         success = True
         success &= self.pump_stop()
 
+        # Enable the PID pressure controller inside of the inverter
+        success &= self.pump_enable_pressure_PID()
+
         success &= self.read_hvl_mode()
         success &= self.read_min_frequency()
         success &= self.read_max_frequency()
@@ -674,27 +697,41 @@ class XylemHydrovarHVL(SerialDevice):
 
         return success
 
-    def pump_enable(self) -> bool:
+    def pump_enable_pressure_PID(self) -> bool:
         """P24: Manually enable the device.
-        Readings will be stored in class member `state`.
+
+        This setting only takes effects when in HVL mode `CONTROLLER`, i.e. when
+        we try to regulate a wanted pressure. It seems to enable the PID
+        controller running inside of the inverter. When in HVL mode `ACTUATOR`
+        this parameter gets ignored.
+
+        NOTE: Not to be confused with the inverter input terminal 18 'ON_OFF',
+        which solely sets the flag `self.state.pump_is_enabled` via
+        `self.read_device_status()`.
         """
         success, data_val = self._RTU_write(HVLREG_ENABLE_DEVICE, 1)
         if data_val is not None:
             val = bool(data_val)
-            self.state.pump_is_enabled = val
-            print(f"Pump is {'ENABLED' if val else 'DISABLED'}")
+            print(f"Pump PID is {'ENABLED' if val else 'DISABLED'}")
 
         return success
 
-    def pump_disable(self) -> bool:
+    def pump_disable_pressure_PID(self) -> bool:
         """P24: Manually disable the device.
-        Readings will be stored in class member `state`.
+
+        This setting only takes effects when in HVL mode `CONTROLLER`, i.e. when
+        we try to regulate a wanted pressure. It seems to disable the PID
+        controller running inside of the inverter. When in HVL mode `ACTUATOR`
+        this parameter gets ignored.
+
+        NOTE: Not to be confused with the inverter input terminal 18 'ON_OFF',
+        which solely sets the flag `self.state.pump_is_enabled` via
+        `self.read_device_status()`.
         """
         success, data_val = self._RTU_write(HVLREG_ENABLE_DEVICE, 0)
         if data_val is not None:
             val = bool(data_val)
-            self.state.pump_is_enabled = val
-            print(f"Pump is {'ENABLED' if val else 'DISABLED'}")
+            print(f"Pump PID is {'ENABLED' if val else 'DISABLED'}")
 
         return success
 
@@ -868,7 +905,8 @@ class XylemHydrovarHVL(SerialDevice):
 
     def read_device_status(self) -> bool:
         """Readings will be stored in class member `device_status`. Also, class
-        members `state.pump_is_on` and `state.pump_is_enabled` will be updated.
+        members `state.pump_is_on, `state.pump_is_running` and
+        `state.pump_is_enabled` will be updated.
         """
         success, data_val = self._RTU_read(HVLREG_DEV_STATUS_H4)
         if data_val is not None:
@@ -886,10 +924,8 @@ class XylemHydrovarHVL(SerialDevice):
             # fmt: on
             # s.report()
 
-            # TODO: Test this: What are the differences between
-            # `device_is_enabled_with_start_button` vs `external_ON_OFF_terminal_enabled`?
-            # `motor_is_running` vs `inverter_STOP_START`
-            self.state.pump_is_on = s.motor_is_running
+            self.state.pump_is_on = s.device_is_enabled_with_start_button
+            self.state.pump_is_running = s.motor_is_running
             self.state.pump_is_enabled = s.external_ON_OFF_terminal_enabled
 
         return success

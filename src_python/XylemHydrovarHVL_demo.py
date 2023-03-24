@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/python-dvg-devices"
-__date__ = "03-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0.0"
 
 import os
@@ -172,6 +172,7 @@ if __name__ == "__main__":
         DAQ_interval_ms=DAQ_INTERVAL_MS,
         debug=DEBUG,
     )
+
     hvl_qdev.start()
 
     # --------------------------------------------------------------------------

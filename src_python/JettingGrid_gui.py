@@ -7,12 +7,13 @@ Manages the graphical user interface
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "22-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
 import os
 import sys
+import time
 
 # Constants
 UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
@@ -213,17 +214,12 @@ class MainWindow(QtWid.QWidget):
         self.debug = debug
 
         self.setWindowTitle("Jetting grid")
-        self.setGeometry(150, 60, 1200, 900)
+        self.setGeometry(150, 60, 1200, 800)
         self.setStyleSheet(
             controls.SS_TEXTBOX_READ_ONLY
             + controls.SS_GROUP
             + controls.SS_HOVER
         )
-
-        # Change the font size
-        self.main_font = QtGui.QFont(QtGui.QGuiApplication.font().family(), 9)
-        self.setFont(self.main_font)  # Keep
-        QtGui.QGuiApplication.setFont(self.main_font)  # Keep
 
         # -------------------------
         #   Top frame
@@ -301,13 +297,39 @@ class MainWindow(QtWid.QWidget):
         #  Pump control
         # -------------------------
 
-        hvl_qdev.qpte_error_status.setMaximumWidth(controls.e8(22))
-        hvl_qdev.qpte_error_status.setMinimumWidth(controls.e8(22))
+        hvl_qdev.qpte_error_status.setMaximumWidth(controls.e8(20))
+        hvl_qdev.qpte_error_status.setMinimumWidth(controls.e8(20))
 
         vbox_pump = QtWid.QVBoxLayout()
         vbox_pump.addWidget(hvl_qdev.qgrp_control)
         vbox_pump.addWidget(hvl_qdev.qgrp_inverter)
         vbox_pump.addWidget(hvl_qdev.qgrp_error_status)
+
+        #  Protocol program
+        # -------------------------
+
+        self.qpbt_load_protocol = QtWid.QPushButton("Load")
+        self.qpbt_start_protocol = QtWid.QPushButton("Start")
+        self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
+        self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
+
+        self.qpbt_start_protocol.clicked.connect(
+            self.process_qpbt_start_protocol
+        )
+        self.qpbt_stop_protocol.clicked.connect(self.process_qpbt_stop_protocol)
+        self.qpbt_pause_protocol.clicked.connect(
+            self.process_qpbt_pause_protocol
+        )
+
+        vbox_protocol = QtWid.QVBoxLayout(spacing=4)
+        vbox_protocol.addWidget(self.qpbt_load_protocol)
+        vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
+        vbox_protocol.addWidget(self.qpbt_start_protocol)
+        vbox_protocol.addWidget(self.qpbt_stop_protocol)
+        vbox_protocol.addWidget(self.qpbt_pause_protocol)
+
+        qgrp_protocol = QtWid.QGroupBox("Protocol")
+        qgrp_protocol.setLayout(vbox_protocol)
 
         #  Charts
         # -------------------------
@@ -409,7 +431,7 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
 
         self.qtxt_comments = QtWid.QTextEdit()
-        self.qtxt_comments.setMinimumHeight(controls.e8(26))
+        self.qtxt_comments.setMinimumHeight(controls.e8(8))
         self.qtxt_comments.setMaximumWidth(controls.e8(26))
         grid = QtWid.QGridLayout()
         grid.addWidget(self.qtxt_comments, 0, 0)
@@ -481,11 +503,15 @@ class MainWindow(QtWid.QWidget):
 
         grid_bot = QtWid.QGridLayout()
         grid_bot.addLayout(vbox_pump, 0, 0)
-        grid_bot.addWidget(self.gw, 0, 1)
-        grid_bot.addLayout(vbox_readings, 0, 2)
+        grid_bot.addWidget(
+            qgrp_protocol, 0, 1, QtCore.Qt.AlignmentFlag.AlignTop
+        )
+        grid_bot.addWidget(self.gw, 0, 2)
+        grid_bot.addLayout(vbox_readings, 0, 3)
         grid_bot.setColumnStretch(0, 0)
-        grid_bot.setColumnStretch(1, 1)
-        grid_bot.setColumnStretch(2, 0)
+        grid_bot.setColumnStretch(1, 0)
+        grid_bot.setColumnStretch(2, 1)
+        grid_bot.setColumnStretch(3, 0)
 
         # -------------------------
         #   Round up full window
@@ -547,14 +573,38 @@ class MainWindow(QtWid.QWidget):
             else ""
         )
 
-        self.qlin_P_pump.setText(f"{self.hvl_qdev.dev.state.actual_pressure:.3f}")
+        self.qlin_P_pump.setText(
+            f"{self.hvl_qdev.dev.state.actual_pressure:.3f}"
+        )
         self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
         self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")
         self.qlin_P_4.setText(f"{state.P_4_bar:.3f}")
+
+        # Don't allow uploading a protocol when the pump is still running
+        self.qpbt_load_protocol.setEnabled(
+            not self.hvl_qdev.dev.state.pump_is_running
+        )
 
         if self.debug:
             tprint("update_charts")
 
         for curve in self.curves:
             curve.update()
+
+    @Slot()
+    def process_qpbt_load_protocol(self):
+        pass
+
+    @Slot()
+    def process_qpbt_start_protocol(self):
+        self.ard_qdev.send_start_protocol()
+
+    @Slot()
+    def process_qpbt_stop_protocol(self):
+        self.hvl_qdev.send_pump_stop()
+        self.ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol = True
+
+    @Slot()
+    def process_qpbt_pause_protocol(self):
+        self.ard_qdev.send_pause_protocol()

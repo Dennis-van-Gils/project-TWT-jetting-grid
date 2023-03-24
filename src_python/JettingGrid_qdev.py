@@ -7,7 +7,7 @@ Manages multi-threaded communication with the Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-03-2023"
+__date__ = "30-03-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -29,6 +29,10 @@ class JettingGrid_qdev(QDeviceIO):
             self.P_2_bar = np.nan  # [bar]
             self.P_3_bar = np.nan  # [bar]
             self.P_4_bar = np.nan  # [bar]
+
+            # Interaction flags to communicate with the Xylem jetting pump that
+            # is running inside of another thread
+            self.waiting_for_pump_standstill_to_stop_protocol = False
 
     # --------------------------------------------------------------------------
     #   JettingGrid_qdev
@@ -57,3 +61,12 @@ class JettingGrid_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
     #   Arduino communication functions
     # --------------------------------------------------------------------------
+
+    def send_start_protocol(self) -> bool:
+        return self.send(self.dev.write, "on")
+
+    def send_stop_protocol(self) -> bool:
+        return self.send(self.dev.write, "off")
+
+    def send_pause_protocol(self) -> bool:
+        return self.send(self.dev.write, "pause")
