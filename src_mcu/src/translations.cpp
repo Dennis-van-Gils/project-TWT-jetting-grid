@@ -2,7 +2,7 @@
  * @file    translations.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    15-08-2022
+ * @date    23-03-2023
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -32,8 +32,8 @@ uint8_t p2valve(P p) {
 }
 
 uint8_t p2led(P p) {
-  int8_t tmp_x = PCS_X_MAX - p.x + 1;
-  int8_t tmp_y = PCS_Y_MAX - p.y + 1;
+  int8_t tmp_x = p.x + PCS_X_MAX + 1;
+  int8_t tmp_y = NUMEL_LED_AXIS - 1 - (p.y + PCS_Y_MAX + 1);
   if ((tmp_x < 0) || (tmp_x >= NUMEL_LED_AXIS) || //
       (tmp_y < 0) || (tmp_y >= NUMEL_LED_AXIS)) {
     snprintf(buf, BUF_LEN,

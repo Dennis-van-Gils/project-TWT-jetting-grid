@@ -549,7 +549,7 @@ class MainWindow(QtWid.QWidget):
             else ""
         )
 
-        self.qlin_P_pump.setText(f"{state.P_1_bar:.3f}")
+        self.qlin_P_pump.setText(f"{self.hvl_qdev.dev.state.actual_pressure:.3f}")
         self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
         self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")
