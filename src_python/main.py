@@ -14,7 +14,6 @@ import sys
 import time
 
 # Constants
-DAQ_INTERVAL_MS = 100  # 100 [ms]
 DEBUG = False  # Show debug info in terminal?
 
 # Mechanism to support both PyQt and PySide
@@ -184,7 +183,7 @@ def DAQ_function() -> bool:
     state.time = time.perf_counter()
 
     # Add readings to chart histories
-    window.curve_P_pump.appendData(state.time, hvl_qdev.dev.state.actual_pressure)
+    window.curve_P_pump.appendData(state.time, hvl.state.actual_pressure)
     window.curve_P_1.appendData(state.time, state.P_1_bar)
     window.curve_P_2.appendData(state.time, state.P_2_bar)
     window.curve_P_3.appendData(state.time, state.P_3_bar)
@@ -272,13 +271,13 @@ if __name__ == "__main__":
     ard_qdev = JettingGrid_qdev(
         dev=ard,
         DAQ_function=DAQ_function,
-        DAQ_interval_ms=DAQ_INTERVAL_MS,
+        DAQ_interval_ms=100,  # 100 ms
         debug=DEBUG,
     )
 
     hvl_qdev = XylemHydrovarHVL_qdev(
         dev=hvl,
-        DAQ_interval_ms=DAQ_INTERVAL_MS,
+        DAQ_interval_ms=200, # Do not set lower than 200 ms, because round-trip time is ~ 120 ms
         debug=DEBUG,
     )
 
@@ -290,7 +289,7 @@ if __name__ == "__main__":
         write_data_function=write_data_to_log,
     )
 
-    window = MainWindow(ard, ard_qdev, hvl_qdev, logger, DEBUG)
+    window = MainWindow(ard_qdev, hvl_qdev, logger, DEBUG)
 
     # Start threads
     ard_qdev.start()
