@@ -198,7 +198,6 @@ def apply_PlotItem_style(
 class MainWindow(QtWid.QWidget):
     def __init__(
         self,
-        ard: Arduino,
         ard_qdev: JettingGrid_qdev,
         hvl_qdev: XylemHydrovarHVL_qdev,
         logger: FileLogger,
@@ -208,7 +207,6 @@ class MainWindow(QtWid.QWidget):
     ):
         super().__init__(parent, **kwargs)
 
-        self.ard = ard
         self.ard_qdev = ard_qdev
         self.hvl_qdev = hvl_qdev
         self.logger = logger
