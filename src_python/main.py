@@ -119,7 +119,7 @@ def notify_connection_lost():
     window.qlbl_title.setText("! ! !    LOST CONNECTION    ! ! !")
     str_cur_date, str_cur_time = current_date_time_strings()
     str_msg = f"{str_cur_date} {str_cur_time}\nLost connection to Arduino."
-    print("\nCRITICAL ERROR @ {str_msg}")
+    print(f"\nCRITICAL ERROR @ {str_msg}")
     reply = QtWid.QMessageBox.warning(
         window, "CRITICAL ERROR", str_msg, QtWid.QMessageBox.Ok
     )
