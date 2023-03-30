@@ -32,7 +32,7 @@ DT_FRAME = 0.05
 # Threshold level to convert [0-1]-grayscale OpenSimplex noise to black and
 # white (BW). Can also get reinterpreted as a transparency fraction [0-1] to
 # solve for, see `TUNE_TRANSPARENCY`.
-BW_THRESHOLD = 0.5
+BW_THRESHOLD = 0.4
 
 # Interpret `BW_THRESHOLD` as a wanted transparency per frame to solve for?
 # It is a very good idea to leave this on as it minimizes the fluctuation of
@@ -55,6 +55,7 @@ SEED_B = 13
 # The originally generated valve durations can be automatically post-processed
 # to ensure a minimum time duration between opening and closing each valve. When
 # set to 0 or 1, no adjustment to the valve durations will be made.
+# Tests show that the minimum valve duration is best kept at >= 0.25 seconds.
 MIN_VALVE_DURATION = 5
 
 # ------------------------------------------------------------------------------
