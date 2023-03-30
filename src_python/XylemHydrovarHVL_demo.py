@@ -95,11 +95,11 @@ class MainWindow(QtWid.QWidget):
 
         p = {"alignment": QtCore.Qt.AlignmentFlag.AlignTop}
         hbox = QtWid.QHBoxLayout()
-        hbox.addWidget(hvl_qdev.qgrp_control)
+        hbox.addWidget(pump_qdev.qgrp_control)
 
         vbox = QtWid.QVBoxLayout()
-        vbox.addWidget(hvl_qdev.qgrp_inverter)
-        vbox.addWidget(hvl_qdev.qgrp_error_status)
+        vbox.addWidget(pump_qdev.qgrp_inverter)
+        vbox.addWidget(pump_qdev.qgrp_error_status)
 
         hbox.addLayout(vbox)
         hbox.addWidget(self.pbtn_exit, **p)
@@ -118,8 +118,8 @@ class MainWindow(QtWid.QWidget):
 def about_to_quit():
     print("About to quit")
     app.processEvents()
-    hvl_qdev.quit()
-    hvl.close()
+    pump_qdev.quit()
+    pump.close()
 
 
 # ------------------------------------------------------------------------------
@@ -137,11 +137,11 @@ if __name__ == "__main__":
     #   Connect to Xylem Hydrovar HVL pump
     # --------------------------------------------------------------------------
 
-    hvl = XylemHydrovarHVL(
+    pump = XylemHydrovarHVL(
         connect_to_modbus_slave_address=0x01,
         max_pressure_setpoint_bar=3,
     )
-    hvl.serial_settings = {
+    pump.serial_settings = {
         "baudrate": 115200,
         "bytesize": 8,
         "parity": "N",
@@ -150,8 +150,8 @@ if __name__ == "__main__":
         "write_timeout": 0.2,
     }
 
-    if hvl.auto_connect(PATH_PORT):
-        hvl.begin()
+    if pump.auto_connect(PATH_PORT):
+        pump.begin()
 
     # --------------------------------------------------------------------------
     #   Create application
@@ -167,13 +167,13 @@ if __name__ == "__main__":
     #   Set up communication threads for the Xylem Hydrovar HVL pump
     # --------------------------------------------------------------------------
 
-    hvl_qdev = XylemHydrovarHVL_qdev(
-        dev=hvl,
+    pump_qdev = XylemHydrovarHVL_qdev(
+        dev=pump,
         DAQ_interval_ms=DAQ_INTERVAL_MS,
         debug=DEBUG,
     )
 
-    hvl_qdev.start()
+    pump_qdev.start()
 
     # --------------------------------------------------------------------------
     #   Start the main GUI event loop

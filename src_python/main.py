@@ -108,7 +108,7 @@ def current_date_time_strings():
 def stop_running():
     app.processEvents()
     ard_qdev.quit()
-    hvl_qdev.quit()
+    pump_qdev.quit()
     logger.close()
 
 
@@ -179,7 +179,7 @@ def DAQ_function() -> bool:
     state.time = time.perf_counter()
 
     # Add readings to chart histories
-    window.curve_P_pump.appendData(state.time, hvl.state.actual_pressure)
+    window.curve_P_pump.appendData(state.time, pump.state.actual_pressure)
     window.curve_P_1.appendData(state.time, state.P_1_bar)
     window.curve_P_2.appendData(state.time, state.P_2_bar)
     window.curve_P_3.appendData(state.time, state.P_3_bar)
@@ -246,11 +246,11 @@ if __name__ == "__main__":
     #   Connect to Xylem Hydrovar HVL pump
     # --------------------------------------------------------------------------
 
-    hvl = XylemHydrovarHVL(
+    pump = XylemHydrovarHVL(
         connect_to_modbus_slave_address=0x01,
         max_pressure_setpoint_bar=3,
     )
-    hvl.serial_settings = {
+    pump.serial_settings = {
         "baudrate": 115200,
         "bytesize": 8,
         "parity": "N",
@@ -259,8 +259,8 @@ if __name__ == "__main__":
         "write_timeout": 0.2,
     }
 
-    if hvl.auto_connect("config/port_Hydrovar.txt"):
-        hvl.begin()
+    if pump.auto_connect("config/port_Hydrovar.txt"):
+        pump.begin()
 
     # --------------------------------------------------------------------------
     #   Create application
@@ -279,13 +279,13 @@ if __name__ == "__main__":
         debug=DEBUG,
     )
 
-    hvl_qdev = XylemHydrovarHVL_qdev(
-        dev=hvl,
+    pump_qdev = XylemHydrovarHVL_qdev(
+        dev=pump,
         DAQ_interval_ms=200,  # Do not set lower than 200 ms, because round-trip time is ~ 120 ms
         debug=DEBUG,
     )
 
-    hvl_qdev.signal_pump_just_stopped_and_reached_standstill.connect(
+    pump_qdev.signal_pump_just_stopped_and_reached_standstill.connect(
         pump_has_reached_standstill
     )
     ard_qdev.signal_connection_lost.connect(notify_connection_lost)
@@ -296,11 +296,11 @@ if __name__ == "__main__":
         write_data_function=write_data_to_log,
     )
 
-    window = MainWindow(ard_qdev, hvl_qdev, logger, DEBUG)
+    window = MainWindow(ard_qdev, pump_qdev, logger, DEBUG)
 
     # Start threads
     ard_qdev.start()
-    hvl_qdev.start()
+    pump_qdev.start()
 
     # Start the main GUI event loop
     window.show()

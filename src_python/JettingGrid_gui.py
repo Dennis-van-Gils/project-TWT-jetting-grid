@@ -200,7 +200,7 @@ class MainWindow(QtWid.QWidget):
     def __init__(
         self,
         ard_qdev: JettingGrid_qdev,
-        hvl_qdev: XylemHydrovarHVL_qdev,
+        pump_qdev: XylemHydrovarHVL_qdev,
         logger: FileLogger,
         debug: bool = False,
         parent=None,
@@ -209,7 +209,7 @@ class MainWindow(QtWid.QWidget):
         super().__init__(parent, **kwargs)
 
         self.ard_qdev = ard_qdev
-        self.hvl_qdev = hvl_qdev
+        self.pump_qdev = pump_qdev
         self.logger = logger
         self.debug = debug
 
@@ -297,13 +297,13 @@ class MainWindow(QtWid.QWidget):
         #  Pump control
         # -------------------------
 
-        hvl_qdev.qpte_error_status.setMaximumWidth(controls.e8(20))
-        hvl_qdev.qpte_error_status.setMinimumWidth(controls.e8(20))
+        pump_qdev.qpte_error_status.setMaximumWidth(controls.e8(20))
+        pump_qdev.qpte_error_status.setMinimumWidth(controls.e8(20))
 
         vbox_pump = QtWid.QVBoxLayout()
-        vbox_pump.addWidget(hvl_qdev.qgrp_control)
-        vbox_pump.addWidget(hvl_qdev.qgrp_inverter)
-        vbox_pump.addWidget(hvl_qdev.qgrp_error_status)
+        vbox_pump.addWidget(pump_qdev.qgrp_control)
+        vbox_pump.addWidget(pump_qdev.qgrp_inverter)
+        vbox_pump.addWidget(pump_qdev.qgrp_error_status)
 
         #  Protocol program
         # -------------------------
@@ -574,7 +574,7 @@ class MainWindow(QtWid.QWidget):
         )
 
         self.qlin_P_pump.setText(
-            f"{self.hvl_qdev.dev.state.actual_pressure:.3f}"
+            f"{self.pump_qdev.dev.state.actual_pressure:.3f}"
         )
         self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
@@ -583,7 +583,7 @@ class MainWindow(QtWid.QWidget):
 
         # Don't allow uploading a protocol when the pump is still running
         self.qpbt_load_protocol.setEnabled(
-            not self.hvl_qdev.dev.state.pump_is_running
+            not self.pump_qdev.dev.state.pump_is_running
         )
 
         if self.debug:
@@ -602,7 +602,7 @@ class MainWindow(QtWid.QWidget):
 
     @Slot()
     def process_qpbt_stop_protocol(self):
-        self.hvl_qdev.send_pump_stop()
+        self.pump_qdev.send_pump_stop()
         self.ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol = True
 
     @Slot()

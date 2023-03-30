@@ -990,11 +990,11 @@ if __name__ == "__main__":
     # Path to the textfile containing the (last used) serial port
     PATH_PORT = "config/port_Hydrovar.txt"
 
-    hvl = XylemHydrovarHVL(
+    pump = XylemHydrovarHVL(
         connect_to_modbus_slave_address=0x01,
         max_pressure_setpoint_bar=3,
     )
-    hvl.serial_settings = {
+    pump.serial_settings = {
         "baudrate": 115200,
         "bytesize": 8,
         "parity": "N",
@@ -1003,28 +1003,28 @@ if __name__ == "__main__":
         "write_timeout": 0.2,
     }
 
-    if hvl.auto_connect(PATH_PORT):
-        hvl.begin()
+    if pump.auto_connect(PATH_PORT):
+        pump.begin()
     else:
         sys.exit(0)
 
     # Report
-    hvl.device_status.report()
-    hvl.error_status.report()
-    hvl.read_inverter_diagnostics()
-    print(f"Read inverter temperature: {hvl.state.inverter_temp:5.0f} 'C")
-    print(f"Read inverter voltage    : {hvl.state.inverter_volt:5.0f} V")
-    print(f"Read inverter current    : {hvl.state.inverter_curr_A:5.2f} A")
-    print(f"Read inverter current    : {hvl.state.inverter_curr_pct:5.1f} %")
-    hvl.read_actual_pressure()
-    print(f"Actual pressure : {hvl.state.actual_pressure:4.2f} bar")
-    hvl.read_actual_frequency()
-    print(f"Actual frequency: {hvl.state.actual_frequency:4.1f} Hz")
+    pump.device_status.report()
+    pump.error_status.report()
+    pump.read_inverter_diagnostics()
+    print(f"Read inverter temperature: {pump.state.inverter_temp:5.0f} 'C")
+    print(f"Read inverter voltage    : {pump.state.inverter_volt:5.0f} V")
+    print(f"Read inverter current    : {pump.state.inverter_curr_A:5.2f} A")
+    print(f"Read inverter current    : {pump.state.inverter_curr_pct:5.1f} %")
+    pump.read_actual_pressure()
+    print(f"Actual pressure : {pump.state.actual_pressure:4.2f} bar")
+    pump.read_actual_frequency()
+    print(f"Actual frequency: {pump.state.actual_frequency:4.1f} Hz")
 
-    # hvl.set_error_reset(False)
-    # hvl.set_mode(HVL_Mode.CONTROLLER)
-    # hvl.set_wanted_pressure(1)
-    # hvl.read_wanted_pressure()
+    # pump.set_error_reset(False)
+    # pump.set_mode(HVL_Mode.CONTROLLER)
+    # pump.set_wanted_pressure(1)
+    # pump.read_wanted_pressure()
 
     # sys.exit(0)
 
@@ -1033,5 +1033,5 @@ if __name__ == "__main__":
     N = 100
     tick = time.perf_counter()
     for i in range(N):
-        hvl.read_actual_pressure()
+        pump.read_actual_pressure()
     print(f"  {(time.perf_counter() - tick)*1000/N:.0f} ms")
