@@ -308,7 +308,7 @@ class MainWindow(QtWid.QWidget):
         #  Protocol program
         # -------------------------
 
-        self.qpbt_load_protocol = QtWid.QPushButton("Load")
+        self.qpbt_upload_protocol = QtWid.QPushButton("Upload")
         self.qpbt_start_protocol = QtWid.QPushButton("Start")
         self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
         self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
@@ -322,7 +322,7 @@ class MainWindow(QtWid.QWidget):
         )
 
         vbox_protocol = QtWid.QVBoxLayout(spacing=4)
-        vbox_protocol.addWidget(self.qpbt_load_protocol)
+        vbox_protocol.addWidget(self.qpbt_upload_protocol)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
         vbox_protocol.addWidget(self.qpbt_start_protocol)
         vbox_protocol.addWidget(self.qpbt_stop_protocol)
@@ -582,7 +582,7 @@ class MainWindow(QtWid.QWidget):
         self.qlin_P_4.setText(f"{state.P_4_bar:.3f}")
 
         # Don't allow uploading a protocol when the pump is still running
-        self.qpbt_load_protocol.setEnabled(
+        self.qpbt_upload_protocol.setEnabled(
             not self.pump_qdev.dev.state.pump_is_running
         )
 
@@ -593,7 +593,7 @@ class MainWindow(QtWid.QWidget):
             curve.update()
 
     @Slot()
-    def process_qpbt_load_protocol(self):
+    def process_qpbt_upload_protocol(self):
         pass
 
     @Slot()
