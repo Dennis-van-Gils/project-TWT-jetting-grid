@@ -27,9 +27,9 @@ import config_proto_opensimplex as CFG
 # ------------------------------------------------------------------------------
 
 
-def generate_protocol_arrays_OpenSimplex() -> Tuple[
-    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-]:
+def generate_protocol_arrays_OpenSimplex() -> (
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+):
     """Generate 'protocol' arrays based on OpenSimplex noise as given by the
     user-configurable parameters taken from `config_proto_OpenSimplex.py`.
 
@@ -153,7 +153,7 @@ def export_protocol_to_disk(valves_stack: np.ndarray, export_path: str):
         timestamp = 0
         f.write("[DATA]\n")
         for frame_idx in trange(N_frames):
-            f.write(f"{timestamp:.1f}")
+            f.write(f"{timestamp:.2f}")
             timestamp += CFG.DT_FRAME
             for valve_idx, state in enumerate(valves_stack[frame_idx, :]):
                 if state:
