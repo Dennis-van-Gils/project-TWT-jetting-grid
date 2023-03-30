@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """JettingGrid_upload.py
 
-Manages uploading a jetting protocol to the Arduino
+Manages uploading a jetting protocol to the Arduino.
+
+TODO: Work-in-progress. This module works but is very fugly.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
@@ -13,6 +15,7 @@ __version__ = "1.0"
 
 import sys
 import struct
+import time
 
 from dvg_devices.Arduino_protocol_serial import Arduino
 
@@ -62,7 +65,7 @@ def upload_protocol(grid: Arduino):
 
     success, ans = grid.query("load")
     print(ans)
-    success, ans = grid.query("OpenSimplex noise")
+    success, ans = grid.query(filename)
     print(ans)
     success, ans = grid.query(f"{len(lines)}")
     print(ans)

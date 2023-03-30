@@ -113,6 +113,7 @@ from dvg_pyqtgraph_threadsafe import (
 
 from dvg_devices.Arduino_protocol_serial import Arduino
 from JettingGrid_qdev import JettingGrid_qdev
+from JettingGrid_upload import upload_protocol
 from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
 
 # Default settings for graphs
@@ -313,6 +314,9 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
         self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
 
+        self.qpbt_upload_protocol.clicked.connect(
+            self.process_qpbt_upload_protocol
+        )
         self.qpbt_start_protocol.clicked.connect(
             self.process_qpbt_start_protocol
         )
@@ -594,7 +598,34 @@ class MainWindow(QtWid.QWidget):
 
     @Slot()
     def process_qpbt_upload_protocol(self):
-        pass
+        # TODO: Rethink this whole procedure. It works but is very fugly.
+
+        # Extra safety check: Don't allow uploading a protocol when the pump is
+        # still running
+        if self.pump_qdev.dev.state.pump_is_running:
+            return
+
+        # Stop the `DAQ_function` running in the worker thread. It is
+        # flooding the serial buffer with ASCII pressure data.
+        DAQ_function_backup = self.grid_qdev.worker_DAQ.DAQ_function
+
+        def empty_DAQ_function():
+            return True
+
+        self.grid_qdev.worker_DAQ.DAQ_function = empty_DAQ_function
+
+        # Wait a few DAQ iterations
+        i = self.grid_qdev.update_counter_DAQ
+        while self.grid_qdev.update_counter_DAQ <= i + 1:
+            pass
+
+        # Flush serial buffers
+        self.grid_qdev.dev.ser.flush()
+
+        upload_protocol(self.grid_qdev.dev)
+
+        # Restore DAQ function
+        self.grid_qdev.worker_DAQ.DAQ_function = DAQ_function_backup
 
     @Slot()
     def process_qpbt_start_protocol(self):
