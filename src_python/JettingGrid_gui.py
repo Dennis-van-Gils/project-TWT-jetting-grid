@@ -199,7 +199,7 @@ def apply_PlotItem_style(
 class MainWindow(QtWid.QWidget):
     def __init__(
         self,
-        ard_qdev: JettingGrid_qdev,
+        grid_qdev: JettingGrid_qdev,
         pump_qdev: XylemHydrovarHVL_qdev,
         logger: FileLogger,
         debug: bool = False,
@@ -208,7 +208,7 @@ class MainWindow(QtWid.QWidget):
     ):
         super().__init__(parent, **kwargs)
 
-        self.ard_qdev = ard_qdev
+        self.grid_qdev = grid_qdev
         self.pump_qdev = pump_qdev
         self.logger = logger
         self.debug = debug
@@ -345,7 +345,7 @@ class MainWindow(QtWid.QWidget):
 
         # Thread-safe curves
         capacity = round(
-            CHART_HISTORY_TIME * 1e3 / ard_qdev.worker_DAQ._DAQ_interval_ms
+            CHART_HISTORY_TIME * 1e3 / grid_qdev.worker_DAQ._DAQ_interval_ms
         )
         PEN_01 = pg.mkPen(controls.COLOR_PEN_RED, width=3)
         PEN_02 = pg.mkPen(controls.COLOR_PEN_YELLOW, width=3)
@@ -534,7 +534,7 @@ class MainWindow(QtWid.QWidget):
         #   Connect external signals
         # -------------------------
 
-        self.ard_qdev.signal_DAQ_updated.connect(self.update_GUI)
+        self.grid_qdev.signal_DAQ_updated.connect(self.update_GUI)
 
         self.logger.signal_recording_started.connect(
             lambda filepath: self.qpbt_record.setText(
@@ -560,12 +560,12 @@ class MainWindow(QtWid.QWidget):
     @Slot()
     def update_GUI(self):
         # Shorthands
-        ard_qdev = self.ard_qdev
-        state = self.ard_qdev.state
+        grid_qdev = self.grid_qdev
+        state = self.grid_qdev.state
 
-        self.qlbl_update_counter.setText(f"{ard_qdev.update_counter_DAQ}")
+        self.qlbl_update_counter.setText(f"{grid_qdev.update_counter_DAQ}")
         self.qlbl_DAQ_rate.setText(
-            f"DAQ: {ard_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
+            f"DAQ: {grid_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
         )
         self.qlbl_recording_time.setText(
             f"REC: {self.logger.pretty_elapsed()}"
@@ -598,13 +598,13 @@ class MainWindow(QtWid.QWidget):
 
     @Slot()
     def process_qpbt_start_protocol(self):
-        self.ard_qdev.send_start_protocol()
+        self.grid_qdev.send_start_protocol()
 
     @Slot()
     def process_qpbt_stop_protocol(self):
         self.pump_qdev.send_pump_stop()
-        self.ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol = True
+        self.grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol = True
 
     @Slot()
     def process_qpbt_pause_protocol(self):
-        self.ard_qdev.send_pause_protocol()
+        self.grid_qdev.send_pause_protocol()

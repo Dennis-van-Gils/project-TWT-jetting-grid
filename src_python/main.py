@@ -107,7 +107,7 @@ def current_date_time_strings():
 
 def stop_running():
     app.processEvents()
-    ard_qdev.quit()
+    grid_qdev.quit()
     pump_qdev.quit()
     logger.close()
 
@@ -132,7 +132,7 @@ def notify_connection_lost():
 def about_to_quit():
     print("\nAbout to quit")
     stop_running()
-    ard.close()
+    grid.close()
 
 
 # ------------------------------------------------------------------------------
@@ -145,15 +145,15 @@ def DAQ_function() -> bool:
     # will be running in a separate and different thread to the main/GUI thread.
 
     # Shorthands
-    state = ard_qdev.state
+    state = grid_qdev.state
 
     # Date-time keeping
     str_cur_date, str_cur_time = current_date_time_strings()
 
     # Query the Arduino for its state
-    success, reply = ard.query_ascii_values("?", delimiter="\t")
+    success, reply = grid.query_ascii_values("?", delimiter="\t")
     if not success:
-        dprint(f"'{ard.name}' reports IOError @ {str_cur_date} {str_cur_time}")
+        dprint(f"'{grid.name}' reports IOError @ {str_cur_date} {str_cur_time}")
         return False
 
     # Parse readings into separate state variables
@@ -172,7 +172,7 @@ def DAQ_function() -> bool:
         # pylint: enable=unbalanced-tuple-unpacking
     except Exception as err:
         pft(err)
-        dprint(f"'{ard.name}' reports IOError @ {str_cur_date} {str_cur_time}")
+        dprint(f"'{grid.name}' reports IOError @ {str_cur_date} {str_cur_time}")
         return False
 
     # We use PC time
@@ -194,9 +194,9 @@ def DAQ_function() -> bool:
 
 @Slot()
 def pump_has_reached_standstill():
-    if ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol:
-        ard_qdev.state.waiting_for_pump_standstill_to_stop_protocol = False
-        ard_qdev.send_stop_protocol()
+    if grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol:
+        grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol = False
+        grid_qdev.send_stop_protocol()
 
 
 # ------------------------------------------------------------------------------
@@ -216,7 +216,7 @@ def write_header_to_log():
 
 
 def write_data_to_log():
-    state = ard_qdev.state  # Shorthand
+    state = grid_qdev.state  # Shorthand
     logger.write(
         f"{logger.elapsed():.2f}\t"
         f"{state.P_1_bar:.3f}\t{state.P_2_bar:.3f}\t"
@@ -233,11 +233,11 @@ if __name__ == "__main__":
     #   Connect to Jetting Grid Arduino
     # --------------------------------------------------------------------------
 
-    ard = Arduino(name="Ard", connect_to_specific_ID="TWT jetting grid")
-    ard.serial_settings["baudrate"] = 115200
-    ard.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
+    grid = Arduino(name="Ard", connect_to_specific_ID="TWT jetting grid")
+    grid.serial_settings["baudrate"] = 115200
+    grid.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
 
-    if not ard.is_alive:
+    if not grid.is_alive:
         print("\nCheck connection and try resetting the Arduino.\n")
         # print("Exiting...\n")
         # sys.exit(0)
@@ -272,8 +272,8 @@ if __name__ == "__main__":
     app.aboutToQuit.connect(about_to_quit)
 
     # Set up multi-threaded communication: Creates workers and threads
-    ard_qdev = JettingGrid_qdev(
-        dev=ard,
+    grid_qdev = JettingGrid_qdev(
+        dev=grid,
         DAQ_function=DAQ_function,
         DAQ_interval_ms=100,  # 100 ms
         debug=DEBUG,
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     pump_qdev.signal_pump_just_stopped_and_reached_standstill.connect(
         pump_has_reached_standstill
     )
-    ard_qdev.signal_connection_lost.connect(notify_connection_lost)
+    grid_qdev.signal_connection_lost.connect(notify_connection_lost)
 
     # File logger
     logger = FileLogger(
@@ -296,10 +296,10 @@ if __name__ == "__main__":
         write_data_function=write_data_to_log,
     )
 
-    window = MainWindow(ard_qdev, pump_qdev, logger, DEBUG)
+    window = MainWindow(grid_qdev, pump_qdev, logger, DEBUG)
 
     # Start threads
-    ard_qdev.start()
+    grid_qdev.start()
     pump_qdev.start()
 
     # Start the main GUI event loop
