@@ -133,6 +133,7 @@ def about_to_quit():
     print("\nAbout to quit")
     stop_running()
     grid.close()
+    pump.close()
 
 
 # ------------------------------------------------------------------------------
