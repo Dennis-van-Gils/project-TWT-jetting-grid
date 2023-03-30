@@ -68,11 +68,11 @@ if ans == "Loading stage 1: Success":
     found_data_section = False
     for line in lines:
         fields = line.split("\t")
-        duration = float(fields[0])
+        duration = int(fields[0])
 
         # Raw byte stream
-        # raw = bytearray(struct.pack(">H", duration)) # Time duration [ms]
-        raw = bytearray(struct.pack(">H", 50))  # Time duration [ms]
+        raw = bytearray(struct.pack(">H", duration))  # Time duration [ms]
+        # raw = bytearray(struct.pack(">H", 50))  # Time duration [ms]
 
         str_points = fields[1:]
         for str_point in str_points:
@@ -104,8 +104,8 @@ else:
     print(ans)
 
 ### Catch "State: Idling..."
-success, ans = ard.readline()
-print(ans)
+# success, ans = ard.readline()
+# print(ans)
 
 ### Restore ASCII communication
 ard.set_write_termination("\n")

@@ -150,11 +150,9 @@ def export_protocol_to_disk(valves_stack: np.ndarray, export_path: str):
         f.write(CFG.create_header_string())
 
         # Write data
-        timestamp = 0
         f.write("[DATA]\n")
         for frame_idx in trange(N_frames):
-            f.write(f"{timestamp:.2f}")
-            timestamp += CFG.DT_FRAME
+            f.write(f"{CFG.DT_FRAME*1000:.0f}")  # Duration in msec
             for valve_idx, state in enumerate(valves_stack[frame_idx, :]):
                 if state:
                     pcs_x = C.valve2pcs_x[valve_idx]
