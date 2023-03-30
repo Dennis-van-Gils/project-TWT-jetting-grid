@@ -147,7 +147,7 @@ pdfs[:, 4] = pdf_off_adj[:idx_last_nonzero_bin]
 np.savetxt(
     CFG.EXPORT_PATH_NO_EXT + "_pdfs.txt",
     pdfs,
-    fmt="%.1f\t%.3e\t%.3e\t%.3e\t%.3e",
+    fmt="%.3f\t%.3e\t%.3e\t%.3e\t%.3e",
     header="duration[s]\tpdf_on_orig\tpdf_on_adj\tpdf_off_orig\tpdf_off_adj",
 )
 
