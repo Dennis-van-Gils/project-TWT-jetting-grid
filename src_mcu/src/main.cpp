@@ -570,6 +570,10 @@ void loop() {
           // Print current program to serial
           protocol_mgr.print_program();
 
+        } else if (strcmp(str_cmd, "fsm?") == 0) {
+          // Print the current FSM state name to serial
+          Serial.println(fsm.getCurrentStateName());
+
         } else if (strcmp(str_cmd, "override_safety") == 0) {
           // WARNING: Will force the jetting pump to enabled, regardless of
           // whether any valves are actually open or not. This function should
