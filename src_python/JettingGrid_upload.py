@@ -28,10 +28,9 @@ PCS_Y_MIN = -7
 
 
 class P:
-    def __init__(self, x_=0, y_=0):
-        # TODO: Rethink default value to match end sentinel
-        self.x = x_
-        self.y = y_
+    def __init__(self, x=0, y=0):
+        self.x = x
+        self.y = y
 
     def pack_into_byte(self):
         return ((self.x - PCS_X_MIN) << 4) | ((self.y - PCS_Y_MIN) & 0xF)
