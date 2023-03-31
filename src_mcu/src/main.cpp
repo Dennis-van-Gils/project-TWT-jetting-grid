@@ -183,9 +183,7 @@ bool R_click_poll_EMA_collectively() {
 void set_LED_matrix_data_fixed_grid() {
   for (int8_t x = PCS_X_MIN; x <= PCS_X_MAX; x++) {
     for (int8_t y = PCS_Y_MIN; y <= PCS_Y_MAX; y++) {
-      if ((x + y) % 2 == 0) {
-        leds[p2led(P{x, y})] = CRGB(12, 12, 12);
-      }
+      if ((x + y) % 2 == 0) { leds[p2led(P{x, y})] = CRGB(12, 12, 12); }
     }
   }
   leds[p2led(P{0, 0})] = CRGB(0, 64, 0); // Center (0, 0)
@@ -320,9 +318,7 @@ void FSM_fun_uploading__upd() {
       if (data_len == 0) {
         // Found just the EOL sentinel without further information on the line
         // --> This signals the end-of-program EOP.
-        if (DEBUG) {
-          Serial.println("Found EOP");
-        }
+        if (DEBUG) { Serial.println("Found EOP"); }
 
         if (protocol_mgr.get_N_lines() != promised_N_lines) {
           // Number of received lines does not match the promise
@@ -360,9 +356,7 @@ void FSM_fun_uploading__upd() {
       line.points[idx_P].set_null(); // Add end sentinel
 
       protocol_mgr.add_line(line);
-      if (DEBUG) {
-        line.print();
-      }
+      if (DEBUG) { line.print(); }
     }
   }
 
@@ -467,9 +461,7 @@ void setup() {
 
   Wire.begin();
   Wire.setClock(1000000); // 1 MHz
-  if (!NO_PERIPHERALS) {
-    cp_mgr.begin();
-  }
+  if (!NO_PERIPHERALS) { cp_mgr.begin(); }
 
   // Load protocol program preset
   load_protocol_program_preset_0();
