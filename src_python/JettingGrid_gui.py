@@ -631,7 +631,7 @@ class MainWindow(QtWid.QWidget):
         # Flush serial buffer
         self.grid.ser.flush()
 
-        # Finally upload the jetting protocol
+        # Now we're ready to upload a new jetting protocol
         upload_protocol(self.grid)
 
         # Restore DAQ function
