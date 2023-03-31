@@ -234,7 +234,7 @@ if __name__ == "__main__":
     #   Connect to Jetting Grid Arduino
     # --------------------------------------------------------------------------
 
-    grid = Arduino(name="Ard", connect_to_specific_ID="TWT jetting grid")
+    grid = Arduino(name="Ard", connect_to_specific_ID="Jetting Grid")
     grid.serial_settings["baudrate"] = 115200
     grid.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
 

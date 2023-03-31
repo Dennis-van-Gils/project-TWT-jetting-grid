@@ -4,7 +4,7 @@
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
  * @date    31-03-2023
  *
- * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
+ * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
  *
  * This firmware is written with safety in mind:
@@ -510,7 +510,7 @@ void loop() {
 
         if (strcmp(str_cmd, "id?") == 0) {
           // Report identity
-          Serial.println("Arduino, TWT jetting grid");
+          Serial.println("Arduino, Jetting Grid");
 
         } else if (strcmp(str_cmd, "on") == 0) {
           // Play the program
