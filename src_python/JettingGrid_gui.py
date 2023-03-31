@@ -316,6 +316,7 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_start_protocol = QtWid.QPushButton("Start")
         self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
         self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
+        self.qlin_protocol_pos = QtWid.QLineEdit("", readOnly=True)
 
         self.qpbt_upload_protocol.clicked.connect(
             self.process_qpbt_upload_protocol
@@ -334,6 +335,7 @@ class MainWindow(QtWid.QWidget):
         vbox_protocol.addWidget(self.qpbt_start_protocol)
         vbox_protocol.addWidget(self.qpbt_stop_protocol)
         vbox_protocol.addWidget(self.qpbt_pause_protocol)
+        vbox_protocol.addWidget(self.qlin_protocol_pos)
 
         qgrp_protocol = QtWid.QGroupBox("Protocol")
         qgrp_protocol.setLayout(vbox_protocol)
@@ -581,6 +583,7 @@ class MainWindow(QtWid.QWidget):
         )
 
         self.qlin_P_pump.setText(f"{self.pump.state.actual_pressure:.3f}")
+        self.qlin_protocol_pos.setText(f"{int(state.protocol_pos):d}")
         self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
         self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")

@@ -623,8 +623,10 @@ void loop() {
           //   former just ~ 320 µs !!!
           // clang-format off
           snprintf(buf, BUF_LEN,
+                   "%d\t"
                    "%.2f\t%.2f\t%.2f\t%.2f\t"
                    "%.3f\t%.3f\t%.3f\t%.3f\n",
+                   protocol_mgr.get_position(),
                    readings.pres_1_mA,
                    readings.pres_2_mA,
                    readings.pres_3_mA,

@@ -161,6 +161,7 @@ def DAQ_function() -> bool:
     try:
         # pylint: disable=unbalanced-tuple-unpacking
         (
+            state.protocol_pos,
             state.P_1_mA,
             state.P_2_mA,
             state.P_3_mA,

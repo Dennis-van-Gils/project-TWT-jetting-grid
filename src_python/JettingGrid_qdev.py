@@ -21,6 +21,7 @@ class JettingGrid_qdev(QDeviceIO):
         def __init__(self):
             # Actual readings of the Arduino
             self.time = np.nan  # [s]
+            self.protocol_pos = 0
             self.P_1_mA = np.nan  # [mA]
             self.P_2_mA = np.nan  # [mA]
             self.P_3_mA = np.nan  # [mA]
