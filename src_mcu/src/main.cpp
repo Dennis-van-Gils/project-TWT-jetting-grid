@@ -211,8 +211,11 @@ bool loading_program = false;
 void FSM_fun_off__ent() {
   alive_blinker_hue = HUE_YELLOW;
 
-  cp_mgr.clear_masks();
-  cp_mgr.send_masks();
+  if (!NO_PERIPHERALS) {
+    cp_mgr.clear_masks();
+    cp_mgr.send_masks();
+  }
+
   for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
     leds[p2led(valve2p(idx_valve + 1))] = 0;
   }
@@ -251,7 +254,7 @@ State state_running("Running", FSM_fun_running__ent, FSM_fun_running__upd);
 ------------------------------------------------------------------------------*/
 
 // Stage 0: Load in via ASCII the name of the protocol program.
-// Stage 1: Load in via ASCII the total number of protocol lines to be send.
+// Stage 1: Load in via ASCII the total number of protocol lines that follow.
 // Stage 2: Load in via binary the protocol program line-by-line until the
 //          end-of-program (EOP) sentinel is received. The EOP is signalled by
 //          receiving two end-of-line (EOL) sentinels directly after each other.
@@ -259,9 +262,7 @@ uint8_t loading_stage = 0;
 bool loading_successful = false;
 
 void FSM_fun_uploading__ent() {
-  Serial.println("State: Loading in protocol program...");
   alive_blinker_hue = HUE_BLUE;
-
   loading_program = true;
   loading_stage = 0;
   loading_successful = false;
@@ -272,41 +273,39 @@ void FSM_fun_uploading__upd() {
   static uint16_t promised_N_lines;
   Line line;
 
+  // Stage 0: Load in via ASCII the name of the protocol program
   if (loading_stage == 0) {
-    // Load in via ASCII the name of the protocol program
     if (sc.available()) {
-      str_cmd = sc.getCommand();
-      protocol_mgr.set_name(str_cmd);
+      protocol_mgr.set_name(sc.getCommand());
       Serial.println(protocol_mgr.get_name()); // Echo the name back
       loading_stage++;
     }
   }
 
+  // Stage 1: Load in via ASCII the total number of protocol lines that follow
   if (loading_stage == 1) {
-    // Load in via ASCII the total number of protocol lines to be send
     if (sc.available()) {
-      str_cmd = sc.getCommand();
-      promised_N_lines = atoi(str_cmd);
+      promised_N_lines = atoi(sc.getCommand());
 
-      if (promised_N_lines <= PROTOCOL_MAX_LINES) {
-        Serial.println("Loading stage 1: Success");
-        loading_stage++;
-      } else {
+      if (promised_N_lines > PROTOCOL_MAX_LINES) {
         // Protocol program will not fit inside pre-allocated memory
         snprintf(buf, BUF_LEN,
                  "ERROR: Protocol program exceeds maximum number of lines. "
-                 "Requested was %d, but maximum is %d.",
+                 "Requested were %d lines, but the maximum is %d.",
                  promised_N_lines, PROTOCOL_MAX_LINES);
         Serial.println(buf);
         loading_program = false;
         fsm.transitionTo(state_off);
         return;
       }
+
+      Serial.println(promised_N_lines);
+      loading_stage++;
     }
   }
 
+  // Stage 2: Load in via binary the protocol program line-by-line
   if (loading_stage == 2) {
-    // Load in via binary the protocol program line-by-line
 
     // Binary stream command availability status
     int8_t bsc_available = bsc.available();
@@ -325,20 +324,22 @@ void FSM_fun_uploading__upd() {
           Serial.println("Found EOP");
         }
 
-        // Check if the number of received lines matches the expectation
-        if (protocol_mgr.get_N_lines() == promised_N_lines) {
-          Serial.println("Loading stage 2: Success");
-        } else {
+        if (protocol_mgr.get_N_lines() != promised_N_lines) {
+          // Number of received lines does not match the promise
           snprintf(buf, BUF_LEN,
                    "ERROR: Protocol program received incorrect number of "
-                   "lines. Promised was %d, but received %d.",
+                   "lines. Promised were %d lines, but %d were received.",
                    promised_N_lines, protocol_mgr.get_N_lines());
           Serial.println(buf);
+          loading_program = false;
+          fsm.transitionTo(state_off);
+          return;
         }
 
-        // Succesful exit
-        loading_program = false;
+        // Successful exit
+        Serial.println("Success!");
         loading_successful = true;
+        loading_program = false;
         fsm.transitionTo(state_off);
         return;
       }

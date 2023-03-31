@@ -15,7 +15,6 @@ __version__ = "1.0"
 
 import sys
 import struct
-import time
 
 from dvg_devices.Arduino_protocol_serial import Arduino
 
@@ -44,6 +43,9 @@ class P:
 
 
 def upload_protocol(grid: Arduino):
+    print("Uploading protocol")
+    print("------------------")
+
     # Read in protocol file from disk
     filename = "proto_example.txt"
     with open(file=filename, mode="r", encoding="utf8") as f:
@@ -58,66 +60,82 @@ def upload_protocol(grid: Arduino):
 
     if data_line_idx is None:
         print("No [DATA] section found")
-        sys.exit()
+        sys.exit()  # TODO: Do not hard exit, but gracefully notify user
+
     lines = lines[data_line_idx:]
+    N_lines = len(lines)
 
+    # Enter the upload state
     grid.set_write_termination("\n")
+    if not grid.write("upload"):
+        # TODO: Show message box referring to error in terminal
+        return
 
-    success, ans = grid.query("upload")
-    print(ans)
+    # Stage 0: Send via ASCII the name of the protocol program.
+    # --------------------------------------------------------------------------
     success, ans = grid.query(filename)
+    if not success:
+        # TODO: Show message box referring to error in terminal
+        return
+
     print(ans)
-    success, ans = grid.query(f"{len(lines)}")
-    print(ans)
 
-    if ans == "Loading stage 1: Success":
-        # Prepare binary data stream
-        grid.set_write_termination(bytes((0xFF, 0xFF, 0xFF)))  # EOL
+    # Stage 1: Send via ASCII the total number of protocol lines that follow.
+    # --------------------------------------------------------------------------
+    success, ans = grid.query(f"{N_lines}")
+    if not success:
+        # TODO: Show message box referring to error in terminal
+        return
 
-        cnt = 0
-        found_data_section = False
-        for line in lines:
-            fields = line.split("\t")
-            duration = int(fields[0])
-
-            # Build raw byte stream
-            raw = bytearray(struct.pack(">H", duration))  # Time duration [ms]
-
-            str_points = fields[1:]
-            for str_point in str_points:
-                str_x, str_y = str_point.split(",")
-                raw.append(P(int(str_x), int(str_y)).pack_into_byte())
-
-            # Send out raw byte stream
-            grid.write(raw)
-
-            """
-            # Force a time-out for debug testing
-            cnt += 1
-            if cnt == 30:
-                time.sleep(4)
-            """
-
-        ### Send EOP
-        grid.write(b"")
-
-        print("Last line send")
-
-        ### Check for success
-        success, ans = grid.readline()
-        if ans == "Loading stage 2: Success":
-            print("Success")
-        else:
-            print(ans)
-
-    else:
+    if ans[:5] == "ERROR":
+        # TODO: Show error message box
         print(ans)
+        return
 
-    ### Catch "State: Idling..."
-    # success, ans = grid.readline()
-    # print(ans)
+    # Stage 2: Send via binary the protocol program line-by-line. Each line is
+    # termined by an end-of-line (EOL) sentinel. Two EOL sentinels directly send
+    # after each other signal the end-of-program (EOP).
+    # --------------------------------------------------------------------------
+    grid.set_write_termination(bytes((0xFF, 0xFF, 0xFF)))  # EOL sentinel
 
-    ### Restore ASCII communication
+    for idx_line, line in enumerate(lines):
+        print(f"\rLine {idx_line + 1} of {N_lines}", end="")
+        fields = line.split("\t")
+        duration = int(fields[0])
+
+        # Build raw byte stream
+        raw = bytearray(struct.pack(">H", duration))  # Time duration [ms]
+        str_points = fields[1:]
+        for str_point in str_points:
+            str_x, str_y = str_point.split(",")
+            raw.append(P(int(str_x), int(str_y)).pack_into_byte())
+
+        # Send out raw byte stream
+        grid.write(raw)
+
+    # Send EOP sentinel
+    grid.write(b"")
+    print("")
+
+    # Check for success
+    success, ans = grid.readline()
+    if not success:
+        # TODO: Show message box referring to error in terminal
+        grid.set_write_termination("\n")
+        return
+
+    if ans[:5] == "ERROR":
+        # TODO: Show error message box
+        pass
+    elif ans[:16] == "EXECUTION HALTED":
+        # TODO: Show error message box
+        # This error has two lines to be read over serial
+        print(ans)
+        _, ans = grid.readline()
+
+    print(ans)
+
+    # Restore ASCII communication
     grid.set_write_termination("\n")
 
 
@@ -128,7 +146,5 @@ def upload_protocol(grid: Arduino):
 if __name__ == "__main__":
     grid = Arduino()
     grid.auto_connect()
-    # grid.ser.timeout = 4
-    # grid.ser.write_timeout = 4
 
     upload_protocol(grid)
