@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Jetting grid
+"""Main control program of the Jetting Grid
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "30-03-2023"
+__date__ = "31-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 

@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """JettingGrid_qdev.py
 
-Manages multi-threaded communication with the Arduino
+Manages multi-threaded communication with the Jetting Grid Arduino
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "30-03-2023"
+__date__ = "31-03-2023"
 __version__ = "1.0"
 
 import numpy as np
