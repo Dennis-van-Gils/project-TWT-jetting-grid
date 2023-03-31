@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    23-03-2023
+ * @date    31-03-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT jetting grid. See
  * `constants.h` for a detailed description.
@@ -105,8 +105,7 @@ CentipedeManager cp_mgr;
   LEDs
 ------------------------------------------------------------------------------*/
 
-bool alive_blinker = true; // Blinker for the 'alive' status LED
-CRGB alive_blinker_color = CRGB::Green;
+uint8_t alive_blinker_hue = HUE_GREEN;
 CRGB onboard_led[1]; // Onboard NeoPixel of the Adafruit Feather M4 board
 CRGB leds[N_LEDS];   // LED matrix, 16x16 RGB NeoPixel (Adafruit #2547)
 uint16_t idx_led;    // Frequently used LED index
@@ -216,7 +215,7 @@ FiniteStateMachine fsm(state_idle);
 
 void fun_idle__ent() {
   // Serial.println("State: Idling...");
-  alive_blinker_color = CRGB::Yellow;
+  alive_blinker_hue = HUE_YELLOW;
 }
 
 void fun_idle__upd() {}
@@ -234,7 +233,7 @@ State state_run_program(fun_run_program__ent, fun_run_program__upd);
 
 void fun_run_program__ent() {
   // Serial.println("State: Running protocol program...");
-  alive_blinker_color = CRGB::Green;
+  alive_blinker_hue = HUE_GREEN;
 
   // Clear all valve leds
   // DEBUG: Necessary?
@@ -267,7 +266,7 @@ State state_load_program(fun_load_program__ent, fun_load_program__upd,
 
 void fun_load_program__ent() {
   Serial.println("State: Loading in protocol program...");
-  alive_blinker_color = CRGB::Blue;
+  alive_blinker_hue = HUE_BLUE;
 
   loading_program = true;
   loading_stage = 0;
@@ -704,14 +703,13 @@ void loop() {
   //   `FastLED.show()` inside an `EVERY_N_MILLIS()` call to leave it
   //   unblocking, while still capping the framerate.
 
-  EVERY_N_MILLIS(500) {
-    // Blink the 'alive' status LEDs
-    leds[p2led(P{-8, -8})] = alive_blinker ? alive_blinker_color : CRGB::Black;
-    onboard_led[0] = alive_blinker ? alive_blinker_color : CRGB::Black;
-    alive_blinker = !alive_blinker;
-  }
-
   EVERY_N_MILLIS(20) {
+    // Blink the 'alive' status LEDs
+    CRGB alive_blinker_color;
+    alive_blinker_color.setHSV(alive_blinker_hue, 255, beatsin8(60, 96, 223));
+    leds[p2led(P{-8, -8})] = alive_blinker_color;
+    onboard_led[0] = alive_blinker_color;
+
     // utick = micros();
     FastLED.show(); // Takes 8003 µs per call
     // Serial.println("show");
