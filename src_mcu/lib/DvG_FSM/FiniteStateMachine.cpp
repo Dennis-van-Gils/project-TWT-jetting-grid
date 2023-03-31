@@ -100,7 +100,7 @@ void State::exit() {
   }
 }
 
-void State::getName(char *buffer) { snprintf(buffer, STATE_NAME_LEN, _name); }
+const char *State::getName() { return _name; }
 // END FINITE STATE
 
 // FINITE STATE MACHINE
@@ -151,8 +151,8 @@ boolean FiniteStateMachine::isInState(State &state) const {
   }
 }
 
-void FiniteStateMachine::getCurrentStateName(char *buffer) {
-  snprintf(buffer, STATE_NAME_LEN, currentState->_name);
+const char *FiniteStateMachine::getCurrentStateName() {
+  return currentState->_name;
 }
 
 unsigned long FiniteStateMachine::timeInCurrentState() {

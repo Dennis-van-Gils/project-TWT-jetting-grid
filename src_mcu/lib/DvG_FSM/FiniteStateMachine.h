@@ -1,10 +1,10 @@
 /*
 Edited:
   - Added name string to class `State`
-  - Added `getCurrentStateName(char *buffer)` to class `FiniteStateMachine`
+  - Added `getCurrentStateName()` to class `FiniteStateMachine`
 
 Dennis van Gils
-18-11-2021
+31-03-2023
 
 ||
 || @file FiniteStateMachine.h
@@ -82,7 +82,7 @@ public:
   void enter();
   void update();
   void exit();
-  void getName(char *buffer);
+  const char *getName();
 
 private:
   void (*userEnter)() = 0;
@@ -101,7 +101,7 @@ public:
 
   State &getCurrentState();
   boolean isInState(State &state) const;
-  void getCurrentStateName(char *buffer);
+  const char *getCurrentStateName();
 
   unsigned long timeInCurrentState();
 
