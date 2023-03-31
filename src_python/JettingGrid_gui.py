@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 """JettingGrid_gui.py
 
-Manages the graphical user interface
+Manages the graphical user interface, tying together the Jetting Grid Arduino
+and the Xylem Hydrovar HVL pump.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "30-03-2023"
+__date__ = "31-03-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
@@ -57,19 +58,15 @@ if QT_LIB is None:
 if QT_LIB == PYQT5:
     from PyQt5 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
-    #from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYQT6:
     from PyQt6 import QtCore, QtGui, QtWidgets as QtWid    # type: ignore
     from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
-    #from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
 elif QT_LIB == PYSIDE2:
     from PySide2 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide2.QtCore import Slot                        # type: ignore
-    #from PySide2.QtCore import Signal                      # type: ignore
 elif QT_LIB == PYSIDE6:
     from PySide6 import QtCore, QtGui, QtWidgets as QtWid  # type: ignore
     from PySide6.QtCore import Slot                        # type: ignore
-    #from PySide6.QtCore import Signal                      # type: ignore
 # pylint: enable=import-error, no-name-in-module
 # fmt: on
 
@@ -114,6 +111,7 @@ from dvg_pyqtgraph_threadsafe import (
 from dvg_devices.Arduino_protocol_serial import Arduino
 from JettingGrid_qdev import JettingGrid_qdev
 from JettingGrid_upload import upload_protocol
+from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
 from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
 
 # Default settings for graphs
@@ -214,6 +212,11 @@ class MainWindow(QtWid.QWidget):
         self.logger = logger
         self.debug = debug
 
+        # Shorthands to the low-level devices
+        self.grid: Arduino = grid_qdev.dev
+        self.pump: XylemHydrovarHVL = pump_qdev.dev
+
+        # Start GUI layout
         self.setWindowTitle("Jetting grid")
         self.setGeometry(150, 60, 1200, 800)
         self.setStyleSheet(
@@ -550,7 +553,7 @@ class MainWindow(QtWid.QWidget):
         )
 
     # --------------------------------------------------------------------------
-    #   Handle controls
+    #   Handle general controls
     # --------------------------------------------------------------------------
 
     @Slot()
@@ -577,9 +580,7 @@ class MainWindow(QtWid.QWidget):
             else ""
         )
 
-        self.qlin_P_pump.setText(
-            f"{self.pump_qdev.dev.state.actual_pressure:.3f}"
-        )
+        self.qlin_P_pump.setText(f"{self.pump.state.actual_pressure:.3f}")
         self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
         self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")
@@ -587,7 +588,7 @@ class MainWindow(QtWid.QWidget):
 
         # Don't allow uploading a protocol when the pump is still running
         self.qpbt_upload_protocol.setEnabled(
-            not self.pump_qdev.dev.state.pump_is_running
+            not self.pump.state.pump_is_running
         )
 
         if self.debug:
@@ -596,17 +597,25 @@ class MainWindow(QtWid.QWidget):
         for curve in self.curves:
             curve.update()
 
+    # --------------------------------------------------------------------------
+    #   Handle protocol controls
+    # --------------------------------------------------------------------------
+
     @Slot()
     def process_qpbt_upload_protocol(self):
-        # TODO: Rethink this whole procedure. It works but is very fugly.
-
         # Extra safety check: Don't allow uploading a protocol when the pump is
         # still running
-        if self.pump_qdev.dev.state.pump_is_running:
+        if self.pump.state.pump_is_running:
             return
 
-        # Stop the `DAQ_function` running in the worker thread. It is
-        # flooding the serial buffer with ASCII pressure data.
+        # Stop the `DAQ_function` running in the worker thread from sending and
+        # receiving ASCII data containing pressure data. We are about to upload
+        # a raw byte stream to the Arduino decoding a jetting protocol and it
+        # must not be interferred.
+        # We stop the ASCII stream in the `DAQ_function` in a hacky way by
+        # temporarily letting it point to an empty function. It would be better
+        # if we build support for "silencing" the DAQ function inside of the
+        # `dvg_qdeviceio::Worker_DAQ()` class (future work perhaps).
         DAQ_function_backup = self.grid_qdev.worker_DAQ.DAQ_function
 
         def empty_DAQ_function():
@@ -619,10 +628,11 @@ class MainWindow(QtWid.QWidget):
         while self.grid_qdev.update_counter_DAQ <= i + 1:
             pass
 
-        # Flush serial buffers
-        self.grid_qdev.dev.ser.flush()
+        # Flush serial buffer
+        self.grid.ser.flush()
 
-        upload_protocol(self.grid_qdev.dev)
+        # Finally upload the jetting protocol
+        upload_protocol(self.grid)
 
         # Restore DAQ function
         self.grid_qdev.worker_DAQ.DAQ_function = DAQ_function_backup
