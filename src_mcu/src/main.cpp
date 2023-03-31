@@ -192,7 +192,7 @@ void set_LED_matrix_data_fixed_grid() {
 }
 
 /*------------------------------------------------------------------------------
-  Finite state machine
+  Finite state machine (FSM)
 ------------------------------------------------------------------------------*/
 
 uint32_t now;      // Timestamp [ms]
@@ -203,51 +203,51 @@ uint8_t idx_valve; // Frequently used valve index
 bool loading_program = false;
 
 /*------------------------------------------------------------------------------
-  FSM: Idle
+  FSM: Off
 
-  Leaving any previously activated valves untouched
+  Close all valves and idle
 ------------------------------------------------------------------------------*/
 
-void fun_idle__ent();
-void fun_idle__upd();
-State state_idle(fun_idle__ent, fun_idle__upd);
-FiniteStateMachine fsm(state_idle);
-
-void fun_idle__ent() {
-  // Serial.println("State: Idling...");
+void FSM_fun_off__ent() {
   alive_blinker_hue = HUE_YELLOW;
-}
 
-void fun_idle__upd() {}
-
-/*------------------------------------------------------------------------------
-  FSM: Run program
-
-  Run the protocol program, advancing line for line when it is time.
-  Will activate solenoid valves and will drive the LED matrix.
-------------------------------------------------------------------------------*/
-
-void fun_run_program__ent();
-void fun_run_program__upd();
-State state_run_program(fun_run_program__ent, fun_run_program__upd);
-
-void fun_run_program__ent() {
-  // Serial.println("State: Running protocol program...");
-  alive_blinker_hue = HUE_GREEN;
-
-  // Clear all valve leds
-  // DEBUG: Necessary?
+  cp_mgr.clear_masks();
+  cp_mgr.send_masks();
   for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
     leds[p2led(valve2p(idx_valve + 1))] = 0;
   }
 }
 
-void fun_run_program__upd() { protocol_mgr.update(); }
+void FSM_fun_off__upd() {}
+
+State state_off("Off", FSM_fun_off__ent, FSM_fun_off__upd);
+FiniteStateMachine fsm(state_off);
 
 /*------------------------------------------------------------------------------
-  FSM: Load program
+  FSM: Paused
 
-  Load a new protocol program into Arduino memory
+  Leave previously activated valves open and idle
+------------------------------------------------------------------------------*/
+
+void FSM_fun_paused__ent() { alive_blinker_hue = HUE_YELLOW; }
+void FSM_fun_paused__upd() {}
+State state_paused("Paused", FSM_fun_paused__ent, FSM_fun_paused__upd);
+
+/*------------------------------------------------------------------------------
+  FSM: Running
+
+  Run the jetting protocol program, advancing line for line when it is time.
+  Will activate solenoid valves and will drive the LED matrix.
+------------------------------------------------------------------------------*/
+
+void FSM_fun_running__ent() { alive_blinker_hue = HUE_GREEN; }
+void FSM_fun_running__upd() { protocol_mgr.update(); }
+State state_running("Running", FSM_fun_running__ent, FSM_fun_running__upd);
+
+/*------------------------------------------------------------------------------
+  FSM: Uploading
+
+  Upload a new jetting protocol program from the PC into Arduino memory
 ------------------------------------------------------------------------------*/
 
 // Stage 0: Load in via ASCII the name of the protocol program.
@@ -258,13 +258,7 @@ void fun_run_program__upd() { protocol_mgr.update(); }
 uint8_t loading_stage = 0;
 bool loading_successful = false;
 
-void fun_load_program__ent();
-void fun_load_program__upd();
-void fun_load_program__ext();
-State state_load_program(fun_load_program__ent, fun_load_program__upd,
-                         fun_load_program__ext);
-
-void fun_load_program__ent() {
+void FSM_fun_uploading__ent() {
   Serial.println("State: Loading in protocol program...");
   alive_blinker_hue = HUE_BLUE;
 
@@ -274,7 +268,7 @@ void fun_load_program__ent() {
   protocol_mgr.clear();
 }
 
-void fun_load_program__upd() {
+void FSM_fun_uploading__upd() {
   static uint16_t promised_N_lines;
   Line line;
 
@@ -305,7 +299,7 @@ void fun_load_program__upd() {
                  promised_N_lines, PROTOCOL_MAX_LINES);
         Serial.println(buf);
         loading_program = false;
-        fsm.transitionTo(state_idle);
+        fsm.transitionTo(state_off);
         return;
       }
     }
@@ -345,7 +339,7 @@ void fun_load_program__upd() {
         // Succesful exit
         loading_program = false;
         loading_successful = true;
-        fsm.transitionTo(state_idle);
+        fsm.transitionTo(state_off);
         return;
       }
 
@@ -376,11 +370,11 @@ void fun_load_program__upd() {
   if (fsm.timeInCurrentState() > LOADING_TIMEOUT) {
     Serial.println("ERROR: Loading in protocol program timed out.");
     loading_program = false;
-    fsm.transitionTo(state_idle);
+    fsm.transitionTo(state_off);
   }
 }
 
-void fun_load_program__ext() {
+void FSM_fun_uploading__ext() {
   if (!loading_successful) {
     // Unsuccesful load --> Create a safe protocol program where all valves are
     // always open.
@@ -401,6 +395,9 @@ void fun_load_program__ext() {
   // `protocol_mgr.update()`.
   protocol_mgr.prime_start();
 }
+
+State state_uploading("Uploading", FSM_fun_uploading__ent,
+                      FSM_fun_uploading__upd, FSM_fun_uploading__ext);
 
 /*------------------------------------------------------------------------------
   setup
@@ -512,27 +509,21 @@ void loop() {
           // Report identity
           Serial.println("Arduino, Jetting Grid");
 
-        } else if (strcmp(str_cmd, "on") == 0) {
-          // Play the program
-          fsm.transitionTo(state_run_program);
+        } else if (strcmp(str_cmd, "run") == 0) {
+          // Run the program
+          fsm.transitionTo(state_running);
 
         } else if (strcmp(str_cmd, "pause") == 0) {
           // Pause the program
-          fsm.transitionTo(state_idle);
+          fsm.transitionTo(state_paused);
 
         } else if (strcmp(str_cmd, "off") == 0) {
-          // Turn all valves off and pause
-          // TODO: Capture into function
-          cp_mgr.clear_masks();
-          cp_mgr.send_masks();
-          for (idx_valve = 0; idx_valve < N_VALVES; ++idx_valve) {
-            leds[p2led(valve2p(idx_valve + 1))] = 0;
-          }
-          fsm.transitionTo(state_idle);
+          // Turn all valves off and idle
+          fsm.transitionTo(state_off);
 
-        } else if (strcmp(str_cmd, "load") == 0) {
-          // Load a new program via an incoming Serial stream send by the PC
-          fsm.transitionTo(state_load_program);
+        } else if (strcmp(str_cmd, "upload") == 0) {
+          // Upload a new program from the PC into Arduino memory
+          fsm.transitionTo(state_uploading);
 
         } else if (strcmp(str_cmd, "preset0") == 0) {
           // Load a preset program

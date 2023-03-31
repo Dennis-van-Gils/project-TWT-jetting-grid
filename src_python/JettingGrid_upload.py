@@ -9,7 +9,7 @@ TODO: Work-in-progress. This module works but is very fugly.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "30-03-2023"
+__date__ = "31-03-2023"
 __version__ = "1.0"
 # pylint: disable=pointless-string-statement
 
@@ -63,7 +63,7 @@ def upload_protocol(grid: Arduino):
 
     grid.set_write_termination("\n")
 
-    success, ans = grid.query("load")
+    success, ans = grid.query("upload")
     print(ans)
     success, ans = grid.query(filename)
     print(ans)

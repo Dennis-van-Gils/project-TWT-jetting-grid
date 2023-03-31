@@ -63,7 +63,7 @@ class JettingGrid_qdev(QDeviceIO):
     # --------------------------------------------------------------------------
 
     def send_start_protocol(self) -> bool:
-        return self.send(self.dev.write, "on")
+        return self.send(self.dev.write, "run")
 
     def send_stop_protocol(self) -> bool:
         return self.send(self.dev.write, "off")
