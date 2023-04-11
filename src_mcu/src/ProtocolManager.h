@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    03-12-2022
+ * @date    11-04-2023
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -278,8 +278,9 @@ public:
   void prime_start();
 
   /**
-   * @brief Go to Line number @p line_no of the protocol program and
-   * immediately activate the solenoid valves and color the LED matrix.
+   * @brief Go to Line number @p line_no of the protocol program (index starts
+   * at 0) and immediately activate the solenoid valves and color the LED
+   * matrix.
    */
   void goto_line(uint16_t line_no);
 
@@ -323,13 +324,17 @@ public:
   inline void set_name(const char *name) { strncpy(_name, name, 64); }
   inline char *get_name() { return _name; }
   inline uint16_t get_N_lines() { return _N_lines; }
+
+  /**
+   * @brief Get the playback position; current line number (index starts at 0)
+   */
   inline int16_t get_position() { return _pos; }
 
 private:
-  Program _program;          // Protocol program currently loaded into memory
-  char _name[64] = {'\0'};   // Name of the protocol program
-  uint16_t _N_lines;         // Total number of lines in the protocol program
-  uint16_t _pos;             // Playback position; current line number
+  Program _program;        // Protocol program currently loaded into memory
+  char _name[64] = {'\0'}; // Name of the protocol program
+  uint16_t _N_lines;       // Total number of lines in the protocol program
+  uint16_t _pos; // Playback position; current line number (index starts at 0)
   uint32_t _tick = 0;        // Timestamp [ms] of last activated protocol line
   Line _last_activated_line; // The Line data that was last activated
 
