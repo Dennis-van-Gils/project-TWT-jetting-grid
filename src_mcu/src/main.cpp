@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    31-03-2023
+ * @date    11-04-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
@@ -498,92 +498,25 @@ void loop() {
       if (sc.available()) {
         str_cmd = sc.getCommand();
 
+        // ***** Reporting ****
+        // ********************
+
         if (strcmp(str_cmd, "id?") == 0) {
           // Report identity
           Serial.println("Arduino, Jetting Grid");
 
-        } else if (strcmp(str_cmd, "run") == 0) {
-          // Run the program
-          fsm.transitionTo(state_running);
-
-        } else if (strcmp(str_cmd, "pause") == 0) {
-          // Pause the program
-          fsm.transitionTo(state_paused);
-
-        } else if (strcmp(str_cmd, "off") == 0) {
-          // Turn all valves off and idle
-          fsm.transitionTo(state_off);
-
-        } else if (strcmp(str_cmd, "upload") == 0) {
-          // Upload a new program from the PC into Arduino memory
-          fsm.transitionTo(state_uploading);
-
-        } else if (strcmp(str_cmd, "preset0") == 0) {
-          // Load a preset program
-          load_protocol_program_preset_0();
-
-        } else if (strcmp(str_cmd, "preset1") == 0) {
-          // Load a preset program
-          load_protocol_program_preset_1();
-
-        } else if (strcmp(str_cmd, "preset2") == 0) {
-          // Load a preset program
-          load_protocol_program_preset_2();
-
-        } else if (strcmp(str_cmd, "preset3") == 0) {
-          // Load a preset program
-          load_protocol_program_preset_3();
-
-        } else if (strcmp(str_cmd, ",") == 0) {
-          // Go to the previous line of the protocol program and immediately
-          // activate the solenoid valves and color the LED matrix.
-          protocol_mgr.goto_prev_line();
-
-        } else if (strcmp(str_cmd, ".") == 0) {
-          // Go to the next line of the protocol program and immediately
-          // activate the solenoid valves and color the LED matrix.
-          protocol_mgr.goto_next_line();
-
-        } else if (strncmp(str_cmd, "goto", 4) == 0) {
-          // Go to the specified line of the protocol program and immediately
-          // activate the solenoid valves and color the LED matrix.
-          protocol_mgr.goto_line(parseIntInString(str_cmd, 4));
-
         } else if (strcmp(str_cmd, "pos?") == 0) {
-          // Print current program position to serial
-          snprintf(buf, BUF_LEN, "%d of %d\n", protocol_mgr.get_position(),
-                   protocol_mgr.get_N_lines() - 1);
-          Serial.print(buf);
+          // Report current protocol position (index starts at 1)
+          Serial.println(protocol_mgr.get_position() + 1);
 
-        } else if (strcmp(str_cmd, "b?") == 0) {
-          // Print current line buffer to serial, useful for debugging
-          protocol_mgr.print_buffer();
-
-        } else if (strcmp(str_cmd, "p?") == 0) {
-          // Print current program to serial
+        } else if (strcmp(str_cmd, "proto?") == 0) {
+          // Report current protocol information, newline delimited:
+          //   1) Protocol name
+          //   2) N_lines
           protocol_mgr.print_program();
 
-        } else if (strcmp(str_cmd, "fsm?") == 0) {
-          // Print the current FSM state name to serial
-          Serial.println(fsm.getCurrentStateName());
-
-        } else if (strcmp(str_cmd, "override_safety") == 0) {
-          // WARNING: Will force the jetting pump to enabled, regardless of
-          // whether any valves are actually open or not. This function should
-          // be used for troubleshooting only.
-          override_pump_safety = true;
-
-        } else if (strcmp(str_cmd, "restore_safety") == 0) {
-          // Revert back from the "override_safety" command and restore the
-          // regular safety procedure to enable the jetting pump.
-          override_pump_safety = false;
-
-        } else if (strcmp(str_cmd, "halt") == 0) {
-          // Trigger a halt, useful for debugging
-          halt(0, "Halted by user command.");
-
         } else if (strcmp(str_cmd, "?") == 0) {
-          // Report pressure readings
+          // Report readings, tab delimited
 
           if (!NO_PERIPHERALS) {
             readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
@@ -618,7 +551,7 @@ void loop() {
                    "%d\t"
                    "%.2f\t%.2f\t%.2f\t%.2f\t"
                    "%.3f\t%.3f\t%.3f\t%.3f\n",
-                   protocol_mgr.get_position(),
+                   protocol_mgr.get_position() + 1,
                    readings.pres_1_mA,
                    readings.pres_2_mA,
                    readings.pres_3_mA,
@@ -629,6 +562,84 @@ void loop() {
                    readings.pres_4_bar);
           // clang-format on
           Serial.print(buf); // Takes 320 µs per call
+
+          // *****  Control  ****
+          // ********************
+
+        } else if (strcmp(str_cmd, "upload") == 0) {
+          // Upload a new protocol from the PC into Arduino memory
+          fsm.transitionTo(state_uploading);
+
+        } else if (strcmp(str_cmd, "play") == 0) {
+          // Play the protocol and automatically actuate valves over time
+          fsm.transitionTo(state_running);
+
+        } else if (strcmp(str_cmd, "stop") == 0) {
+          // Stop the protocol and close all valves immediately
+          fsm.transitionTo(state_off);
+
+        } else if (strcmp(str_cmd, "pause") == 0) {
+          // Pause the protocol keeping the last actuated state of the valves
+          fsm.transitionTo(state_paused);
+
+        } else if (strcmp(str_cmd, ",") == 0) {
+          // "<" Go to the previous line of the protocol and immediately
+          // activate the valves
+          protocol_mgr.goto_prev_line();
+
+        } else if (strcmp(str_cmd, ".") == 0) {
+          // "<" Go to the next line of the protocol and immediately
+          // activate the valves
+          protocol_mgr.goto_next_line();
+
+        } else if (strncmp(str_cmd, "goto", 4) == 0) {
+          // Go to the specified line (index starts at 1) of the protocol and
+          // immediately activate the solenoid valves
+          uint16_t tmp_int = max(parseIntInString(str_cmd, 4), 1);
+          protocol_mgr.goto_line(tmp_int - 1);
+
+        } else if (strcmp(str_cmd, "preset0") == 0) {
+          // Load protocol preset: All valves open
+          load_protocol_program_preset_0();
+
+        } else if (strcmp(str_cmd, "preset1") == 0) {
+          // Load protocol preset: Walk over each single valve
+          load_protocol_program_preset_1();
+
+        } else if (strcmp(str_cmd, "preset2") == 0) {
+          // Load protocol preset: Alternate 50/50 checkerboard pattern
+          load_protocol_program_preset_2();
+
+        } else if (strcmp(str_cmd, "preset3") == 0) {
+          // Load protocol preset: Alternate 50/50 even- and odd-numbered valves
+          load_protocol_program_preset_3();
+
+          // ***** Debugging  ****
+          // *********************
+
+        } else if (strcmp(str_cmd, "b?") == 0) {
+          // Report current line buffer contents
+          protocol_mgr.print_buffer();
+
+        } else if (strcmp(str_cmd, "fsm?") == 0) {
+          // Report current Finite State Machine state name
+          Serial.println(fsm.getCurrentStateName());
+
+        } else if (strcmp(str_cmd, "halt") == 0) {
+          // Trigger a halt
+          halt(0, "Halted by user command.");
+
+        } else if (strcmp(str_cmd, "override_safety") == 0) {
+          // WARNING: Will override enable the jetting pump, regardless of
+          // whether any valves are actually open or not. This function should
+          // be used for troubleshooting only.
+          override_pump_safety = true;
+
+        } else if (strcmp(str_cmd, "restore_safety") == 0) {
+          // Revert back from the "override_safety" command: Restore the regular
+          // safety procedure to enable the jetting pump only when at least one
+          // valve is open.
+          override_pump_safety = false;
         }
       }
     }
