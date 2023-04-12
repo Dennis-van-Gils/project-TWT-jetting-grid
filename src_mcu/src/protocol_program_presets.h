@@ -2,7 +2,7 @@
  * @file    protocol_program_presets.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-02-2023
+ * @date    12-04-2023
  *
  * @brief   Predefined protocol program presets for the TWT jetting grid.
  *
@@ -15,17 +15,17 @@
 extern ProtocolManager protocol_mgr;
 
 /**
- * @brief Loop over each single valve
+ * @brief All valves open
  */
 void load_protocol_program_preset_0();
 
 /**
- * @brief Growing center square
+ * @brief Walk over each single valve
  */
 void load_protocol_program_preset_1();
 
 /**
- * @brief All open
+ * @brief Alternating checkerboard
  */
 void load_protocol_program_preset_2();
 
