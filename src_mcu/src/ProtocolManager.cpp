@@ -190,7 +190,6 @@ void ProtocolManager::activate_buffer() {
     _cp_mgr->send_masks(); // Activate the valves
   }
 
-  // Serial.println(_pos); // TODO: Rethink if we should print current line no.
   if (DEBUG) {
     print_buffer();
   }
