@@ -7,7 +7,7 @@ Manages multi-threaded communication with the Jetting Grid Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "31-03-2023"
+__date__ = "12-04-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -63,11 +63,11 @@ class JettingGrid_qdev(QDeviceIO):
     #   Arduino communication functions
     # --------------------------------------------------------------------------
 
-    def send_start_protocol(self) -> bool:
-        return self.send(self.dev.write, "run")
+    def send_play_protocol(self) -> bool:
+        return self.send(self.dev.write, "play")
 
     def send_stop_protocol(self) -> bool:
-        return self.send(self.dev.write, "off")
+        return self.send(self.dev.write, "stop")
 
     def send_pause_protocol(self) -> bool:
         return self.send(self.dev.write, "pause")

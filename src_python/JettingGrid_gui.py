@@ -8,7 +8,7 @@ and the Xylem Hydrovar HVL pump.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "31-03-2023"
+__date__ = "12-04-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
@@ -313,7 +313,7 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
 
         self.qpbt_upload_protocol = QtWid.QPushButton("Upload")
-        self.qpbt_start_protocol = QtWid.QPushButton("Start")
+        self.qpbt_play_protocol = QtWid.QPushButton("Play")
         self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
         self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
         self.qlin_protocol_pos = QtWid.QLineEdit("", readOnly=True)
@@ -321,9 +321,7 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_upload_protocol.clicked.connect(
             self.process_qpbt_upload_protocol
         )
-        self.qpbt_start_protocol.clicked.connect(
-            self.process_qpbt_start_protocol
-        )
+        self.qpbt_play_protocol.clicked.connect(self.process_qpbt_play_protocol)
         self.qpbt_stop_protocol.clicked.connect(self.process_qpbt_stop_protocol)
         self.qpbt_pause_protocol.clicked.connect(
             self.process_qpbt_pause_protocol
@@ -332,7 +330,7 @@ class MainWindow(QtWid.QWidget):
         vbox_protocol = QtWid.QVBoxLayout(spacing=4)
         vbox_protocol.addWidget(self.qpbt_upload_protocol)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
-        vbox_protocol.addWidget(self.qpbt_start_protocol)
+        vbox_protocol.addWidget(self.qpbt_play_protocol)
         vbox_protocol.addWidget(self.qpbt_stop_protocol)
         vbox_protocol.addWidget(self.qpbt_pause_protocol)
         vbox_protocol.addWidget(self.qlin_protocol_pos)
@@ -641,8 +639,8 @@ class MainWindow(QtWid.QWidget):
         self.grid_qdev.worker_DAQ.DAQ_function = DAQ_function_backup
 
     @Slot()
-    def process_qpbt_start_protocol(self):
-        self.grid_qdev.send_start_protocol()
+    def process_qpbt_play_protocol(self):
+        self.grid_qdev.send_play_protocol()
 
     @Slot()
     def process_qpbt_stop_protocol(self):
