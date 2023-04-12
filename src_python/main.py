@@ -227,6 +227,56 @@ def write_data_to_log():
 
 
 # ------------------------------------------------------------------------------
+#   JettingGridArduino
+# ------------------------------------------------------------------------------
+import numpy as np
+
+
+class JettingGridArduino(Arduino):
+    """
+    class State(object):
+        def __init__(self):
+            # Actual readings of the Arduino
+            self.time = np.nan  # [s]
+            self.protocol_pos = 0
+            self.P_1_mA = np.nan  # [mA]
+            self.P_2_mA = np.nan  # [mA]
+            self.P_3_mA = np.nan  # [mA]
+            self.P_4_mA = np.nan  # [mA]
+            self.P_1_bar = np.nan  # [bar]
+            self.P_2_bar = np.nan  # [bar]
+            self.P_3_bar = np.nan  # [bar]
+            self.P_4_bar = np.nan  # [bar]
+
+            # Interaction flags to communicate with the Xylem jetting pump that
+            # is running inside of another thread
+            self.waiting_for_pump_standstill_to_stop_protocol = False
+    """
+
+    def __init__(
+        self,
+        name="Ard",
+        connect_to_specific_ID="Jetting Grid",
+    ):
+        super().__init__(
+            name=name, connect_to_specific_ID=connect_to_specific_ID
+        )
+
+        self.serial_settings["baudrate"] = 115200
+        # self.state = self.State()
+
+    """
+    def stop_protocol(self):
+        reply = self.query("stop")
+        try:
+            self.protocol_pos = int(reply)
+        except ValueError:
+            # TODO
+            pass
+    """
+
+
+# ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
 
@@ -235,8 +285,7 @@ if __name__ == "__main__":
     #   Connect to Jetting Grid Arduino
     # --------------------------------------------------------------------------
 
-    grid = Arduino(name="Ard", connect_to_specific_ID="Jetting Grid")
-    grid.serial_settings["baudrate"] = 115200
+    grid = JettingGridArduino()
     grid.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
 
     if not grid.is_alive:
