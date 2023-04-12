@@ -5,7 +5,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "31-03-2023"
+__date__ = "12-04-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
 
@@ -77,10 +77,9 @@ elif QT_LIB == PYSIDE6:
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
-from dvg_debug_functions import dprint, print_fancy_traceback as pft
 from dvg_pyqt_filelogger import FileLogger
 
-from dvg_devices.Arduino_protocol_serial import Arduino
+from JettingGrid_Arduino import JettingGrid_Arduino
 from JettingGrid_qdev import JettingGrid_qdev
 from JettingGrid_gui import MainWindow
 
@@ -145,39 +144,12 @@ def DAQ_function() -> bool:
     # WARNING: Do not change the GUI directly from out of this function as it
     # will be running in a separate and different thread to the main/GUI thread.
 
-    # Shorthands
-    state = grid_qdev.state
-
-    # Date-time keeping
-    str_cur_date, str_cur_time = current_date_time_strings()
-
     # Query the Arduino for its state
-    success, reply = grid.query_ascii_values("?", delimiter="\t")
-    if not success:
-        dprint(f"'{grid.name}' reports IOError @ {str_cur_date} {str_cur_time}")
-        return False
-
-    # Parse readings into separate state variables
-    try:
-        # pylint: disable=unbalanced-tuple-unpacking
-        (
-            state.protocol_pos,
-            state.P_1_mA,
-            state.P_2_mA,
-            state.P_3_mA,
-            state.P_4_mA,
-            state.P_1_bar,
-            state.P_2_bar,
-            state.P_3_bar,
-            state.P_4_bar,
-        ) = reply
-        # pylint: enable=unbalanced-tuple-unpacking
-    except Exception as err:
-        pft(err)
-        dprint(f"'{grid.name}' reports IOError @ {str_cur_date} {str_cur_time}")
+    if not grid.perform_DAQ():
         return False
 
     # We use PC time
+    state = grid.state  # Shorthand
     state.time = time.perf_counter()
 
     # Add readings to chart histories
@@ -192,13 +164,6 @@ def DAQ_function() -> bool:
 
     # Return success
     return True
-
-
-@Slot()
-def pump_has_reached_standstill():
-    if grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol:
-        grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol = False
-        grid_qdev.send_stop_protocol()
 
 
 # ------------------------------------------------------------------------------
@@ -227,56 +192,6 @@ def write_data_to_log():
 
 
 # ------------------------------------------------------------------------------
-#   JettingGridArduino
-# ------------------------------------------------------------------------------
-import numpy as np
-
-
-class JettingGridArduino(Arduino):
-    """
-    class State(object):
-        def __init__(self):
-            # Actual readings of the Arduino
-            self.time = np.nan  # [s]
-            self.protocol_pos = 0
-            self.P_1_mA = np.nan  # [mA]
-            self.P_2_mA = np.nan  # [mA]
-            self.P_3_mA = np.nan  # [mA]
-            self.P_4_mA = np.nan  # [mA]
-            self.P_1_bar = np.nan  # [bar]
-            self.P_2_bar = np.nan  # [bar]
-            self.P_3_bar = np.nan  # [bar]
-            self.P_4_bar = np.nan  # [bar]
-
-            # Interaction flags to communicate with the Xylem jetting pump that
-            # is running inside of another thread
-            self.waiting_for_pump_standstill_to_stop_protocol = False
-    """
-
-    def __init__(
-        self,
-        name="Ard",
-        connect_to_specific_ID="Jetting Grid",
-    ):
-        super().__init__(
-            name=name, connect_to_specific_ID=connect_to_specific_ID
-        )
-
-        self.serial_settings["baudrate"] = 115200
-        # self.state = self.State()
-
-    """
-    def stop_protocol(self):
-        reply = self.query("stop")
-        try:
-            self.protocol_pos = int(reply)
-        except ValueError:
-            # TODO
-            pass
-    """
-
-
-# ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
 
@@ -285,7 +200,7 @@ if __name__ == "__main__":
     #   Connect to Jetting Grid Arduino
     # --------------------------------------------------------------------------
 
-    grid = JettingGridArduino()
+    grid = JettingGrid_Arduino()
     grid.auto_connect(filepath_last_known_port="config/port_Arduino.txt")
 
     if not grid.is_alive:
@@ -337,7 +252,7 @@ if __name__ == "__main__":
     )
 
     pump_qdev.signal_pump_just_stopped_and_reached_standstill.connect(
-        pump_has_reached_standstill
+        grid_qdev.pump_has_reached_standstill
     )
     grid_qdev.signal_connection_lost.connect(notify_connection_lost)
 

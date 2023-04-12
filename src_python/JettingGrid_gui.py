@@ -108,7 +108,7 @@ from dvg_pyqtgraph_threadsafe import (
     PlotManager,
 )
 
-from dvg_devices.Arduino_protocol_serial import Arduino
+from JettingGrid_Arduino import JettingGrid_Arduino
 from JettingGrid_qdev import JettingGrid_qdev
 from JettingGrid_upload import upload_protocol
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
@@ -213,7 +213,7 @@ class MainWindow(QtWid.QWidget):
         self.debug = debug
 
         # Shorthands to the low-level devices
-        self.grid: Arduino = grid_qdev.dev
+        self.grid: JettingGrid_Arduino = grid_qdev.dev
         self.pump: XylemHydrovarHVL = pump_qdev.dev
 
         # Start GUI layout
@@ -542,6 +542,7 @@ class MainWindow(QtWid.QWidget):
         # -------------------------
 
         self.grid_qdev.signal_DAQ_updated.connect(self.update_GUI)
+        self.grid_qdev.signal_GUI_needs_update.connect(self.update_GUI)
 
         self.logger.signal_recording_started.connect(
             lambda filepath: self.qpbt_record.setText(
@@ -566,13 +567,9 @@ class MainWindow(QtWid.QWidget):
 
     @Slot()
     def update_GUI(self):
-        # Shorthands
-        grid_qdev = self.grid_qdev
-        state = self.grid_qdev.state
-
-        self.qlbl_update_counter.setText(f"{grid_qdev.update_counter_DAQ}")
+        self.qlbl_update_counter.setText(f"{self.grid_qdev.update_counter_DAQ}")
         self.qlbl_DAQ_rate.setText(
-            f"DAQ: {grid_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
+            f"DAQ: {self.grid_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
         )
         self.qlbl_recording_time.setText(
             f"REC: {self.logger.pretty_elapsed()}"
@@ -581,11 +578,11 @@ class MainWindow(QtWid.QWidget):
         )
 
         self.qlin_P_pump.setText(f"{self.pump.state.actual_pressure:.3f}")
-        self.qlin_protocol_pos.setText(f"{int(state.protocol_pos):d}")
-        self.qlin_P_1.setText(f"{state.P_1_bar:.3f}")
-        self.qlin_P_2.setText(f"{state.P_2_bar:.3f}")
-        self.qlin_P_3.setText(f"{state.P_3_bar:.3f}")
-        self.qlin_P_4.setText(f"{state.P_4_bar:.3f}")
+        self.qlin_protocol_pos.setText(f"{int(self.grid.state.protocol_pos):d}")
+        self.qlin_P_1.setText(f"{self.grid.state.P_1_bar:.3f}")
+        self.qlin_P_2.setText(f"{self.grid.state.P_2_bar:.3f}")
+        self.qlin_P_3.setText(f"{self.grid.state.P_3_bar:.3f}")
+        self.qlin_P_4.setText(f"{self.grid.state.P_4_bar:.3f}")
 
         # Don't allow uploading a protocol when the pump is still running
         self.qpbt_upload_protocol.setEnabled(
@@ -645,7 +642,7 @@ class MainWindow(QtWid.QWidget):
     @Slot()
     def process_qpbt_stop_protocol(self):
         self.pump_qdev.send_pump_stop()
-        self.grid_qdev.state.waiting_for_pump_standstill_to_stop_protocol = True
+        self.grid_qdev.waiting_for_pump_standstill_to_stop_protocol = True
 
     @Slot()
     def process_qpbt_pause_protocol(self):

@@ -10,46 +10,81 @@ __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "12-04-2023"
 __version__ = "1.0"
 
-import numpy as np
+import os
+import sys
 
-from dvg_devices.Arduino_protocol_serial import Arduino
+# Mechanism to support both PyQt and PySide
+# -----------------------------------------
+
+PYQT5 = "PyQt5"
+PYQT6 = "PyQt6"
+PYSIDE2 = "PySide2"
+PYSIDE6 = "PySide6"
+QT_LIB_ORDER = [PYQT5, PYSIDE2, PYSIDE6, PYQT6]
+QT_LIB = None
+
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        if lib in sys.modules:
+            QT_LIB = lib
+            break
+
+if QT_LIB is None:
+    for lib in QT_LIB_ORDER:
+        try:
+            __import__(lib)
+            QT_LIB = lib
+            break
+        except ImportError:
+            pass
+
+if QT_LIB is None:
+    this_file = __file__.split(os.sep)[-1]
+    raise ImportError(
+        f"{this_file} requires PyQt5, PyQt6, PySide2 or PySide6; "
+        "none of these packages could be imported."
+    )
+
+# fmt: off
+# pylint: disable=import-error, no-name-in-module
+if QT_LIB == PYQT5:
+    from PyQt5.QtCore import pyqtSignal as Signal          # type: ignore
+    from PyQt5.QtCore import pyqtSlot as Slot              # type: ignore
+elif QT_LIB == PYQT6:
+    from PyQt6.QtCore import pyqtSignal as Signal          # type: ignore
+    from PyQt6.QtCore import pyqtSlot as Slot              # type: ignore
+elif QT_LIB == PYSIDE2:
+    from PySide2.QtCore import Signal, Slot                # type: ignore
+elif QT_LIB == PYSIDE6:
+    from PySide6.QtCore import Signal, Slot                # type: ignore
+# pylint: enable=import-error, no-name-in-module
+# fmt: on
+
+# \end[Mechanism to support both PyQt and PySide]
+# -----------------------------------------------
+
+from JettingGrid_Arduino import JettingGrid_Arduino
+from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_qdeviceio import QDeviceIO
+
+# ------------------------------------------------------------------------------
+#   JettingGrid_qdev
+# ------------------------------------------------------------------------------
 
 
 class JettingGrid_qdev(QDeviceIO):
-    class State(object):
-        def __init__(self):
-            # Actual readings of the Arduino
-            self.time = np.nan  # [s]
-            self.protocol_pos = 0
-            self.P_1_mA = np.nan  # [mA]
-            self.P_2_mA = np.nan  # [mA]
-            self.P_3_mA = np.nan  # [mA]
-            self.P_4_mA = np.nan  # [mA]
-            self.P_1_bar = np.nan  # [bar]
-            self.P_2_bar = np.nan  # [bar]
-            self.P_3_bar = np.nan  # [bar]
-            self.P_4_bar = np.nan  # [bar]
-
-            # Interaction flags to communicate with the Xylem jetting pump that
-            # is running inside of another thread
-            self.waiting_for_pump_standstill_to_stop_protocol = False
-
-    # --------------------------------------------------------------------------
-    #   JettingGrid_qdev
-    # --------------------------------------------------------------------------
+    signal_GUI_needs_update = Signal()
 
     def __init__(
         self,
-        dev: Arduino,
+        dev: JettingGrid_Arduino,
         DAQ_function=None,
         DAQ_interval_ms=100,
         debug=False,
         **kwargs,
     ):
         super().__init__(dev, **kwargs)  # Pass kwargs onto QtCore.QObject()
-
-        self.state = self.State()
+        self.dev: JettingGrid_Arduino
 
         self.create_worker_DAQ(
             DAQ_function=DAQ_function,
@@ -57,17 +92,50 @@ class JettingGrid_qdev(QDeviceIO):
             critical_not_alive_count=3,
             debug=debug,
         )
-        self.create_worker_jobs(debug=debug)
+        self.create_worker_jobs(jobs_function=self.jobs_function, debug=debug)
+
+        # Interaction flags to communicate with the Xylem jetting pump that is
+        # running inside of another thread
+        self.waiting_for_pump_standstill_to_stop_protocol = False
+
+    # --------------------------------------------------------------------------
+    #   jobs_function
+    # --------------------------------------------------------------------------
+
+    def jobs_function(self, func, args):
+        if func == "signal_GUI_needs_update":
+            # Special instruction
+            self.signal_GUI_needs_update.emit()
+        else:
+            # Default job processing:
+            # Send I/O operation to the device
+            try:
+                func(*args)
+            except Exception as err:
+                pft(err)
 
     # --------------------------------------------------------------------------
     #   Arduino communication functions
     # --------------------------------------------------------------------------
 
-    def send_play_protocol(self) -> bool:
-        return self.send(self.dev.write, "play")
+    @Slot()
+    def pump_has_reached_standstill(self):
+        if self.waiting_for_pump_standstill_to_stop_protocol:
+            self.waiting_for_pump_standstill_to_stop_protocol = False
+            self.send_stop_protocol()
 
-    def send_stop_protocol(self) -> bool:
-        return self.send(self.dev.write, "stop")
+    @Slot()
+    def send_play_protocol(self):
+        self.send(self.dev.play_protocol)
 
-    def send_pause_protocol(self) -> bool:
-        return self.send(self.dev.write, "pause")
+    @Slot()
+    def send_stop_protocol(self):
+        self.add_to_jobs_queue(self.dev.stop_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
+
+    @Slot()
+    def send_pause_protocol(self):
+        self.add_to_jobs_queue(self.dev.pause_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
