@@ -116,6 +116,14 @@ uint16_t idx_led;    // Frequently used LED index
 
 ProtocolManager protocol_mgr(&cp_mgr);
 
+/**
+ * @brief Return the current protocol position starting at index 1.
+ */
+uint16_t get_protocol_position() {
+  // The protocol manager internally stores the position starting at index 0
+  return protocol_mgr.get_position() + 1;
+}
+
 /*------------------------------------------------------------------------------
   MIKROE 4-20 mA R Click boards for reading out the OMEGA pressure sensors
 ------------------------------------------------------------------------------*/
@@ -506,8 +514,8 @@ void loop() {
           Serial.println("Arduino, Jetting Grid");
 
         } else if (strcmp(str_cmd, "pos?") == 0) {
-          // Report current protocol position (index starts at 1)
-          Serial.println(protocol_mgr.get_position() + 1);
+          // Report current protocol position starting at index 1
+          Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, "proto?") == 0) {
           // Report current protocol information, newline delimited:
@@ -551,7 +559,7 @@ void loop() {
                    "%d\t"
                    "%.2f\t%.2f\t%.2f\t%.2f\t"
                    "%.3f\t%.3f\t%.3f\t%.3f\n",
-                   protocol_mgr.get_position() + 1,
+                   get_protocol_position(),
                    readings.pres_1_mA,
                    readings.pres_2_mA,
                    readings.pres_3_mA,
@@ -577,26 +585,31 @@ void loop() {
         } else if (strcmp(str_cmd, "stop") == 0) {
           // Stop the protocol and close all valves immediately
           fsm.transitionTo(state_off);
+          Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, "pause") == 0) {
           // Pause the protocol keeping the last actuated state of the valves
           fsm.transitionTo(state_paused);
+          Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, ",") == 0) {
           // "<" Go to the previous line of the protocol and immediately
           // activate the valves
           protocol_mgr.goto_prev_line();
+          Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, ".") == 0) {
           // "<" Go to the next line of the protocol and immediately
           // activate the valves
           protocol_mgr.goto_next_line();
+          Serial.println(get_protocol_position());
 
         } else if (strncmp(str_cmd, "goto", 4) == 0) {
           // Go to the specified line (index starts at 1) of the protocol and
           // immediately activate the solenoid valves
           uint16_t tmp_int = max(parseIntInString(str_cmd, 4), 1);
           protocol_mgr.goto_line(tmp_int - 1);
+          Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, "preset0") == 0) {
           // Load protocol preset: All valves open
@@ -607,12 +620,16 @@ void loop() {
           load_protocol_program_preset_1();
 
         } else if (strcmp(str_cmd, "preset2") == 0) {
-          // Load protocol preset: Alternate 50/50 checkerboard pattern
+          // Load protocol preset: Alternating checkerboard
           load_protocol_program_preset_2();
 
         } else if (strcmp(str_cmd, "preset3") == 0) {
-          // Load protocol preset: Alternate 50/50 even- and odd-numbered valves
+          // Load protocol preset: Alternating even/odd valves
           load_protocol_program_preset_3();
+
+        } else if (strcmp(str_cmd, "preset4") == 0) {
+          // Load protocol preset: Walk over each manifold
+          load_protocol_program_preset_4();
 
           // ***** Debugging  ****
           // *********************
