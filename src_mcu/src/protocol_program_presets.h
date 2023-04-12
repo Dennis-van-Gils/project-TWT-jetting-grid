@@ -33,3 +33,8 @@ void load_protocol_program_preset_2();
  * @brief Alternating even/odd valves
  */
 void load_protocol_program_preset_3();
+
+/**
+ * @brief Walk over each manifold
+ */
+void load_protocol_program_preset_4();
