@@ -14,6 +14,7 @@ __version__ = "1.0"
 
 import os
 import sys
+from functools import partial
 
 # Constants
 UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
@@ -352,15 +353,10 @@ class MainWindow(QtWid.QWidget):
             self.process_qpbt_proto_gotoline
         )
 
-        self.qpbt_proto_upload = QtWid.QPushButton("Upload")
+        self.qpbt_proto_upload = QtWid.QPushButton("Upload file")
         self.qpbt_proto_upload.clicked.connect(self.process_qpbt_proto_upload)
 
         self.qpbt_proto_pos = QtWid.QLineEdit("", readOnly=True)
-        # self.qpbt_proto_pos.setMinimumWidth(controls.e8(5))
-        # self.qpbt_proto_pos.setSizePolicy(
-        #    QtWid.QSizePolicy.Policy.Minimum,
-        #    QtWid.QSizePolicy.Policy.Preferred,
-        # )
 
         # fmt: off
         qgrid_protocol = QtWid.QGridLayout()
@@ -372,12 +368,35 @@ class MainWindow(QtWid.QWidget):
         qgrid_protocol.addWidget(self.qpbt_proto_nextline, 1, 2)
         qgrid_protocol.addWidget(self.qpbt_proto_gotoline, 2, 0)
         qgrid_protocol.addWidget(self.qpbt_proto_pos     , 2, 1, 1, 2)
+
+        self.qpbt_preset_0 = QtWid.QPushButton("Preset 0\n└ Open all valves")
+        self.qpbt_preset_1 = QtWid.QPushButton("Preset 1\n└ Walk over valves")
+        self.qpbt_preset_2 = QtWid.QPushButton("Preset 2\n└ Walk over manifolds")
+        self.qpbt_preset_3 = QtWid.QPushButton("Preset 3\n└ Checkerboard")
+        self.qpbt_preset_4 = QtWid.QPushButton("Preset 4\n└ Even/odd valves")
         # fmt: on
+
+        qpbts_presets = [
+            self.qpbt_preset_0,
+            self.qpbt_preset_1,
+            self.qpbt_preset_2,
+            self.qpbt_preset_3,
+            self.qpbt_preset_4,
+        ]
+        for idx, qpbt in enumerate(qpbts_presets):
+            qpbt.setStyleSheet("text-align:left;")
+            qpbt.clicked.connect(partial(self.process_qpbtn_preset, idx))
 
         vbox_protocol = QtWid.QVBoxLayout(spacing=4)
         vbox_protocol.addWidget(self.qpbt_proto_upload)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
         vbox_protocol.addLayout(qgrid_protocol)
+        vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
+        vbox_protocol.addWidget(self.qpbt_preset_0)
+        vbox_protocol.addWidget(self.qpbt_preset_1)
+        vbox_protocol.addWidget(self.qpbt_preset_2)
+        vbox_protocol.addWidget(self.qpbt_preset_3)
+        vbox_protocol.addWidget(self.qpbt_preset_4)
 
         qgrp_protocol = QtWid.QGroupBox("Protocol")
         qgrp_protocol.setLayout(vbox_protocol)
@@ -702,3 +721,14 @@ class MainWindow(QtWid.QWidget):
                 line_no = 1
 
             self.grid_qdev.send_gotoline_protocol(line_no)
+
+    @Slot(int)
+    def process_qpbtn_preset(self, preset_no: int):
+        reply = QtWid.QMessageBox.question(
+            self,
+            "Confirmation",
+            f"Do you want to load in preset {preset_no}?",
+        )
+
+        if reply == QtWid.QMessageBox.StandardButton.Yes:
+            self.grid_qdev.send_load_preset(preset_no)

@@ -184,3 +184,24 @@ class JettingGrid_Arduino(Arduino):
             idx_line = 1
 
         return self._protocol_query_fun(f"goto {idx_line:d}")
+
+    def load_preset(self, preset_no: int) -> bool:
+        """Load in a protocol preset:
+            0: Open all valves
+            1: Walk over all valves
+            2: Walk over all manifolds
+            3: Alternating checkerboard
+            4: Alternating even/odd valves
+        Returns: True if successful, False otherwise.
+        """
+        try:
+            idx_preset = int(preset_no)
+        except (TypeError, ValueError):
+            idx_preset = 0
+
+        # Only presets 0 to 4 exist. Check user input.
+        IDX_PRESET_MAX = 4
+        if not idx_preset in range(IDX_PRESET_MAX + 1):
+            idx_preset = 0
+
+        return self.write(f"preset{idx_preset:d}")

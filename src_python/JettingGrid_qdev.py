@@ -185,3 +185,8 @@ class JettingGrid_qdev(QDeviceIO):
         self.add_to_jobs_queue(self.dev.gotoline_protocol, line_no)
         self.add_to_jobs_queue("signal_GUI_needs_update")
         self.process_jobs_queue()
+
+    @Slot(int)
+    def send_load_preset(self, preset_no: int):
+        """Load in a protocol preset."""
+        self.send(self.dev.load_preset, preset_no)
