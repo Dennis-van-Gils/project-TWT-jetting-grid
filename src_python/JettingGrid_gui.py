@@ -243,11 +243,17 @@ class MainWindow(QtWid.QWidget):
         vbox_left.addWidget(self.qlbl_DAQ_rate, stretch=0)
 
         # Middle box
+        icon = "fa.fighter-jet"
+        self.icon_1 = QtWid.QLabel()
+        self.icon_1.setPixmap(qta.icon(icon).pixmap(30, 30))
+        self.icon_2 = QtWid.QLabel()
+        self.icon_2.setPixmap(qta.icon(icon, hflip=True).pixmap(30, 30))
         self.qlbl_title = QtWid.QLabel(
-            "Jetting Grid",
+            "  Jetting Grid  ",
             font=QtGui.QFont("Palatino", 14, weight=QtGui.QFont.Weight.Bold),
         )
         self.qlbl_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
         self.qlbl_cur_date_time = QtWid.QLabel("00-00-0000    00:00:00")
         self.qlbl_cur_date_time.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignCenter
@@ -259,8 +265,13 @@ class MainWindow(QtWid.QWidget):
             lambda state: self.logger.record(state)
         )
 
+        hbox_title = QtWid.QHBoxLayout()
+        hbox_title.addWidget(self.icon_1)
+        hbox_title.addWidget(self.qlbl_title)
+        hbox_title.addWidget(self.icon_2)
+
         vbox_middle = QtWid.QVBoxLayout()
-        vbox_middle.addWidget(self.qlbl_title)
+        vbox_middle.addLayout(hbox_title)
         vbox_middle.addWidget(self.qlbl_cur_date_time)
         vbox_middle.addWidget(self.qpbt_record)
 
