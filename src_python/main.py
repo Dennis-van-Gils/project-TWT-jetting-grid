@@ -179,16 +179,17 @@ def write_header_to_log():
     logger.write(str_cur_time + "\n")
     logger.write(window.qtxt_comments.toPlainText())
     logger.write("\n\n[DATA]\n")
-    logger.write("[s]\t[bar]\t[bar]\t[bar]\t[bar]\n")
-    logger.write("time\tP_1\tP_2\tP_3\tP_4\n")
+    logger.write("[s]\t[#]\t[bar]\t[bar]\t[bar]\t[bar]\t[bar]\n")
+    logger.write("time\tpos\tP_pump\tP_1\tP_2\tP_3\tP_4\n")
 
 
 def write_data_to_log():
-    state = grid_qdev.state  # Shorthand
     logger.write(
         f"{logger.elapsed():.2f}\t"
-        f"{state.P_1_bar:.3f}\t{state.P_2_bar:.3f}\t"
-        f"{state.P_3_bar:.3f}\t{state.P_4_bar:.3f}\n"
+        f"{grid.state.protocol_pos:.0f}\t"
+        f"{pump.state.actual_pressure:.3f}\t"
+        f"{grid.state.P_1_bar:.3f}\t{grid.state.P_2_bar:.3f}\t"
+        f"{grid.state.P_3_bar:.3f}\t{grid.state.P_4_bar:.3f}\n"
     )
 
 
