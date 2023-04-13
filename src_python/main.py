@@ -77,6 +77,7 @@ elif QT_LIB == PYSIDE6:
 # \end[Mechanism to support both PyQt and PySide]
 # -----------------------------------------------
 
+import qtawesome as qta
 from dvg_pyqt_filelogger import FileLogger
 
 from JettingGrid_Arduino import JettingGrid_Arduino
@@ -234,6 +235,7 @@ if __name__ == "__main__":
 
     QtCore.QThread.currentThread().setObjectName("MAIN")  # For DEBUG info
     app = QtWid.QApplication(sys.argv)
+    app.setWindowIcon(qta.icon("fa.fighter-jet", color="#dddddd"))
     app.setFont(QtGui.QFont(QtGui.QGuiApplication.font().family(), 9))
     app.aboutToQuit.connect(about_to_quit)
 

@@ -218,7 +218,7 @@ class MainWindow(QtWid.QWidget):
         self.pump: XylemHydrovarHVL = pump_qdev.dev
 
         # Start GUI layout
-        self.setWindowTitle("Jetting grid")
+        self.setWindowTitle("Jetting Grid")
         self.setGeometry(150, 60, 1200, 800)
         self.setStyleSheet(
             controls.SS_TEXTBOX_READ_ONLY
@@ -244,7 +244,7 @@ class MainWindow(QtWid.QWidget):
 
         # Middle box
         self.qlbl_title = QtWid.QLabel(
-            "Jetting grid",
+            "Jetting Grid",
             font=QtGui.QFont("Palatino", 14, weight=QtGui.QFont.Weight.Bold),
         )
         self.qlbl_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
