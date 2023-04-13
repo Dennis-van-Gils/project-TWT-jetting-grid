@@ -130,6 +130,11 @@ class JettingGrid_qdev(QDeviceIO):
 
     @Slot()
     def send_stop_protocol(self):
+        # NOTE: It is actually redundant to trigger a GUI update to update the
+        # protocol position textbox at the moment of 'stop'. DAQ_worker already
+        # triggers GUI updates of this control (and others) at 10 Hz. Still, we
+        # keep it as a good practice. So, in theory, below block could be
+        # replaced by a single instruction: self.send(self.dev.stop_protocol).
         self.add_to_jobs_queue(self.dev.stop_protocol)
         self.add_to_jobs_queue("signal_GUI_needs_update")
         self.process_jobs_queue()
