@@ -183,15 +183,4 @@ class JettingGrid_Arduino(Arduino):
         except (TypeError, ValueError):
             idx_line = 1
 
-        success, reply = self.query(f"goto {idx_line:d}")
-        if success:
-            try:
-                num = int(reply)
-            except (TypeError, ValueError) as err:
-                pft(err)
-            else:
-                # All successful
-                self.state.protocol_pos = num
-                return True
-
-        return False
+        return self._protocol_query_fun(f"goto {idx_line:d}")
