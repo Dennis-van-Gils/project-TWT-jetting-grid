@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    11-04-2023
+ * @date    13-04-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
@@ -22,7 +22,7 @@
 #include "CentipedeManager.h"
 #include "ProtocolManager.h"
 #include "constants.h"
-#include "protocol_program_presets.h"
+#include "protocol_presets.h"
 #include "translations.h"
 
 #include "Adafruit_SleepyDog.h"
@@ -471,8 +471,8 @@ void setup() {
   Wire.setClock(1000000); // 1 MHz
   if (!NO_PERIPHERALS) { cp_mgr.begin(); }
 
-  // Load protocol program preset
-  load_protocol_program_preset_0();
+  // Load protocol preset
+  load_protocol_preset_0();
 
   // Reached the end of setup, so now show the fixed grid in the LED matrix
   FastLED.clearData();
@@ -612,24 +612,24 @@ void loop() {
           Serial.println(get_protocol_position());
 
         } else if (strcmp(str_cmd, "preset0") == 0) {
-          // Load protocol preset: All valves open
-          load_protocol_program_preset_0();
+          // Load protocol preset: Open all valves
+          load_protocol_preset_0();
 
         } else if (strcmp(str_cmd, "preset1") == 0) {
-          // Load protocol preset: Walk over each single valve
-          load_protocol_program_preset_1();
+          // Load protocol preset:  Walk over all valves
+          load_protocol_preset_1();
 
         } else if (strcmp(str_cmd, "preset2") == 0) {
-          // Load protocol preset: Alternating checkerboard
-          load_protocol_program_preset_2();
+          // Load protocol preset: Walk over all manifolds
+          load_protocol_preset_2();
 
         } else if (strcmp(str_cmd, "preset3") == 0) {
-          // Load protocol preset: Alternating even/odd valves
-          load_protocol_program_preset_3();
+          // Load protocol preset: Alternating checkerboard
+          load_protocol_preset_3();
 
         } else if (strcmp(str_cmd, "preset4") == 0) {
-          // Load protocol preset: Walk over each manifold
-          load_protocol_program_preset_4();
+          // Load protocol preset: Alternating even/odd valves
+          load_protocol_preset_4();
 
           // ***** Debugging  ****
           // *********************
