@@ -8,13 +8,12 @@ and the Xylem Hydrovar HVL pump.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "12-04-2023"
+__date__ = "13-04-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
 import os
 import sys
-import time
 
 # Constants
 UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
@@ -80,6 +79,7 @@ QT_VERSION = (
 # -----------------------------------------------
 
 import pyqtgraph as pg
+import qtawesome as qta
 
 print(f"{QT_LIB:9s} {QT_VERSION}")
 print(f"PyQtGraph {pg.__version__}")
@@ -312,28 +312,72 @@ class MainWindow(QtWid.QWidget):
         #  Protocol program
         # -------------------------
 
-        self.qpbt_upload_protocol = QtWid.QPushButton("Upload")
-        self.qpbt_play_protocol = QtWid.QPushButton("Play")
-        self.qpbt_stop_protocol = QtWid.QPushButton("Stop")
-        self.qpbt_pause_protocol = QtWid.QPushButton("Pause")
-        self.qlin_protocol_pos = QtWid.QLineEdit("", readOnly=True)
+        g = self.grid_qdev  # Shorthand
+        qbtn_width = controls.e8(5)
 
-        self.qpbt_upload_protocol.clicked.connect(
-            self.process_qpbt_upload_protocol
+        self.qpbt_proto_play = QtWid.QPushButton("")
+        self.qpbt_proto_play.setFixedWidth(qbtn_width)
+        self.qpbt_proto_play.setIcon(qta.icon("mdi6.play"))
+        self.qpbt_proto_play.clicked.connect(g.send_play_protocol)
+
+        self.qpbt_proto_pause = QtWid.QPushButton("")
+        self.qpbt_proto_pause.setFixedWidth(qbtn_width)
+        self.qpbt_proto_pause.setIcon(qta.icon("mdi6.pause"))
+        self.qpbt_proto_pause.clicked.connect(g.send_pause_protocol)
+
+        self.qpbt_proto_stop = QtWid.QPushButton("")
+        self.qpbt_proto_stop.setFixedWidth(qbtn_width)
+        self.qpbt_proto_stop.setIcon(qta.icon("mdi6.stop"))
+        self.qpbt_proto_stop.clicked.connect(self.process_qpbt_proto_stop)
+
+        self.qpbt_proto_rewind = QtWid.QPushButton("")
+        self.qpbt_proto_rewind.setFixedWidth(qbtn_width)
+        self.qpbt_proto_rewind.setIcon(qta.icon("mdi6.skip-backward"))
+        self.qpbt_proto_rewind.clicked.connect(g.send_rewind_protocol)
+
+        self.qpbt_proto_prevline = QtWid.QPushButton("")
+        self.qpbt_proto_prevline.setFixedWidth(qbtn_width)
+        self.qpbt_proto_prevline.setIcon(qta.icon("mdi6.step-backward"))
+        self.qpbt_proto_prevline.clicked.connect(g.send_prevline_protocol)
+
+        self.qpbt_proto_nextline = QtWid.QPushButton("")
+        self.qpbt_proto_nextline.setFixedWidth(qbtn_width)
+        self.qpbt_proto_nextline.setIcon(qta.icon("mdi6.step-forward"))
+        self.qpbt_proto_nextline.clicked.connect(g.send_nextline_protocol)
+
+        self.qpbt_proto_gotoline = QtWid.QPushButton("")
+        self.qpbt_proto_gotoline.setFixedWidth(qbtn_width)
+        self.qpbt_proto_gotoline.setIcon(qta.icon("mdi6.arrow-down-right-bold"))
+        self.qpbt_proto_gotoline.clicked.connect(
+            self.process_qpbt_proto_gotoline
         )
-        self.qpbt_play_protocol.clicked.connect(self.process_qpbt_play_protocol)
-        self.qpbt_stop_protocol.clicked.connect(self.process_qpbt_stop_protocol)
-        self.qpbt_pause_protocol.clicked.connect(
-            self.process_qpbt_pause_protocol
-        )
+
+        self.qpbt_proto_upload = QtWid.QPushButton("Upload")
+        self.qpbt_proto_upload.clicked.connect(self.process_qpbt_proto_upload)
+
+        self.qpbt_proto_pos = QtWid.QLineEdit("", readOnly=True)
+        # self.qpbt_proto_pos.setMinimumWidth(controls.e8(5))
+        # self.qpbt_proto_pos.setSizePolicy(
+        #    QtWid.QSizePolicy.Policy.Minimum,
+        #    QtWid.QSizePolicy.Policy.Preferred,
+        # )
+
+        # fmt: off
+        qgrid_protocol = QtWid.QGridLayout()
+        qgrid_protocol.addWidget(self.qpbt_proto_play    , 0, 0)
+        qgrid_protocol.addWidget(self.qpbt_proto_pause   , 0, 1)
+        qgrid_protocol.addWidget(self.qpbt_proto_stop    , 0, 2)
+        qgrid_protocol.addWidget(self.qpbt_proto_rewind  , 1, 0)
+        qgrid_protocol.addWidget(self.qpbt_proto_prevline, 1, 1)
+        qgrid_protocol.addWidget(self.qpbt_proto_nextline, 1, 2)
+        qgrid_protocol.addWidget(self.qpbt_proto_gotoline, 2, 0)
+        qgrid_protocol.addWidget(self.qpbt_proto_pos     , 2, 1, 1, 2)
+        # fmt: on
 
         vbox_protocol = QtWid.QVBoxLayout(spacing=4)
-        vbox_protocol.addWidget(self.qpbt_upload_protocol)
+        vbox_protocol.addWidget(self.qpbt_proto_upload)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
-        vbox_protocol.addWidget(self.qpbt_play_protocol)
-        vbox_protocol.addWidget(self.qpbt_stop_protocol)
-        vbox_protocol.addWidget(self.qpbt_pause_protocol)
-        vbox_protocol.addWidget(self.qlin_protocol_pos)
+        vbox_protocol.addLayout(qgrid_protocol)
 
         qgrp_protocol = QtWid.QGroupBox("Protocol")
         qgrp_protocol.setLayout(vbox_protocol)
@@ -578,16 +622,14 @@ class MainWindow(QtWid.QWidget):
         )
 
         self.qlin_P_pump.setText(f"{self.pump.state.actual_pressure:.3f}")
-        self.qlin_protocol_pos.setText(f"{int(self.grid.state.protocol_pos):d}")
+        self.qpbt_proto_pos.setText(f"{int(self.grid.state.protocol_pos):d}")
         self.qlin_P_1.setText(f"{self.grid.state.P_1_bar:.3f}")
         self.qlin_P_2.setText(f"{self.grid.state.P_2_bar:.3f}")
         self.qlin_P_3.setText(f"{self.grid.state.P_3_bar:.3f}")
         self.qlin_P_4.setText(f"{self.grid.state.P_4_bar:.3f}")
 
         # Don't allow uploading a protocol when the pump is still running
-        self.qpbt_upload_protocol.setEnabled(
-            not self.pump.state.pump_is_running
-        )
+        self.qpbt_proto_upload.setEnabled(not self.pump.state.pump_is_running)
 
         if self.debug:
             tprint("update_charts")
@@ -600,7 +642,7 @@ class MainWindow(QtWid.QWidget):
     # --------------------------------------------------------------------------
 
     @Slot()
-    def process_qpbt_upload_protocol(self):
+    def process_qpbt_proto_upload(self):
         # Extra safety check: Don't allow uploading a protocol when the pump is
         # still running
         if self.pump.state.pump_is_running:
@@ -636,14 +678,27 @@ class MainWindow(QtWid.QWidget):
         self.grid_qdev.worker_DAQ.DAQ_function = DAQ_function_backup
 
     @Slot()
-    def process_qpbt_play_protocol(self):
-        self.grid_qdev.send_play_protocol()
+    def process_qpbt_proto_stop(self):
+        if self.pump.is_alive:
+            # Safely stop the pump first and only then stop the protocol and
+            # close all valves. The `pump_qdev` will emit a signal once it has
+            # reached standstill, which we will connect in `main.py` to the
+            # `stop protocol` command.
+            self.pump_qdev.send_pump_stop()
+            self.grid_qdev.waiting_for_pump_standstill_to_stop_protocol = True
+        else:
+            # Pump is not alive, so it is safe to immediately close all valves.
+            self.grid_qdev.send_stop_protocol()
 
     @Slot()
-    def process_qpbt_stop_protocol(self):
-        self.pump_qdev.send_pump_stop()
-        self.grid_qdev.waiting_for_pump_standstill_to_stop_protocol = True
+    def process_qpbt_proto_gotoline(self):
+        user_str, user_ok = QtWid.QInputDialog.getText(
+            self, "Go to protocol line", "Enter line number:"
+        )
+        if user_ok and not user_str == "":
+            try:
+                line_no = int(user_str)
+            except (ValueError, TypeError):
+                line_no = 1
 
-    @Slot()
-    def process_qpbt_pause_protocol(self):
-        self.grid_qdev.send_pause_protocol()
+            self.grid_qdev.send_gotoline_protocol(line_no)

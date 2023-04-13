@@ -7,7 +7,7 @@ Manages multi-threaded communication with the Jetting Grid Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "12-04-2023"
+__date__ = "13-04-2023"
 __version__ = "1.0"
 
 import os
@@ -120,16 +120,26 @@ class JettingGrid_qdev(QDeviceIO):
 
     @Slot()
     def pump_has_reached_standstill(self):
+        """We got a confirmation signal that the pump has reached standstill,
+        so now we can safely send the `stop protocol` command and close all
+        valves."""
         if self.waiting_for_pump_standstill_to_stop_protocol:
             self.waiting_for_pump_standstill_to_stop_protocol = False
             self.send_stop_protocol()
 
     @Slot()
     def send_play_protocol(self):
+        """Play the protocol and automatically actuate valves over time."""
         self.send(self.dev.play_protocol)
 
     @Slot()
     def send_stop_protocol(self):
+        """Stop the protocol and immediately close all valves.
+
+        WARNING: This method is ignorant of whether the jetting pump is running
+        or not. Closing all valves suddenly while the pump is running can damage
+        the system.
+        """
         # NOTE: It is actually redundant to trigger a GUI update to update the
         # protocol position textbox at the moment of 'stop'. DAQ_worker already
         # triggers GUI updates of this control (and others) at 10 Hz. Still, we
@@ -141,6 +151,37 @@ class JettingGrid_qdev(QDeviceIO):
 
     @Slot()
     def send_pause_protocol(self):
+        """Pause the protocol keeping the last actuated states of the valves."""
         self.add_to_jobs_queue(self.dev.pause_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
+
+    @Slot()
+    def send_rewind_protocol(self):
+        """Rewind the protocol and immediately actuate valves."""
+        self.add_to_jobs_queue(self.dev.rewind_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
+
+    @Slot()
+    def send_prevline_protocol(self):
+        """Go to the previous line of the protocol and immediately actuate
+        valves."""
+        self.add_to_jobs_queue(self.dev.prevline_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
+
+    @Slot()
+    def send_nextline_protocol(self):
+        """Go to the next line of the protocol and immediately actuate valves."""
+        self.add_to_jobs_queue(self.dev.nextline_protocol)
+        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.process_jobs_queue()
+
+    @Slot(int)
+    def send_gotoline_protocol(self, line_no: int):
+        """Go to the given line number of the protocol and immediately actuate
+        valves."""
+        self.add_to_jobs_queue(self.dev.gotoline_protocol, line_no)
         self.add_to_jobs_queue("signal_GUI_needs_update")
         self.process_jobs_queue()

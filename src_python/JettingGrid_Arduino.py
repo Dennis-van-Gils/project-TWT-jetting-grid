@@ -7,7 +7,7 @@ Manages low-level serial communication with the Jetting Grid Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "12-04-2023"
+__date__ = "13-04-2023"
 __version__ = "1.0"
 
 from datetime import datetime
@@ -111,20 +111,14 @@ class JettingGrid_Arduino(Arduino):
     #   Misc. methods
     # --------------------------------------------------------------------------
 
-    def play_protocol(self) -> bool:
-        """Play the protocol and automatically actuate valves over time.
-
+    def _protocol_query_fun(self, query_cmd: str) -> bool:
+        """Helper function to send a query command to the Arduino involving the
+        protocol controls 'pause/stop/rewind/prevline/nextline'. The protocol
+        position is returned by the query and will get updated in the `state`
+        member.
         Returns: True if successful, False otherwise.
         """
-        return self.write("play")
-
-    def stop_protocol(self) -> bool:
-        """Stop the protocol and close all valves immediately. The protocol
-        position at the moment of pause will get updated in the `state` member.
-
-        Returns: True if successful, False otherwise.
-        """
-        success, reply = self.query("stop")
+        success, reply = self.query(query_cmd)
         if success:
             try:
                 num = int(reply)
@@ -137,14 +131,59 @@ class JettingGrid_Arduino(Arduino):
 
         return False
 
-    def pause_protocol(self) -> bool:
-        """Pause the protocol keeping the last actuated states of the valves.
-        The protocol position at the moment of stop will get updated in the
-        `state` member.
+    def play_protocol(self) -> bool:
+        """Play the protocol and automatically actuate valves over time.
+        Returns: True if successful, False otherwise.
+        """
+        return self.write("play")
+
+    def stop_protocol(self) -> bool:
+        """Stop the protocol and immediately close all valves.
+
+        WARNING: This method is ignorant of whether the jetting pump is running
+        or not. Closing all valves suddenly while the pump is running can damage
+        the system.
 
         Returns: True if successful, False otherwise.
         """
-        success, reply = self.query("pause")
+        return self._protocol_query_fun("stop")
+
+    def pause_protocol(self) -> bool:
+        """Pause the protocol keeping the last actuated states of the valves.
+        Returns: True if successful, False otherwise.
+        """
+        return self._protocol_query_fun("pause")
+
+    def rewind_protocol(self) -> bool:
+        """Rewind the protocol and immediately actuate valves.
+        Returns: True if successful, False otherwise.
+        """
+        return self._protocol_query_fun("goto 1")
+
+    def prevline_protocol(self) -> bool:
+        """Go to the previous line of the protocol and immediately actuate
+        valves.
+        Returns: True if successful, False otherwise.
+        """
+        return self._protocol_query_fun(",")
+
+    def nextline_protocol(self) -> bool:
+        """Go to the next line of the protocol and immediately actuate valves.
+        Returns: True if successful, False otherwise.
+        """
+        return self._protocol_query_fun(".")
+
+    def gotoline_protocol(self, line_no: int) -> bool:
+        """Go to the given line number of the protocol and immediately actuate
+        valves.
+        Returns: True if successful, False otherwise.
+        """
+        try:
+            idx_line = int(line_no)
+        except (TypeError, ValueError):
+            idx_line = 1
+
+        success, reply = self.query(f"goto {idx_line:d}")
         if success:
             try:
                 num = int(reply)
