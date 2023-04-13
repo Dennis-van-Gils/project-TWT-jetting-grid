@@ -4,6 +4,7 @@ numpy
 pyqt6
 pyqtgraph
 pyopengl
+qtawesome
 
 dvg-debug-functions
 dvg-devices
