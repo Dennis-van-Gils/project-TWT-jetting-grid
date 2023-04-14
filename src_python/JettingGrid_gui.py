@@ -245,13 +245,18 @@ class MainWindow(QtWid.QWidget):
         # Middle box
         icon = "fa.fighter-jet"
         self.icon_1 = QtWid.QLabel()
-        self.icon_1.setPixmap(qta.icon(icon).pixmap(30, 30))
+        self.icon_1.setPixmap(qta.icon(icon).pixmap(28, 28))
+        self.icon_1.setVisible(False)
         self.icon_2 = QtWid.QLabel()
-        self.icon_2.setPixmap(qta.icon(icon, hflip=True).pixmap(30, 30))
+        self.icon_2.setPixmap(qta.icon(icon, hflip=False).pixmap(28, 28))
+        self.icon_2.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+        self.icon_2.setVisible(False)
+
         self.qlbl_title = QtWid.QLabel(
-            "  Jetting Grid  ",
+            "Jetting Grid",
             font=QtGui.QFont("Palatino", 14, weight=QtGui.QFont.Weight.Bold),
         )
+        self.qlbl_title.mousePressEvent = self.toggle_icons
         self.qlbl_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
         self.qlbl_cur_date_time = QtWid.QLabel("00-00-0000    00:00:00")
@@ -261,6 +266,7 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_record = controls.create_Toggle_button(
             "Click to start recording to file"
         )
+        self.qpbt_record.setMinimumWidth(controls.e8(32))
         self.qpbt_record.clicked.connect(
             lambda state: self.logger.record(state)
         )
@@ -630,6 +636,10 @@ class MainWindow(QtWid.QWidget):
     # --------------------------------------------------------------------------
     #   Handle general controls
     # --------------------------------------------------------------------------
+
+    def toggle_icons(self, event):
+        self.icon_1.setVisible(not self.icon_1.isVisible())
+        self.icon_2.setVisible(not self.icon_2.isVisible())
 
     @Slot()
     def update_wall_clock(self):
