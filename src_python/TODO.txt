@@ -1,0 +1,11 @@
+* Implement shortcut keys for protocol step navigation:
+
+A la code example:
+"""
+openFile = QAction(QIcon('open.png'), 'Open', self)
+openFile.setShortcut('Ctrl+O')
+openFile.setStatusTip('Open new File')
+openFile.triggered.connect(self.showDialog)
+"""
+
+* Rename extension of protocol files from `.txt` to `.proto`
