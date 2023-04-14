@@ -8,7 +8,7 @@ and the Xylem Hydrovar HVL pump.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "13-04-2023"
+__date__ = "14-04-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
@@ -110,7 +110,7 @@ from dvg_pyqtgraph_threadsafe import (
 )
 
 from JettingGrid_Arduino import JettingGrid_Arduino
-from JettingGrid_qdev import JettingGrid_qdev
+from JettingGrid_qdev import JettingGrid_qdev, GUI_objects
 from JettingGrid_upload import upload_protocol
 from XylemHydrovarHVL_protocol_RTU import XylemHydrovarHVL
 from XylemHydrovarHVL_qdev import XylemHydrovarHVL_qdev
@@ -214,10 +214,12 @@ class MainWindow(QtWid.QWidget):
         self.debug = debug
 
         # Shorthands to the low-level devices
-        self.grid: JettingGrid_Arduino = grid_qdev.dev
-        self.pump: XylemHydrovarHVL = pump_qdev.dev
+        self.grid: JettingGrid_Arduino = self.grid_qdev.dev
+        self.pump: XylemHydrovarHVL = self.pump_qdev.dev
 
-        # Start GUI layout
+        self.create_GUI()
+
+    def create_GUI(self):
         self.setWindowTitle("Jetting Grid")
         self.setGeometry(150, 60, 1200, 800)
         self.setStyleSheet(
@@ -319,29 +321,29 @@ class MainWindow(QtWid.QWidget):
         #  Pump control
         # -------------------------
 
-        pump_qdev.qpte_error_status.setMaximumWidth(controls.e8(20))
-        pump_qdev.qpte_error_status.setMinimumWidth(controls.e8(20))
+        self.pump_qdev.qpte_error_status.setMaximumWidth(controls.e8(20))
+        self.pump_qdev.qpte_error_status.setMinimumWidth(controls.e8(20))
 
         vbox_pump = QtWid.QVBoxLayout()
-        vbox_pump.addWidget(pump_qdev.qgrp_control)
-        vbox_pump.addWidget(pump_qdev.qgrp_inverter)
-        vbox_pump.addWidget(pump_qdev.qgrp_error_status)
+        vbox_pump.addWidget(self.pump_qdev.qgrp_control)
+        vbox_pump.addWidget(self.pump_qdev.qgrp_inverter)
+        vbox_pump.addWidget(self.pump_qdev.qgrp_error_status)
 
-        #  Protocol program
+        #  Protocol control
         # -------------------------
 
-        g = self.grid_qdev  # Shorthand
+        gq = self.grid_qdev  # Even shorter shorthand
         qbtn_width = controls.e8(5)
 
         self.qpbt_proto_play = QtWid.QPushButton("")
         self.qpbt_proto_play.setFixedWidth(qbtn_width)
         self.qpbt_proto_play.setIcon(qta.icon("mdi6.play"))
-        self.qpbt_proto_play.clicked.connect(g.send_play_protocol)
+        self.qpbt_proto_play.clicked.connect(gq.send_play_protocol)
 
         self.qpbt_proto_pause = QtWid.QPushButton("")
         self.qpbt_proto_pause.setFixedWidth(qbtn_width)
         self.qpbt_proto_pause.setIcon(qta.icon("mdi6.pause"))
-        self.qpbt_proto_pause.clicked.connect(g.send_pause_protocol)
+        self.qpbt_proto_pause.clicked.connect(gq.send_pause_protocol)
 
         self.qpbt_proto_stop = QtWid.QPushButton("")
         self.qpbt_proto_stop.setFixedWidth(qbtn_width)
@@ -351,17 +353,17 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_proto_rewind = QtWid.QPushButton("")
         self.qpbt_proto_rewind.setFixedWidth(qbtn_width)
         self.qpbt_proto_rewind.setIcon(qta.icon("mdi6.skip-backward"))
-        self.qpbt_proto_rewind.clicked.connect(g.send_rewind_protocol)
+        self.qpbt_proto_rewind.clicked.connect(gq.send_rewind_protocol)
 
         self.qpbt_proto_prevline = QtWid.QPushButton("")
         self.qpbt_proto_prevline.setFixedWidth(qbtn_width)
         self.qpbt_proto_prevline.setIcon(qta.icon("mdi6.step-backward"))
-        self.qpbt_proto_prevline.clicked.connect(g.send_prevline_protocol)
+        self.qpbt_proto_prevline.clicked.connect(gq.send_prevline_protocol)
 
         self.qpbt_proto_nextline = QtWid.QPushButton("")
         self.qpbt_proto_nextline.setFixedWidth(qbtn_width)
         self.qpbt_proto_nextline.setIcon(qta.icon("mdi6.step-forward"))
-        self.qpbt_proto_nextline.clicked.connect(g.send_nextline_protocol)
+        self.qpbt_proto_nextline.clicked.connect(gq.send_nextline_protocol)
 
         self.qpbt_proto_gotoline = QtWid.QPushButton("")
         self.qpbt_proto_gotoline.setFixedWidth(qbtn_width)
@@ -374,6 +376,9 @@ class MainWindow(QtWid.QWidget):
         self.qpbt_proto_upload.clicked.connect(self.process_qpbt_proto_upload)
 
         self.qpbt_proto_pos = QtWid.QLineEdit("", readOnly=True)
+        self.qlin_proto_name = QtWid.QLineEdit(
+            self.grid.state.protocol_name, readOnly=True
+        )
 
         # fmt: off
         qgrid_protocol = QtWid.QGridLayout()
@@ -407,6 +412,7 @@ class MainWindow(QtWid.QWidget):
         vbox_protocol = QtWid.QVBoxLayout(spacing=4)
         vbox_protocol.addWidget(self.qpbt_proto_upload)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
+        vbox_protocol.addWidget(self.qlin_proto_name)
         vbox_protocol.addLayout(qgrid_protocol)
         vbox_protocol.addSpacerItem(QtWid.QSpacerItem(0, 20))
         vbox_protocol.addWidget(self.qpbt_preset_0)
@@ -432,7 +438,9 @@ class MainWindow(QtWid.QWidget):
 
         # Thread-safe curves
         capacity = round(
-            CHART_HISTORY_TIME * 1e3 / grid_qdev.worker_DAQ._DAQ_interval_ms
+            CHART_HISTORY_TIME
+            * 1e3
+            / self.grid_qdev.worker_DAQ._DAQ_interval_ms
         )
         PEN_01 = pg.mkPen(controls.COLOR_PEN_RED, width=3)
         PEN_02 = pg.mkPen(controls.COLOR_PEN_YELLOW, width=3)
@@ -650,32 +658,45 @@ class MainWindow(QtWid.QWidget):
         )
 
     @Slot()
-    def update_GUI(self):
-        self.qlbl_update_counter.setText(f"{self.grid_qdev.update_counter_DAQ}")
-        self.qlbl_DAQ_rate.setText(
-            f"DAQ: {self.grid_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
-        )
-        self.qlbl_recording_time.setText(
-            f"REC: {self.logger.pretty_elapsed()}"
-            if self.logger.is_recording()
-            else ""
-        )
+    @Slot(int)
+    def update_GUI(self, GUI_object=GUI_objects.ALL):
+        # Shorthands
+        grid = self.grid
+        grid_qdev = self.grid_qdev
+        pump = self.pump
 
-        self.qlin_P_pump.setText(f"{self.pump.state.actual_pressure:.3f}")
-        self.qpbt_proto_pos.setText(f"{int(self.grid.state.protocol_pos):d}")
-        self.qlin_P_1.setText(f"{self.grid.state.P_1_bar:.3f}")
-        self.qlin_P_2.setText(f"{self.grid.state.P_2_bar:.3f}")
-        self.qlin_P_3.setText(f"{self.grid.state.P_3_bar:.3f}")
-        self.qlin_P_4.setText(f"{self.grid.state.P_4_bar:.3f}")
+        if GUI_object == GUI_objects.PROTO_POS:
+            self.qpbt_proto_pos.setText(f"{int(grid.state.protocol_pos):d}")
 
-        # Don't allow uploading a protocol when the pump is still running
-        self.qpbt_proto_upload.setEnabled(not self.pump.state.pump_is_running)
+        elif GUI_object == GUI_objects.PROTO_INFO:
+            self.qlin_proto_name.setText(grid.state.protocol_name)
 
-        if self.debug:
-            tprint("update_charts")
+        else:
+            self.qlbl_update_counter.setText(f"{grid_qdev.update_counter_DAQ}")
+            self.qlbl_DAQ_rate.setText(
+                f"DAQ: {grid_qdev.obtained_DAQ_rate_Hz:.1f} Hz"
+            )
+            self.qlbl_recording_time.setText(
+                f"REC: {self.logger.pretty_elapsed()}"
+                if self.logger.is_recording()
+                else ""
+            )
 
-        for curve in self.curves:
-            curve.update()
+            self.qlin_P_pump.setText(f"{pump.state.actual_pressure:.3f}")
+            self.qpbt_proto_pos.setText(f"{int(grid.state.protocol_pos):d}")
+            self.qlin_P_1.setText(f"{grid.state.P_1_bar:.3f}")
+            self.qlin_P_2.setText(f"{grid.state.P_2_bar:.3f}")
+            self.qlin_P_3.setText(f"{grid.state.P_3_bar:.3f}")
+            self.qlin_P_4.setText(f"{grid.state.P_4_bar:.3f}")
+
+            # Don't allow uploading a protocol when the pump is still running
+            self.qpbt_proto_upload.setEnabled(not pump.state.pump_is_running)
+
+            if self.debug:
+                tprint("update_charts")
+
+            for curve in self.curves:
+                curve.update()
 
     # --------------------------------------------------------------------------
     #   Handle protocol controls
@@ -713,6 +734,11 @@ class MainWindow(QtWid.QWidget):
 
         # Now we're ready to upload a new jetting protocol
         upload_protocol(self.grid)
+
+        # Retrieve the name and total number of lines of the protocol currently
+        # loaded into the Arduino
+        self.grid.get_protocol_info()
+        self.update_GUI(GUI_objects.PROTO_INFO)
 
         # Restore DAQ function
         self.grid_qdev.worker_DAQ.DAQ_function = DAQ_function_backup

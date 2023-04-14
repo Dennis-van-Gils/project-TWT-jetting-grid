@@ -1,5 +1,5 @@
 /**
- * @file    protocol_program_presets.cpp
+ * @file    protocol_presets.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
  * @date    14-04-2023
@@ -13,9 +13,8 @@
 /**
  * @brief Open all valves
  */
-void load_protocol_preset_0() {
-  protocol_mgr.clear();
-  protocol_mgr.set_name("Preset 0: Open all valves");
+static void generate_preset_0() {
+  protocol_mgr.set_name("Open all valves");
   Line line;
 
   for (uint8_t idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
@@ -25,15 +24,13 @@ void load_protocol_preset_0() {
   line.points[N_VALVES].set_null(); // Add end sentinel
   line.duration = 1000;             // [ms]
   protocol_mgr.add_line(line);
-  protocol_mgr.prime_start();
 }
 
 /**
  * @brief Walk over all valves
  */
-void load_protocol_preset_1() {
-  protocol_mgr.clear();
-  protocol_mgr.set_name("Preset 1: Walk over all valves");
+static void generate_preset_1() {
+  protocol_mgr.set_name("Walk over valves");
   Line line;
 
   for (uint8_t idx_valve = 1; idx_valve <= N_VALVES; ++idx_valve) {
@@ -42,16 +39,13 @@ void load_protocol_preset_1() {
     line.duration = 500;       // [ms]
     protocol_mgr.add_line(line);
   }
-
-  protocol_mgr.prime_start();
 }
 
 /**
  * @brief Walk over all manifolds
  */
-void load_protocol_preset_2() {
-  protocol_mgr.clear();
-  protocol_mgr.set_name("Preset 2: Walk over all manifolds");
+static void generate_preset_2() {
+  protocol_mgr.set_name("Walk over manifolds");
   Line line;
   uint8_t idx_valve;
   uint8_t idx_point;
@@ -95,16 +89,13 @@ void load_protocol_preset_2() {
   line.points[idx_point].set_null(); // Add end sentinel
   line.duration = 1000;              // [ms]
   protocol_mgr.add_line(line);
-
-  protocol_mgr.prime_start();
 }
 
 /**
  * @brief Alternating checkerboard
  */
-void load_protocol_preset_3() {
-  protocol_mgr.clear();
-  protocol_mgr.set_name("Preset 3: Alternating checkerboard");
+static void generate_preset_3() {
+  protocol_mgr.set_name("Checkerboard");
   Line line;
   uint8_t idx_valve;
   uint8_t idx_point;
@@ -138,16 +129,13 @@ void load_protocol_preset_3() {
   line.points[idx_point].set_null(); // Add end sentinel
   line.duration = 1000;              // [ms]
   protocol_mgr.add_line(line);
-
-  protocol_mgr.prime_start();
 }
 
 /**
  * @brief Alternating even/odd valves
  */
-void load_protocol_preset_4() {
-  protocol_mgr.clear();
-  protocol_mgr.set_name("Preset 4: Alternating even/odd valves");
+static void generate_preset_4() {
+  protocol_mgr.set_name("Even/odd valves");
   Line line;
   uint8_t idx_valve;
   uint8_t idx_point;
@@ -173,6 +161,31 @@ void load_protocol_preset_4() {
   line.points[idx_point].set_null(); // Add end sentinel
   line.duration = 1000;              // [ms]
   protocol_mgr.add_line(line);
+}
+
+void load_protocol_preset(uint16_t idx_preset) {
+  protocol_mgr.clear();
+
+  switch (idx_preset) {
+    case 0:
+      generate_preset_0();
+      break;
+    case 1:
+      generate_preset_1();
+      break;
+    case 2:
+      generate_preset_2();
+      break;
+    case 3:
+      generate_preset_3();
+      break;
+    case 4:
+      generate_preset_4();
+      break;
+    default:
+      generate_preset_0();
+      break;
+  }
 
   protocol_mgr.prime_start();
 }

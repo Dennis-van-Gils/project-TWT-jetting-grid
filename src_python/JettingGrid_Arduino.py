@@ -7,7 +7,7 @@ Manages low-level serial communication with the Jetting Grid Arduino
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "13-04-2023"
+__date__ = "14-04-2023"
 __version__ = "1.0"
 
 from datetime import datetime
@@ -42,6 +42,8 @@ class JettingGrid_Arduino(Arduino):
 
         def __init__(self):
             self.time = np.nan  # [s]
+            self.protocol_name = ""
+            self.protocol_N_lines = 0
             self.protocol_pos = 0
             self.P_1_mA = np.nan  # [mA]
             self.P_2_mA = np.nan  # [mA]
@@ -192,6 +194,10 @@ class JettingGrid_Arduino(Arduino):
             2: Walk over all manifolds
             3: Alternating checkerboard
             4: Alternating even/odd valves
+
+        The name and total number of lines of the protocol will get updated in
+        members `state.protocol_name` and `state.protocol_N_lines`.
+
         Returns: True if successful, False otherwise.
         """
         try:
@@ -204,4 +210,32 @@ class JettingGrid_Arduino(Arduino):
         if not idx_preset in range(IDX_PRESET_MAX + 1):
             idx_preset = 0
 
-        return self.write(f"preset{idx_preset:d}")
+        success = self.write(f"preset{idx_preset:d}")
+        success &= self.get_protocol_info()
+
+        return success
+
+    def get_protocol_info(self) -> bool:
+        """Get the name and total number of lines of the protocol currently
+        loaded into the Arduino, and write them into members
+        `state.protocol_name` and `state.protocol_N_lines`.
+        Returns: True if successful, False otherwise.
+        """
+        success, reply = self.query("p?")
+
+        if not success:
+            return False
+
+        try:
+            info1, info2 = reply.split("\t")
+            self.state.protocol_name = info1
+            self.state.protocol_N_lines = int(info2)
+        except Exception as err:
+            str_cur_date, str_cur_time = current_date_time_strings()
+            pft(err)
+            dprint(
+                f"'{self.name}' reports IOError @ {str_cur_date} {str_cur_time}"
+            )
+            return False
+
+        return True

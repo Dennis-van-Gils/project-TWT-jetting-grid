@@ -2,7 +2,7 @@
  * @file    ProtocolManager.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    09-02-2023
+ * @date    14-04-2023
  * @copyright MIT License. See the LICENSE file for details.
  */
 
@@ -202,10 +202,16 @@ void ProtocolManager::update() {
 }
 
 void ProtocolManager::print_program() {
-  Serial.println(_name);
+  Serial.print(_name);
+  Serial.write('\t');
+  Serial.println(_N_lines);
+}
+
+void ProtocolManager::print_full_program() {
+  Serial.print(_name);
+  Serial.write('\t');
   Serial.println(_N_lines);
 
-  /*
   Line line;
   Serial.write('\n');
   for (uint16_t i = 0; i < _N_lines; ++i) {
@@ -215,7 +221,6 @@ void ProtocolManager::print_program() {
     line.print();
   }
   Serial.write('\n');
-  */
 }
 
 void ProtocolManager::print_buffer() {

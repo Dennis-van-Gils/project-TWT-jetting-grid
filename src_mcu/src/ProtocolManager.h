@@ -2,7 +2,7 @@
  * @file    ProtocolManager.h
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    12-04-2023
+ * @date    14-04-2023
  *
  * @brief   Provides classes `P`, `Line`, `PackedLine` and `ProtocolManager`,
  * needed for reading in and playing back a protocol program for the jetting
@@ -312,9 +312,14 @@ public:
   void update();
 
   /**
-   * @brief Pretty print the protocol program.
+   * @brief Print the protocol program name and total number of lines.
    */
   void print_program();
+
+  /**
+   * @brief Pretty print the full protocol program, line by line.
+   */
+  void print_full_program();
 
   /**
    * @brief Pretty print the current line buffer, useful for debugging.

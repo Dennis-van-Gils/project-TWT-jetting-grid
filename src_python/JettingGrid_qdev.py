@@ -12,6 +12,7 @@ __version__ = "1.0"
 
 import os
 import sys
+from enum import IntEnum
 
 # Mechanism to support both PyQt and PySide
 # -----------------------------------------
@@ -67,13 +68,21 @@ from JettingGrid_Arduino import JettingGrid_Arduino
 from dvg_debug_functions import print_fancy_traceback as pft
 from dvg_qdeviceio import QDeviceIO
 
+
+# Enumeration
+class GUI_objects(IntEnum):
+    ALL = 0
+    PROTO_POS = 1
+    PROTO_INFO = 2
+
+
 # ------------------------------------------------------------------------------
 #   JettingGrid_qdev
 # ------------------------------------------------------------------------------
 
 
 class JettingGrid_qdev(QDeviceIO):
-    signal_GUI_needs_update = Signal()
+    signal_GUI_needs_update = Signal(int)
 
     def __init__(
         self,
@@ -105,7 +114,7 @@ class JettingGrid_qdev(QDeviceIO):
     def jobs_function(self, func, args):
         if func == "signal_GUI_needs_update":
             # Special instruction
-            self.signal_GUI_needs_update.emit()
+            self.signal_GUI_needs_update.emit(*args)
         else:
             # Default job processing:
             # Send I/O operation to the device
@@ -140,27 +149,22 @@ class JettingGrid_qdev(QDeviceIO):
         or not. Closing all valves suddenly while the pump is running can damage
         the system.
         """
-        # NOTE: It is actually redundant to trigger a GUI update to update the
-        # protocol position textbox at the moment of 'stop'. DAQ_worker already
-        # triggers GUI updates of this control (and others) at 10 Hz. Still, we
-        # keep it as a good practice. So, in theory, below block could be
-        # replaced by a single instruction: self.send(self.dev.stop_protocol).
         self.add_to_jobs_queue(self.dev.stop_protocol)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot()
     def send_pause_protocol(self):
         """Pause the protocol keeping the last actuated states of the valves."""
         self.add_to_jobs_queue(self.dev.pause_protocol)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot()
     def send_rewind_protocol(self):
         """Rewind the protocol and immediately actuate valves."""
         self.add_to_jobs_queue(self.dev.rewind_protocol)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot()
@@ -168,14 +172,14 @@ class JettingGrid_qdev(QDeviceIO):
         """Go to the previous line of the protocol and immediately actuate
         valves."""
         self.add_to_jobs_queue(self.dev.prevline_protocol)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot()
     def send_nextline_protocol(self):
         """Go to the next line of the protocol and immediately actuate valves."""
         self.add_to_jobs_queue(self.dev.nextline_protocol)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot(int)
@@ -183,10 +187,14 @@ class JettingGrid_qdev(QDeviceIO):
         """Go to the given line number of the protocol and immediately actuate
         valves."""
         self.add_to_jobs_queue(self.dev.gotoline_protocol, line_no)
-        self.add_to_jobs_queue("signal_GUI_needs_update")
+        self.add_to_jobs_queue("signal_GUI_needs_update", GUI_objects.PROTO_POS)
         self.process_jobs_queue()
 
     @Slot(int)
     def send_load_preset(self, preset_no: int):
         """Load in a protocol preset."""
-        self.send(self.dev.load_preset, preset_no)
+        self.add_to_jobs_queue(self.dev.load_preset, preset_no)
+        self.add_to_jobs_queue(
+            "signal_GUI_needs_update", GUI_objects.PROTO_INFO
+        )
+        self.process_jobs_queue()

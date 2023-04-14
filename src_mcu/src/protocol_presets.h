@@ -15,26 +15,11 @@
 extern ProtocolManager protocol_mgr;
 
 /**
- * @brief Open all valves
+ * @brief Load a protocol preset into Arduino memory:
+ *   0: Open all valves
+ *   1: Walk over all valves
+ *   2: Walk over all manifolds
+ *   3: Alternating checkerboard
+ *   4: Alternating even/odd valves
  */
-void load_protocol_preset_0();
-
-/**
- * @brief Walk over all valves
- */
-void load_protocol_preset_1();
-
-/**
- * @brief Walk over all manifolds
- */
-void load_protocol_preset_2();
-
-/**
- * @brief Alternating checkerboard
- */
-void load_protocol_preset_3();
-
-/**
- * @brief Alternating even/odd valves
- */
-void load_protocol_preset_4();
+void load_protocol_preset(uint16_t idx_preset);

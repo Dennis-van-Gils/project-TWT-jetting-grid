@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    13-04-2023
+ * @date    14-04-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
@@ -471,8 +471,8 @@ void setup() {
   Wire.setClock(1000000); // 1 MHz
   if (!NO_PERIPHERALS) { cp_mgr.begin(); }
 
-  // Load protocol preset
-  load_protocol_preset_0();
+  // Load a protocol preset
+  load_protocol_preset(0);
 
   // Reached the end of setup, so now show the fixed grid in the LED matrix
   FastLED.clearData();
@@ -517,8 +517,8 @@ void loop() {
           // Report current protocol position starting at index 1
           Serial.println(get_protocol_position());
 
-        } else if (strcmp(str_cmd, "proto?") == 0) {
-          // Report current protocol information, newline delimited:
+        } else if (strcmp(str_cmd, "p?") == 0) {
+          // Report current protocol information, tab delimited:
           //   1) Protocol name
           //   2) N_lines
           protocol_mgr.print_program();
@@ -611,32 +611,21 @@ void loop() {
           protocol_mgr.goto_line(tmp_int - 1);
           Serial.println(get_protocol_position());
 
-        } else if (strcmp(str_cmd, "preset0") == 0) {
-          // Load protocol preset: Open all valves
-          load_protocol_preset_0();
-
-        } else if (strcmp(str_cmd, "preset1") == 0) {
-          // Load protocol preset:  Walk over all valves
-          load_protocol_preset_1();
-
-        } else if (strcmp(str_cmd, "preset2") == 0) {
-          // Load protocol preset: Walk over all manifolds
-          load_protocol_preset_2();
-
-        } else if (strcmp(str_cmd, "preset3") == 0) {
-          // Load protocol preset: Alternating checkerboard
-          load_protocol_preset_3();
-
-        } else if (strcmp(str_cmd, "preset4") == 0) {
-          // Load protocol preset: Alternating even/odd valves
-          load_protocol_preset_4();
+        } else if (strncmp(str_cmd, "preset", 6) == 0) {
+          // Load a protocol preset
+          uint16_t idx_preset = max(parseIntInString(str_cmd, 6), 0);
+          load_protocol_preset(idx_preset);
 
           // ***** Debugging  ****
           // *********************
 
         } else if (strcmp(str_cmd, "b?") == 0) {
-          // Report current line buffer contents
+          // Pretty print the current line buffer contents
           protocol_mgr.print_buffer();
+
+        } else if (strcmp(str_cmd, "proto?") == 0) {
+          // Pretty print the full protocol program, line by line
+          protocol_mgr.print_full_program();
 
         } else if (strcmp(str_cmd, "fsm?") == 0) {
           // Report current Finite State Machine state name
