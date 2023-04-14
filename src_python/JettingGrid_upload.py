@@ -9,14 +9,15 @@ TODO: Work-in-progress. This module works but is very fugly.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "31-03-2023"
+__date__ = "14-04-2023"
 __version__ = "1.0"
 # pylint: disable=pointless-string-statement
 
 import sys
 import struct
+from pathlib import Path
 
-from dvg_devices.Arduino_protocol_serial import Arduino
+from JettingGrid_Arduino import JettingGrid_Arduino
 
 # ------------------------------------------------------------------------------
 #   Point `P` in the protocol coordinate system (PCS)
@@ -41,14 +42,18 @@ class P:
 # -----------------------------------------------------------------------------
 
 
-def upload_protocol(grid: Arduino):
+def upload_protocol(
+    grid: JettingGrid_Arduino, file_path: str = "proto_example.txt"
+):
     print("Uploading protocol")
     print("------------------")
 
     # Read in protocol file from disk
-    filename = "proto_example.txt"
-    with open(file=filename, mode="r", encoding="utf8") as f:
+    with open(file=file_path, mode="r", encoding="utf8") as f:
         lines = [line.rstrip() for line in f]
+
+    # Extract the filename from the full path
+    filename = Path(file_path).name
 
     # Find DATA section
     data_line_idx = None
@@ -143,7 +148,7 @@ def upload_protocol(grid: Arduino):
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    grid = Arduino()
+    grid = JettingGrid_Arduino()
     grid.auto_connect()
 
     upload_protocol(grid)

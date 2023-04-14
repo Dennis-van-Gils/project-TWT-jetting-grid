@@ -15,6 +15,7 @@ __version__ = "1.0"
 import os
 import sys
 from functools import partial
+from pathlib import Path
 
 # Constants
 UPDATE_INTERVAL_WALL_CLOCK = 50  # 50 [ms]
@@ -709,6 +710,18 @@ class MainWindow(QtWid.QWidget):
         if self.pump.state.pump_is_running:
             return
 
+        protocol_dir = str(Path("..\protocols\protocols"))
+        reply = QtWid.QFileDialog.getOpenFileName(
+            self,
+            "Upload protocol file",
+            protocol_dir,
+            "Protocol files (*.txt *.proto)",
+        )
+        if reply[0]:
+            file_path = reply[0]
+        else:
+            return
+
         # Stop the `DAQ_function` running in the worker thread from sending and
         # receiving ASCII data containing pressure data. We are about to upload
         # a raw byte stream to the Arduino decoding a jetting protocol and it
@@ -733,7 +746,7 @@ class MainWindow(QtWid.QWidget):
         self.grid.ser.flush()
 
         # Now we're ready to upload a new jetting protocol
-        upload_protocol(self.grid)
+        upload_protocol(self.grid, file_path)
 
         # Retrieve the name and total number of lines of the protocol currently
         # loaded into the Arduino
