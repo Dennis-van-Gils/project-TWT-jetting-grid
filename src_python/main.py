@@ -175,8 +175,10 @@ def DAQ_function() -> bool:
 def write_header_to_log():
     str_cur_date, str_cur_time = current_date_time_strings()
     logger.write("[HEADER]\n")
-    logger.write(str_cur_date + "\n")
-    logger.write(str_cur_time + "\n")
+    logger.write(f"Date: {str_cur_date}\n")
+    logger.write(f"Time: {str_cur_time}\n")
+    logger.write(f"Protocol: {grid.state.protocol_name}\n")
+    logger.write("Comments:\n")
     logger.write(window.qtxt_comments.toPlainText())
     logger.write("\n\n[DATA]\n")
     logger.write("[s]\t[#]\t[bar]\t[bar]\t[bar]\t[bar]\t[bar]\n")
