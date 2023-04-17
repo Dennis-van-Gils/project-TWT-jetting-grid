@@ -132,6 +132,7 @@ def _binarize_stack_using_newton(
     wanted_transparency: float,
     stack_BW: np.ndarray,
     alpha: np.ndarray,
+    solved_successfully: np.ndarray,
 ):
     """Using Newton's method to solve for the given transparency:
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
@@ -152,6 +153,8 @@ def _binarize_stack_using_newton(
             )
         except:
             print(f"\nWARNING: Failed to solve for transparency @ iter {i}")
+        else:
+            solved_successfully[i] = True
 
         true_pxs = np.where(stack_in[i] > threshold)
         alpha[i] = len(true_pxs[0]) / stack_in.shape[1] / stack_in.shape[2]
@@ -162,6 +165,7 @@ def binarize_stack(
     stack_in: np.ndarray,
     BW_threshold: float,
     tune_transparency: Union[bool, int],
+    solved_successfully: np.ndarray = np.array([], dtype=bool),
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Binarize each frame of the image stack.
 
@@ -201,7 +205,14 @@ def binarize_stack(
 
     if tune_transparency:
         print("Binarizing noise and tuning transparency...")
-        _binarize_stack_using_newton(stack_in, BW_threshold, stack_BW, alpha)
+        # solved_successfully = np.zeros(stack_in.shape[0], dtype=bool)
+        _binarize_stack_using_newton(
+            stack_in,
+            BW_threshold,
+            stack_BW,
+            alpha,
+            solved_successfully,
+        )
     else:
         print("Binarizing noise...")
         _binarize_stack_using_threshold(

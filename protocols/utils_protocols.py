@@ -105,8 +105,12 @@ def generate_protocol_arrays_OpenSimplex() -> (
 
     # Transform grayscale noise into binary BW map, optionally solving for a
     # desired transparency level.
+    solved_successfully = np.zeros(CFG.N_FRAMES, dtype=bool)
     img_stack_BW, alpha_noise = binarize_stack(
-        img_stack_A, CFG.BW_THRESHOLD, CFG.TUNE_TRANSPARENCY
+        img_stack_A,
+        CFG.BW_THRESHOLD,
+        CFG.TUNE_TRANSPARENCY,
+        solved_successfully,
     )
 
     # Generate valves stack
