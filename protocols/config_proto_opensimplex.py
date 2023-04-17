@@ -22,7 +22,7 @@ protocol textfile.
 
 # Filename without extension for exporting the generated protocol files to disk
 EXPORT_SUBFOLDER = "protocols"
-EXPORT_FILENAME = "proto_001"
+EXPORT_FILENAME = "simplex_001"
 
 # Number of frames (i.e. protocol lines) to generate.
 # Do need exceed 5000 as this hits the memory limit of the microcontroller.

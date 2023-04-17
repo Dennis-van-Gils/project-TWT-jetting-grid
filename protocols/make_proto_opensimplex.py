@@ -128,7 +128,7 @@ print(f"  alpha_valves_adj = {stats_alpha_valves_adj}\n")
 # ------------------------------------------------------------------------------
 
 # Protocol formatted such that it can be send to the microcontroller
-export_protocol_to_disk(valves_stack_adj, CFG.EXPORT_PATH_NO_EXT + ".txt")
+export_protocol_to_disk(valves_stack_adj, CFG.EXPORT_PATH_NO_EXT + ".proto")
 
 # The final `valves_stack`, useful for optional post-processing
 np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack_adj)
