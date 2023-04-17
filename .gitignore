@@ -1,7 +1,5 @@
 ~$*.*
 \\.git/
-.vscode/
-settings.json
 
 # Specific to this library
 port*.txt
@@ -117,4 +115,4 @@ venv.bak/
 */.vscode/c_cpp_properties.json
 */.vscode/launch.json
 */.vscode/ipch
-protocols/.vscode/settings.json
+*/.vscode/settings.json
