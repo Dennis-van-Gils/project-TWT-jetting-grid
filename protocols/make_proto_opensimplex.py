@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
+"""make_proto_opensimplex.py
+
 Installation:
     In Anaconda prompt:
     > conda create -n twt python=3.10
@@ -15,6 +16,10 @@ Usage:
     > ipython make_proto_opensimplex.py
 """
 __author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
+__date__ = "17-04-2023"
+__version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
 from time import perf_counter

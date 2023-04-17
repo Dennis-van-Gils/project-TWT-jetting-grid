@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Example code block
+"""utils_tracemalloc.py
+
+Example code block
 
 # DEBUG info: Report on memory allocation?
 REPORT_MALLOC = False

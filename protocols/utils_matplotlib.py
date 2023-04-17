@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Utility functions for matplotlib.
+"""utils_matplotlib.py
+
+Utility functions for matplotlib.
 """
 __author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
+__date__ = "17-04-2023"
+__version__ = "1.0"
 
 from sys import platform
 import matplotlib

@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Utility functions for PIL "pillow": Fork of the Python Imaging Library
+"""utils_pillow.py
+
+Utility functions for PIL "pillow": Fork of the Python Imaging Library
 """
 __author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
+__date__ = "17-04-2023"
+__version__ = "1.0"
 # pylint: disable=invalid-name
 
 import io

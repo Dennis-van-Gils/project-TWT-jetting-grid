@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""User-configurable parameters for the generation of a jetting protocol using
+"""config_proto_opensimplex.py
+
+User-configurable parameters for the generation of a jetting protocol using
 OpenSimplex noise.
 
 Two different sets of OpenSimplex noise can be mixed together: set A and set B.
@@ -24,20 +26,21 @@ EXPORT_FILENAME = "proto_001"
 
 # Number of frames (i.e. protocol lines) to generate.
 # Do need exceed 5000 as this hits the memory limit of the microcontroller.
-N_FRAMES = 5000
+N_FRAMES = 5000  # Leave as is
 
-# Time interval between each frame [s]
-DT_FRAME = 0.05
+# Time interval between each frame [s]. Suggest 0.05 s.
+DT_FRAME = 0.05  # Leave as is
 
 # Threshold level to convert [0-1]-grayscale OpenSimplex noise to black and
 # white (BW). Can also get reinterpreted as a transparency fraction [0-1] to
-# solve for, see `TUNE_TRANSPARENCY`.
+# solve for, see `TUNE_TRANSPARENCY`. Transparency is defined here as the ratio
+# of opened valves over all valves.
 BW_THRESHOLD = 0.4
 
 # Interpret `BW_THRESHOLD` as a wanted transparency per frame to solve for?
 # It is a very good idea to leave this on as it minimizes the fluctuation of
 # the resulting valve transparency over each frame.
-TUNE_TRANSPARENCY = 1
+TUNE_TRANSPARENCY = 1  # Leave as is
 
 # OpenSimplex noise coherent feature size [arb. unit, try ~ 50]
 FEATURE_SIZE_A = 50
@@ -60,10 +63,14 @@ MIN_VALVE_DURATION = 5
 
 # ------------------------------------------------------------------------------
 #  End of user-configurable parameters
+#  DO NOT ADJUST THE CODE FOLLOWING BELOW
 # ------------------------------------------------------------------------------
 # pylint: disable=wrong-import-position, invalid-name, missing-function-docstring
 
 __author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
+__date__ = "17-04-2023"
 __version__ = "1.0"  # Export file header info. Bump when major changes occur
 
 import os as _os

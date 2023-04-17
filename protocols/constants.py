@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Configuration constants of the jetting grid of the Twente Water Tunnel.
+"""constants.py
+
+Configuration constants of the jetting grid of the Twente Water Tunnel.
 
 Protocol coordinate system (PCS):
   The jetting nozzles are laid out in a square grid, aka the protocol coordinate
@@ -31,6 +33,10 @@ Protocol coordinate system (PCS):
      └─────────────────────────────────────────────┘
 """
 __author__ = "Dennis van Gils"
+__authoremail__ = "vangils.dennis@gmail.com"
+__url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
+__date__ = "17-04-2023"
+__version__ = "1.0"
 
 import numpy as _np
 
