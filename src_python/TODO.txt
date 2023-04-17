@@ -7,5 +7,3 @@ openFile.setShortcut('Ctrl+O')
 openFile.setStatusTip('Open new File')
 openFile.triggered.connect(self.showDialog)
 """
-
-* Rename extension of protocol files from `.txt` to `.proto`

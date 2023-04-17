@@ -8,7 +8,7 @@ and the Xylem Hydrovar HVL pump.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "14-04-2023"
+__date__ = "17-04-2023"
 __version__ = "1.0"
 # pylint: disable=bare-except, broad-except, unnecessary-lambda, wrong-import-position
 
@@ -710,17 +710,45 @@ class MainWindow(QtWid.QWidget):
         if self.pump.state.pump_is_running:
             return
 
-        protocol_dir = str(Path("..\protocols\protocols"))
+        # Get the folder that was last used to load in a protocol file
+        last_used_folder = ""
+        config_path = Path("config/protocol_folder.txt")
+        if config_path.is_file():
+            try:
+                with config_path.open() as f:
+                    last_used_folder = Path(f.readline().strip())
+            except:
+                pass  # Do not panic and remain silent
+
+        # Open file navigator
         reply = QtWid.QFileDialog.getOpenFileName(
             self,
             "Upload protocol file",
-            protocol_dir,
-            "Protocol files (*.txt *.proto)",
+            str(last_used_folder),
+            "Protocol files (*.proto)",
         )
-        if reply[0]:
-            file_path = reply[0]
-        else:
+
+        if not reply[0]:
+            # User pressed cancel
             return
+
+        # Extract the full file path and file folder
+        file_path = Path(reply[0])
+        file_folder = file_path.parent
+
+        # Save the last used folder to disk
+        if not config_path.parent.is_dir():
+            # Subfolder 'config/' does not exists yet. Create.
+            try:
+                config_path.parent.mkdir()
+            except:
+                pass  # Do not panic and remain silent
+
+        try:
+            # Write the config file
+            config_path.write_text(str(file_folder))
+        except:
+            pass  # Do not panic and remain silent
 
         # Stop the `DAQ_function` running in the worker thread from sending and
         # receiving ASCII data containing pressure data. We are about to upload

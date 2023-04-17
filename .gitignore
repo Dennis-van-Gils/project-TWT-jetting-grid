@@ -3,6 +3,7 @@
 
 # Specific to this library
 port*.txt
+protocol_folder.txt
 cache.npz
 
 # Byte-compiled / optimized / DLL files

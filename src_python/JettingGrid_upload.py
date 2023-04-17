@@ -9,7 +9,7 @@ TODO: Work-in-progress. This module works but is very fugly.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "14-04-2023"
+__date__ = "17-04-2023"
 __version__ = "1.0"
 # pylint: disable=pointless-string-statement
 
@@ -43,17 +43,20 @@ class P:
 
 
 def upload_protocol(
-    grid: JettingGrid_Arduino, file_path: str = "proto_example.txt"
+    grid: JettingGrid_Arduino,
+    file_path: Path = Path("..\protocols\protocols\simplex_example.proto"),
 ):
     print("Uploading protocol")
     print("------------------")
 
+    # Extract file folder and filename from full path
+    file_path = Path(file_path)
+    file_folder = file_path.resolve().parent
+    filename = file_path.name
+
     # Read in protocol file from disk
     with open(file=file_path, mode="r", encoding="utf8") as f:
         lines = [line.rstrip() for line in f]
-
-    # Extract the filename from the full path
-    filename = Path(file_path).name
 
     # Find DATA section
     data_line_idx = None
