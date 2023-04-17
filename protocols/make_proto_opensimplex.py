@@ -45,7 +45,7 @@ import constants as C
 import config_proto_opensimplex as CFG
 
 # Global flags
-EXPORT_GIF = 0  # Export animation as a .gif to disk?
+EXPORT_GIF = 1  # Export animation as a .gif to disk?
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
 
@@ -223,7 +223,7 @@ ax.grid(which="major")
 
 # Animation function
 def animate_fig_1(j):
-    ax_text.set_text(f"frame {j:04d}")
+    ax_text.set_text(f"frame {j:04d} | {alpha_valves_adj[j]:.2f}")
     if SHOW_NOISE_IN_PLOT:
         hax_noise.set_data(img_stack_plot[j])
     hax_valves.set_data(valves_plot_pcs_x[j, :], valves_plot_pcs_y[j, :])
