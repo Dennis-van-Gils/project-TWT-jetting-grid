@@ -142,13 +142,16 @@ def _binarize_stack_using_newton(
 
     for i in trange(stack_in.shape[0]):
         # Solve for transparency
-        threshold = optimize.newton(
-            newton_fun,
-            1 - wanted_transparency,
-            args=(stack_in[i], wanted_transparency),
-            maxiter=20,
-            tol=0.02,
-        )
+        try:
+            threshold = optimize.newton(
+                newton_fun,
+                1 - wanted_transparency,
+                args=(stack_in[i], wanted_transparency),
+                maxiter=20,
+                tol=0.02,
+            )
+        except:
+            print(f"\nWARNING: Failed to solve for transparency @ iter {i}")
 
         true_pxs = np.where(stack_in[i] > threshold)
         alpha[i] = len(true_pxs[0]) / stack_in.shape[1] / stack_in.shape[2]
