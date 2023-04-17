@@ -1,11 +1,11 @@
 ~$*.*
 \\.git/
 .vscode/
+settings.json
 
 # Specific to this library
 port*.txt
 cache.npz
-proto_001*.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -117,3 +117,4 @@ venv.bak/
 */.vscode/c_cpp_properties.json
 */.vscode/launch.json
 */.vscode/ipch
+protocols/.vscode/settings.json
