@@ -4,7 +4,8 @@
 
 Manages uploading a jetting protocol to the Arduino.
 
-TODO: Work-in-progress. This module works but is very fugly.
+TODO: Work-in-progress. This module works but errors still need to be handled
+gracefully.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
