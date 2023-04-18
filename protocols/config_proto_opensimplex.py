@@ -26,21 +26,10 @@ EXPORT_FILENAME = "simplex_001"
 
 # Number of frames (i.e. protocol lines) to generate.
 # Do need exceed 5000 as this hits the memory limit of the microcontroller.
-N_FRAMES = 5000  # Leave as is
+N_FRAMES = 5000  # Leave it at 5000
 
-# Time interval between each frame [s]. Suggest 0.05 s.
-DT_FRAME = 0.05  # Leave as is
-
-# Threshold level to convert [0-1]-grayscale OpenSimplex noise to black and
-# white (BW). Can also get reinterpreted as a transparency fraction [0-1] to
-# solve for, see `TUNE_TRANSPARENCY`. Transparency is defined here as the ratio
-# of opened valves over all valves.
-BW_THRESHOLD = 0.4
-
-# Interpret `BW_THRESHOLD` as a wanted transparency per frame to solve for?
-# It is a very good idea to leave this on as it minimizes the fluctuation of
-# the resulting valve transparency over each frame.
-TUNE_TRANSPARENCY = 1  # Leave as is
+# Time interval between each frame [s].
+DT_FRAME = 0.05  # Leave it at 0.05
 
 # OpenSimplex noise coherent feature size [arb. unit, try ~ 50]
 FEATURE_SIZE_A = 50
@@ -53,6 +42,30 @@ T_STEP_B = 0.1
 # OpenSimplex noise seeds
 SEED_A = 1
 SEED_B = 13
+
+# To determine which valves should be opened and which ones should be closed, we
+# apply a threshold function on each generated OpenSimplex noise [0-1]-grayscale
+# image frame. In essence, we binarize each noise frame into a boolean black and
+# white (BW) map. If a valve lies inside the `True` region it will get opened,
+# otherwise it will get closed.
+#
+# Two different thresholding schemes exist.
+# --> YOU MUST SPECIFY A VALUE FOR ONE SCHEME ONLY AND SET THE OTHER TO `None`.
+#
+# 1) Constant threshold
+# ---------------------
+# The applied threshold is constant for all image frames. Grayscale values above
+# `1 - BW_threshold` will be set `True`. [grayscale value, 0-1].
+BW_THRESHOLD = None  # Leave it at None. Use `TARGET_TRANSPARENCY` instead.
+
+# 2) Newton solver
+# ----------------
+# A Newton solver is employed per image frame to try solve for the grayscale
+# threshold that would result in the given target transparency. Transparency is
+# defined as the number of `True / 1 / valve on` elements over the total number
+# of elements. This method tends to minimize the fluctuation of the resulting
+# valve transparency over each frame. [ratio, 0-1].
+TARGET_TRANSPARENCY = 0.4
 
 # Minimum valve on/off duration [number of frames].
 # The originally generated valve durations can be automatically post-processed
@@ -70,7 +83,7 @@ MIN_VALVE_DURATION = 5
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-04-2023"
+__date__ = "18-04-2023"
 __version__ = "1.0"  # Export file header info. Bump when major changes occur
 
 import os as _os
@@ -125,14 +138,14 @@ del _os, _np
 
 
 def create_header_string() -> str:
-    w = 19
+    w = 20
     header_str = (
         f"{'TYPE':<{w}}OpenSimplex noise v{__version__}\n"
         f"{'DATE':<{w}}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         f"{'N_FRAMES':<{w}}{N_FRAMES}\n"
         f"{'DT_FRAME':<{w}}{DT_FRAME} s\n\n"
         f"{'BW_THRESHOLD':<{w}}{BW_THRESHOLD}\n"
-        f"{'TUNE_TRANSPARENCY':<{w}}{bool(TUNE_TRANSPARENCY)!s}\n\n"
+        f"{'TARGET_TRANSPARENCY':<{w}}{TARGET_TRANSPARENCY}\n\n"
         f"{'FEATURE_SIZE_A':<{w}}{FEATURE_SIZE_A}\n"
         f"{'FEATURE_SIZE_B':<{w}}{FEATURE_SIZE_B}\n\n"
         f"{'T_STEP_A':<{w}}{T_STEP_A}\n"

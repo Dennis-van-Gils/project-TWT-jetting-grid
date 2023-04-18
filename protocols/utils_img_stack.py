@@ -7,7 +7,7 @@ Utility functions that operate on an `img_stack`.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-04-2023"
+__date__ = "18-04-2023"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
@@ -102,7 +102,7 @@ def rescale_stack(stack: np.ndarray, symmetrically: bool = True):
     parallel=True,
     nogil=True,
 )
-def _binarize_stack_using_threshold(
+def binarize_stack_using_threshold(
     stack_in: np.ndarray,
     threshold: float,
     stack_BW: np.ndarray,
@@ -122,21 +122,22 @@ def _binarize_stack_using_threshold(
     parallel=True,
     nogil=True,
 )
-def newton_fun(x, arr_in, target):
+def _newton_fun(x, arr_in, target):
     true_pxs = np.where(arr_in > x)
     return target - len(true_pxs[0]) / arr_in.shape[0] / arr_in.shape[1]
 
 
-def _binarize_stack_using_newton(
+def binarize_stack_using_newton(
     stack_in: np.ndarray,
-    wanted_transparency: float,
+    target_transparency: float,
     stack_BW: np.ndarray,
     alpha: np.ndarray,
-    solved_successfully: np.ndarray,
+    alpha_did_converge: np.ndarray,
 ):
     """Using Newton's method to solve for the given transparency:
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton.html
-    NOTE: In-place operation on arguments `stack_BW` and `alpha`
+    NOTE: In-place operation on arguments `stack_BW`, `alpha` and
+    `alpha_did_converge`.
     """
     # NOTE: Can't `njit` on `optimize.newton()`. We use python package
     # `scipy-numba` to get scipy to make use of numba.
@@ -145,79 +146,18 @@ def _binarize_stack_using_newton(
         # Solve for transparency
         try:
             threshold = optimize.newton(
-                newton_fun,
-                1 - wanted_transparency,
-                args=(stack_in[i], wanted_transparency),
+                _newton_fun,
+                1 - target_transparency,
+                args=(stack_in[i], target_transparency),
                 maxiter=20,
                 tol=0.02,
             )
         except:
-            print(f"\nWARNING: Failed to solve for transparency @ iter {i}")
+            print(f"\nWARNING: Convergence failed @ frame {i}")
+            alpha_did_converge[i] = False
         else:
-            solved_successfully[i] = True
+            alpha_did_converge[i] = True
 
         true_pxs = np.where(stack_in[i] > threshold)
         alpha[i] = len(true_pxs[0]) / stack_in.shape[1] / stack_in.shape[2]
         stack_BW[i][true_pxs] = 1
-
-
-def binarize_stack(
-    stack_in: np.ndarray,
-    BW_threshold: float,
-    tune_transparency: Union[bool, int],
-    solved_successfully: np.ndarray = np.array([], dtype=bool),
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Binarize each frame of the image stack.
-
-    Two methods are possible:
-    1) When `tune_transparency=False` a simple threshold value as given by
-       `BW_threshold` is applied. Pixels with a value above `1 - BW_threshold`
-       are set to True (1), else False (0).
-    2) When `tune_transparency=True` a Newton solver is employed per frame
-       to solve for the needed threshold level to achieve a near constant
-       transparency over all frames. The given `BW_threshold` value gets now
-       interpretted as the transparency value to solve for.
-
-    Transparency is defined as the number of `True` pixels over the total number
-    of pixels in the frame.
-
-    Args:
-        stack_in (numpy.ndarray):
-            2D image stack [time, y-pixel, x-pixel] containing float values.
-
-        BW_threshold (float):
-            Either the simple threshold value, or the transparency value [0 - 1]
-            to solve for, see above.
-
-        tune_transparency (bool | int):
-            See above.
-
-    Returns: (Tuple)
-        stack_BW (numpy.ndarray):
-            2D image stack [time, y-pixel, x-pixel] containing boolean values.
-
-        alpha (numpy.ndarray):
-            1D array containing the effective transparency of each frame.
-    """
-    tick = perf_counter()
-    stack_BW = np.zeros(stack_in.shape, dtype=bool)
-    alpha = np.zeros(stack_in.shape[0])
-
-    if tune_transparency:
-        print("Binarizing noise and tuning transparency...")
-        # solved_successfully = np.zeros(stack_in.shape[0], dtype=bool)
-        _binarize_stack_using_newton(
-            stack_in,
-            BW_threshold,
-            stack_BW,
-            alpha,
-            solved_successfully,
-        )
-    else:
-        print("Binarizing noise...")
-        _binarize_stack_using_threshold(
-            stack_in, 1 - BW_threshold, stack_BW, alpha
-        )
-
-    print(f"done in {(perf_counter() - tick):.2f} s\n")
-    return stack_BW, alpha

@@ -7,7 +7,7 @@ Utility functions for generating protocols.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-04-2023"
+__date__ = "18-04-2023"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -22,56 +22,30 @@ from opensimplex_loops import looping_animated_2D_image
 from utils_img_stack import (
     add_stack_B_to_A,
     rescale_stack,
-    binarize_stack,
+    binarize_stack_using_threshold,
+    binarize_stack_using_newton,
 )
 
 import constants as C
 import config_proto_opensimplex as CFG
 
 # ------------------------------------------------------------------------------
-#  generate_protocol_arrays_OpenSimplex
+#  generate_OpenSimplex_grayscale_img_stack
 # ------------------------------------------------------------------------------
 
 
-def generate_protocol_arrays_OpenSimplex() -> (
-    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
-):
-    """Generate 'protocol' arrays based on OpenSimplex noise as given by the
-    user-configurable parameters taken from `config_proto_OpenSimplex.py`.
+def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
+    """Generate OpenSimplex noise as specified in `config_proto_OpenSimplex.py`.
+    Sets A and B will be mixed together into one image stack and rescaled to lie
+    within the grayscale value range [0-1].
 
-    Transparency is defined as the number of `True / 1 / valve on` elements over
-    the total number of elements.
-
-    Returns: (Tuple)
-        valves_stack (np.ndarray):
-            Stack containing the boolean states of all valves as 0's and 1's.
-            Array shape: [N_frames, N_valves]
-
-        img_stack_noise (np.ndarray):
+    Returns:
+        img_stack_out (np.ndarray):
             2D image stack [time, y-pixel, x-pixel] containing float values.
-            This is the underlying OpenSimplex noise data for `valves_stack`
-            before binarization.
             Array shape: [N_frames, N_pixels, N_pixels]
-
-        img_stack_noise_BW (np.ndarray):
-            2D image stack [time, y-pixel, x-pixel] containing 0 or 1 values.
-            This is the underlying OpenSimplex noise data for `valves_stack`
-            after binarization.
-            Array shape: [N_frames, N_pixels, N_pixels]
-
-        alpha_noise (np.ndarray):
-            Transparency of each `img_stack_noise_BW` frame.
-            Array shape: [N_frames]
-
-        alpha_valves (np.ndarray):
-            Transparency of each `valves_stack` frame.
-            Array shape: [N_frames]
     """
 
-    # Generate noise image stacks
-    # ---------------------------
-
-    # Pixel value range between [-1, 1]
+    # Pixel values range between [-1, 1]
     img_stack_A = looping_animated_2D_image(
         N_frames=CFG.N_FRAMES,
         N_pixels_x=CFG.N_PIXELS,
@@ -83,7 +57,7 @@ def generate_protocol_arrays_OpenSimplex() -> (
     print("")
 
     if CFG.FEATURE_SIZE_B > 0:
-        # Pixel value range between [-1, 1]
+        # Pixel values range between [-1, 1]
         img_stack_B = looping_animated_2D_image(
             N_frames=CFG.N_FRAMES,
             N_pixels_x=CFG.N_PIXELS,
@@ -94,7 +68,7 @@ def generate_protocol_arrays_OpenSimplex() -> (
         )
         print("")
 
-        # Pixel value range between [-2, 2]
+        # Pixel values range between [-2, 2]
         add_stack_B_to_A(img_stack_A, img_stack_B)
         del img_stack_B
 
@@ -103,20 +77,87 @@ def generate_protocol_arrays_OpenSimplex() -> (
     # distribution towards 0 or 1.
     rescale_stack(img_stack_A, symmetrically=True)
 
-    # Transform grayscale noise into binary BW map, optionally solving for a
-    # desired transparency level.
-    solved_successfully = np.zeros(CFG.N_FRAMES, dtype=bool)
-    img_stack_BW, alpha_noise = binarize_stack(
-        img_stack_A,
-        CFG.BW_THRESHOLD,
-        CFG.TUNE_TRANSPARENCY,
-        solved_successfully,
-    )
+    return img_stack_A
 
-    # Generate valves stack
-    # ---------------------
 
-    # Determine the state of each valve based on the BW noise image stack
+# ------------------------------------------------------------------------------
+#  binarize_img_stack
+# ------------------------------------------------------------------------------
+
+
+def binarize_img_stack(
+    img_stack_in: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Binarize the passed grayscale image stack `img_stack_in` using a
+    thresholding scheme as specified in `config_proto_OpenSimplex.py`.
+
+    Returns: (Tuple)
+        img_stack_BW (np.ndarray):
+            2D image stack [time, y-pixel, x-pixel] containing 0 or 1 values.
+            Array shape: [N_frames, N_pixels, N_pixels]
+
+        alpha_BW (np.ndarray):
+            Transparency of each `stack_BW` frame. Transparency is defined as
+            the number of `1` elements over the total number of elements.
+            Array shape: [N_frames]
+
+        alpha_did_converge (np.ndarray):
+            When the Newton solver is used, did it manage to converge to the
+            given target transparency per frame?
+            Array shape: [N_frames]
+    """
+
+    tick = perf_counter()
+    img_stack_BW = np.zeros(img_stack_in.shape, dtype=bool)
+    alpha_BW = np.zeros(img_stack_in.shape[0])
+    alpha_BW_did_converge = np.zeros(CFG.N_FRAMES, dtype=bool)
+
+    if CFG.BW_THRESHOLD is not None:
+        # Constant BW threshold
+        # Values above `1 - BW_threshold` are set `True` (1), else `False` (0).
+        print("Binarizing noise using a constant threshold...")
+        binarize_stack_using_threshold(
+            img_stack_in,
+            1 - CFG.BW_THRESHOLD,
+            img_stack_BW,
+            alpha_BW,
+        )
+
+    else:
+        # Newton solver
+        print("Binarizing noise solving for a target transparency...")
+        binarize_stack_using_newton(
+            img_stack_in,
+            CFG.TARGET_TRANSPARENCY,
+            img_stack_BW,
+            alpha_BW,
+            alpha_BW_did_converge,
+        )
+
+    print(f"done in {(perf_counter() - tick):.2f} s\n")
+    return img_stack_BW, alpha_BW, alpha_BW_did_converge
+
+
+# ------------------------------------------------------------------------------
+#  compute_valves_stack
+# ------------------------------------------------------------------------------
+
+
+def compute_valves_stack(img_stack_BW: np.ndarray):
+    """Compute the state of each valve based on the passed BW image stack
+    `img_stack_BW`.
+
+    Returns: (Tuple)
+        valves_stack (np.ndarray):
+            Stack containing the boolean states of all valves as 0's and 1's.
+            Array shape: [N_frames, N_valves]
+
+        alpha_valves (np.ndarray):
+            Transparency of each `valves_stack` frame. Transparency is defined
+            as the number of opened valves over the total number of valves.
+            Array shape: [N_frames]
+    """
+
     # NOTE: Use `int8` as type, not `bool` because we need `np.diff()` later.
     valves_stack = np.zeros([CFG.N_FRAMES, C.N_VALVES], dtype=np.int8)
 
@@ -125,10 +166,10 @@ def generate_protocol_arrays_OpenSimplex() -> (
             img_stack_BW[frame, CFG.valve2px_y, CFG.valve2px_x] == 1
         )
 
-    # Calculate the valve transparency
+    # Valve transparency
     alpha_valves = valves_stack.sum(1) / C.N_VALVES
 
-    return valves_stack, img_stack_A, img_stack_BW, alpha_noise, alpha_valves
+    return valves_stack, alpha_valves
 
 
 # ------------------------------------------------------------------------------

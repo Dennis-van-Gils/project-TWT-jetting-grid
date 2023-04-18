@@ -18,10 +18,11 @@ Usage:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "17-04-2023"
+__date__ = "18-04-2023"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
+import sys
 from time import perf_counter
 
 import numpy as np
@@ -37,7 +38,9 @@ from utils_valves_stack import (
     valve_on_off_PDFs,
 )
 from utils_protocols import (
-    generate_protocol_arrays_OpenSimplex,
+    generate_OpenSimplex_grayscale_img_stack,
+    binarize_img_stack,
+    compute_valves_stack,
     export_protocol_to_disk,
 )
 
@@ -45,38 +48,41 @@ import constants as C
 import config_proto_opensimplex as CFG
 
 # Global flags
-EXPORT_GIF = 1  # Export animation as a .gif to disk?
+EXPORT_GIF = 0  # Export animation as a .gif to disk?
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
 SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
-
-# ------------------------------------------------------------------------------
-#  Generate OpenSimplex protocol
-# ------------------------------------------------------------------------------
 
 # Flags useful for developing. Leave both set to False for normal operation.
 LOAD_FROM_CACHE = False
 SAVE_TO_CACHE = False
 
+# ------------------------------------------------------------------------------
+#  Check validity of user configurable parameters
+# ------------------------------------------------------------------------------
+
+if (CFG.BW_THRESHOLD is not None and CFG.TARGET_TRANSPARENCY is not None) or (
+    CFG.BW_THRESHOLD is None and CFG.TARGET_TRANSPARENCY is None
+):
+    print(
+        "ERROR: Invalid configuration in `config_proto_opensimplex.py`.\n"
+        "Either specify `BW_THRESHOLD` or specify `TARGET_TRANSPARENCY`."
+    )
+    sys.exit(0)
+
+# ------------------------------------------------------------------------------
+#  Generate OpenSimplex protocol
+# ------------------------------------------------------------------------------
+
 if not LOAD_FROM_CACHE:
-    # Normal operation
-    (
-        valves_stack,
-        img_stack_noise,
-        img_stack_noise_BW,
-        alpha_noise,
-        alpha_valves,
-    ) = generate_protocol_arrays_OpenSimplex()
+    # Generate OpenSimplex grayscale noise
+    img_stack_gray = generate_OpenSimplex_grayscale_img_stack()
 
     if SAVE_TO_CACHE:
         print("Saving cache to disk...")
         tick = perf_counter()
         np.savez(
             "cache.npz",
-            valves_stack=valves_stack,
-            img_stack_noise=img_stack_noise,
-            img_stack_noise_BW=img_stack_noise_BW,
-            alpha_noise=alpha_noise,
-            alpha_valves=alpha_valves,
+            img_stack_gray=img_stack_gray,
         )
         print(f"done in {(perf_counter() - tick):.2f} s\n")
 
@@ -85,19 +91,25 @@ else:
     print("Reading cache from disk...")
     tick = perf_counter()
     with np.load("cache.npz", allow_pickle=False) as cache:
-        valves_stack = cache["valves_stack"]
-        img_stack_noise = cache["img_stack_noise"]
-        img_stack_noise_BW = cache["img_stack_noise_BW"]
-        alpha_noise = cache["alpha_noise"]
-        alpha_valves = cache["alpha_valves"]
+        img_stack_gray = cache["img_stack_gray"]
     print(f"done in {(perf_counter() - tick):.2f} s\n")
+
+# Binarize OpenSimplex noise
+(
+    img_stack_BW,
+    alpha_BW,
+    alpha_BW_did_converge,
+) = binarize_img_stack(img_stack_gray)
 
 # Determine which noise image stack to plot later
 if SHOW_NOISE_AS_GRAY:
-    img_stack_plot = img_stack_noise
+    img_stack_plot = img_stack_gray
 else:
-    img_stack_plot = img_stack_noise_BW
-    del img_stack_noise  # Not needed anymore -> Free up large chunk of mem
+    img_stack_plot = img_stack_BW
+    del img_stack_gray  # Not needed anymore -> Free up large chunk of mem
+
+# Map OpenSimplex noise onto valve locations
+valves_stack, alpha_valves = compute_valves_stack(img_stack_BW)
 
 # Adjust minimum valve durations
 (
@@ -115,11 +127,11 @@ def build_stats_str(x):
     return f"{np.mean(x):.2f} ± {np.std(x):.3f}"
 
 
-stats_alpha_noise = build_stats_str(alpha_noise)
+stats_alpha_BW = build_stats_str(alpha_BW)
 stats_alpha_valves = build_stats_str(alpha_valves)
 stats_alpha_valves_adj = build_stats_str(alpha_valves_adj)
 print("Transparencies (avg ± stdev):")
-print(f"  alpha_noise      = {stats_alpha_noise}")
+print(f"  alpha_BW         = {stats_alpha_BW}")
 print(f"  alpha_valves     = {stats_alpha_valves}")
 print(f"  alpha_valves_adj = {stats_alpha_valves_adj}\n")
 
@@ -132,6 +144,27 @@ export_protocol_to_disk(valves_stack_adj, CFG.EXPORT_PATH_NO_EXT + ".proto")
 
 # The final `valves_stack`, useful for optional post-processing
 np.save(CFG.EXPORT_PATH_NO_EXT + "_valves_stack.npy", valves_stack_adj)
+
+# The transparencies per frame
+with open(CFG.EXPORT_PATH_NO_EXT + "_alpha.txt", "w", encoding="utf-8") as f:
+    if CFG.TARGET_TRANSPARENCY is not None:
+        f.write("Newton solver was used to solve for a wanted transparency.\n")
+        failed_convergences = CFG.N_FRAMES - sum(alpha_BW_did_converge)
+        if failed_convergences > 0:
+            f.write(f"{failed_convergences:d} frames failed to converge!\n")
+        else:
+            f.write("All frames did converge.\n")
+    else:
+        f.write("A simple BW threshold was used.\n")
+        f.write("Column `converged?` can be ignored.\n")
+
+    f.write("\n# frame\talpha_BW\talpha_valves_adj\tconverged?\n")
+    for i in range(CFG.N_FRAMES):
+        f.write(
+            f"{i:d}\t{alpha_BW[i]:.2f}\t"
+            f"{alpha_valves_adj[i]:.2f}\t"
+            f"{alpha_BW_did_converge[i]!s}\n"
+        )
 
 # PDFs
 idx_last_nonzero_bin = bins.size - np.min(
@@ -243,13 +276,15 @@ anim = animation.FuncAnimation(
 
 fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)
-plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
+fig_2.set_size_inches(12, 4.8)
+# plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
 plt.plot(alpha_valves_adj, "k", label=f"valves adj {stats_alpha_valves_adj}")
-plt.plot(alpha_noise, "g", label=f"noise {stats_alpha_noise}")
+# plt.plot(alpha_BW, "g", label=f"noise {stats_alpha_BW}")
 plt.xlim(0, CFG.N_FRAMES)
 plt.title("transparency")
 plt.xlabel("frame #")
 plt.ylabel("alpha [0 - 1]")
+plt.minorticks_on()
 plt.legend()
 
 # 3: Probability densities
@@ -258,7 +293,6 @@ plt.legend()
 # Plot
 fig_3, axs = plt.subplots(2)
 fig_3.set_tight_layout(True)
-move_figure(fig_3, 200, 0)
 
 axs[0].set_title("valve ON")
 axs[0].step(bins, pdf_on, "deeppink", where="mid", label="original")
