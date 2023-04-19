@@ -1,0 +1,39 @@
+Protocol file format:
+    - Plain ASCII, tab delimited, rows ending with '\n' , not '\n\r'
+    - Assume each row all valves are turned off, unless listed 
+
+    [HEADER]
+    ... (info to be able to generate the protocol)
+    [DATA]
+    [duration in ms, max 2^16-1] [list of open valves in grid (-7,-7) to (7,7)]
+    50       -7,-2    3,2    1,2    4,-2
+    50       -6,-4    3,6    -3,2
+    100      ..... 
+
+Memory allocation @ Arduino:
+
+    Protocol:
+
+    Send from Python to Arduino via binary serial stream
+    ----------------------------------------------------
+    Sends a single protocol line each time as follows:
+      1x2 bytes: Duration in ms, big-endian
+      Nx1 bytes: Each PCS point (x, y) packed into a single byte.
+                 Upper 4 bits = PCS.x, lower 4 bits = PCS.y
+      1x3 bytes: End-of-line (EOL) sentinel: [0xFF, 0xFF, 0xFF]
+
+
+    When received at Arduino side
+    -----------------------------
+    Each line gets transformed into a 16x16 boolean matrix where all send PCS
+    coordinates are 1's, the rest 0.
+    Next, we pack each row of the matrix into a 16 bit structure, i.e. uint16_t.
+    We have 15 rows of each 16 bits --> 30 bytes for the full boolean matrix
+    +2 bytes for the time duration in ms as uint16_t
+    ----> 30 + 2 = 32 bytes per protocol line, fixed number of bytes, regardless
+    of how many valves should be opened or closed.
+    This allows us to define a fixed-size array within C++, yeay!
+    Say we have 180.000 bytes of RAM left over to play with:
+    --> 180000/32 = 5625 protocol lines will fit into memory.
+    Hence, we safely limit the max number of lines a protocol can contain to
+    5000.
