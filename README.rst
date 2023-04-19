@@ -11,11 +11,21 @@ noise: a type of gradient noise that features temporal and spatial coherence.
 
 In this repository you can find:
 
-- The electronic design schematics
-- The electronics cabinet in 3D-CAD Solidworks
-- The microcontroller C++ source code and firmware
-- The Python user control program
-- The Jetting Grid protocol generator based on 4D-OpenSimplex noise
+.. list-table::
+  :widths: 50 50
+
+  * - The electronic design diagram
+    - `</docs/electronic_diagram.pdf>`_
+  * - The electronics cabinet in 3D-CAD
+    - `</Solidworks/_main_cabinet.pdf>`_
+  * - The microcontroller C++ source code and firmware
+    - `</src_mcu>`_
+  * - The Python user control program
+    - `</src_python>`_
+  * - The protocol generator based on 4D-OpenSimplex noise
+    - `</protocols>`_
+  * - Project photos
+    - `</docs/photos>`_
 
 .. figure:: /docs/photos/grid_outside_tunnel.jpg
 
