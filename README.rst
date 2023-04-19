@@ -1,4 +1,4 @@
-This repository involves the Jetting Grid of the Twente Water Tunnel (TWT) facility of the University of Twente, Physics of Fluids group.
+*This repository involves the Jetting Grid of the Twente Water Tunnel (TWT) facility of the University of Twente, Physics of Fluids group.*
 
 Introduction
 ============
@@ -11,20 +11,25 @@ noise: a type of gradient noise that features temporal and spatial coherence.
 
 In this repository you can find:
 
-- The full electronic design schematics
+- The electronic design schematics
 - The electronics cabinet in 3D-CAD Solidworks
 - The microcontroller C++ source code and firmware
 - The Python user control program
 - The Jetting Grid protocol generator based on 4D-OpenSimplex noise
 
-.. image:: /docs/photos/grid_outside_tunnel.jpg
-.. image:: /docs/photos/grid_head_on_inside_tunnel.jpg
+.. figure:: /docs/photos/grid_outside_tunnel.jpg
+
+  *Figure 1: The jetting grid before installation in the tunnel.*
+
+.. figure:: /docs/photos/grid_head_on_inside_tunnel.jpg
+
+  *Figure 2: The jetting grid inside of the tunnel viewed head-on through the measurement section of cross-section 0.45 m by 0.45 m.*
 
 
 Extended introduction
 =====================
 
-All jetting nozzles are powered by a single water pump providing the driving pressure for the jets. Each nozzle is controlled by an individual solenoid valve that can be programmatically opened or closed. The valves of the grid come in through the 4 side walls of the tunnel section, with 28 valves through each side: 4 x 28 = 112 valves. Each set of these 28 valves shares a common pressure distribution manifold of which we will monitor the pressure.
+All jetting nozzles are powered by a single water pump providing the driving pressure for the jets. Each nozzle is controlled by an individual solenoid valve that can be programmatically opened or closed. The valves of the grid come in through the 4 side walls of the tunnel section with 28 valves through each side: 4 x 28 = 112 valves. Each set of these 28 valves shares a common pressure distribution manifold of which we will monitor the pressure.
 
 An Arduino controls the 112 solenoid valves, reads out the 4 pressure sensors and drives a 16x16 LED matrix to visualize the status of each valve.
 
