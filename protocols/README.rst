@@ -34,6 +34,6 @@ Example output
 
 See the `protocols subfolder </protocols/protocols>`_.
 
-.. image:: /protocols/protocols/proto_example.gif
-.. image:: /protocols/protocols/proto_example_alpha.png
-.. image:: /protocols/protocols/proto_example_pdfs.png
+.. image:: /protocols/protocols/simplex_example.gif
+.. image:: /protocols/protocols/simplex_example_alpha.png
+.. image:: /protocols/protocols/simplex_example_pdfs.png
