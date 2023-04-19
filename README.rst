@@ -1,33 +1,37 @@
-Jetting Grid
+This repository involves the Jetting Grid of the Twente Water Tunnel (TWT) facility of the University of Twente, Physics of Fluids group.
+
+Introduction
 ============
 
-This repository involves the Jetting Grid of the Twente Water Tunnel (TWT) facility of the Physics of Fluids research group at the University of Twente.
+The Jetting Grid is essentially a turbulence generator. It consists of a rectangular array of 112 individually computer-controlled water jets that are aligned streamwise to the measurement section of our 8 meter tall vertically recirculating water tunnel. Individual jets will turn on and off following predefined 'protocols' tailored to different turbulent statistics inside the measurement section. The protocols are based on 4-dimensional OpenSimplex
+noise: a type of gradient noise that features temporal and spatial coherence.
 
 ..
   More details can be found in the Review of Scientific Instruments article found here.
 
-Here, you can find:
+In this repository you can find:
 
 - The full electronic design schematics
 - The electronics cabinet in 3D-CAD Solidworks
-- The microcontroller source code and firmware
-- The user control program
+- The microcontroller C++ source code and firmware
+- The Python user control program
 - The Jetting Grid protocol generator based on 4D-OpenSimplex noise
 
+.. image:: /docs/photos/grid_outside_tunnel.jpg
+.. image:: /docs/photos/grid_head_on_inside_tunnel.jpg
 
-Introduction
-------------
 
-Upstream of the TWT measurement section is the jetting grid consisting of 112 individual nozzles laid out in a square grid perpendicular to the mean flow. All nozzles are powered by a single water pump providing the driving pressure for the jets. Each nozzle is controlled by an individual solenoid valve that can be programmatically opened or closed. The nozzles will open and close following predefined 'protocols' tailored to different turbulent statistics inside the measurement section.
+Extended introduction
+=====================
 
-The valves of the grid come in through the 4 side walls of the tunnel section, with 28 valves through each side: 4 x 28 = 112 valves. Each set of these 28 valves shares a common pressure distribution manifold of which we will monitor the pressure.
+All jetting nozzles are powered by a single water pump providing the driving pressure for the jets. Each nozzle is controlled by an individual solenoid valve that can be programmatically opened or closed. The valves of the grid come in through the 4 side walls of the tunnel section, with 28 valves through each side: 4 x 28 = 112 valves. Each set of these 28 valves shares a common pressure distribution manifold of which we will monitor the pressure.
 
 An Arduino controls the 112 solenoid valves, reads out the 4 pressure sensors and drives a 16x16 LED matrix to visualize the status of each valve.
 
 Protocol coordinate system (PCS)
---------------------------------
+================================
 
-The solenoid valves are ultimately opening and closing jetting nozzles that are laid out in a square grid, aka the protocol coordinate system (PCS): ::
+The jetting nozzles are laid out in a square grid, aka the protocol coordinate system (PCS): ::
 
       ●: Indicates a valve & nozzle
       -: Indicates no nozzle & valve exists
