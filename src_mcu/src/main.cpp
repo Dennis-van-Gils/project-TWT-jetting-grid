@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    14-04-2023
+ * @date    23-08-2023
  *
  * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
@@ -369,7 +369,7 @@ void FSM_fun_uploading__upd() {
   }
 
   // Time-out check
-  const uint16_t LOADING_TIMEOUT = 4000; // [ms]
+  const uint16_t LOADING_TIMEOUT = 7000; // [ms]
   if (fsm.timeInCurrentState() > LOADING_TIMEOUT) {
     Serial.println("ERROR: Loading in protocol program timed out.");
     loading_program = false;
