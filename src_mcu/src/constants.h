@@ -179,7 +179,7 @@ const uint8_t P2LED[NUMEL_LED_AXIS][NUMEL_LED_AXIS] = {
   The output channels of the Centipedes deliver 3.3 V. To drive the solenoid
   valves we need a voltage of 24 V. Hence, we use MOSFET boards in order to
   increase the electrical power of each digital channel. Each MOSFET board
-  (from AliExpress, brand Sanwo?) provides 16-channels, so we have 8 MOSFET
+  (AliExpress, Shifun K Workshop) provides 16-channels, so we have 8 MOSFET
   boards in total. All 128 Centipede channels are wired in a 1-to-1 incremental
   fashion to the MOSFET boards. This physical wiring SHOULD NOT CHANGE!
 
