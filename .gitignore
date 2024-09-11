@@ -2,6 +2,7 @@
 \\.git/
 
 # Specific to this library
+protocols/temp/
 port*.txt
 protocol_folder.txt
 cache.npz
