@@ -1,0 +1,15 @@
+N_FRAMES        500
+DT_FRAME        0.05
+
+FEATURE_SIZE_A  50
+FEATURE_SIZE_B  150
+
+T_STEP_A        0.1
+T_STEP_B        0.04
+
+SEED_A          1
+SEED_B          13
+
+Post-processed:
+- Inverted grayscale
+- Maximized contrast

@@ -61,11 +61,80 @@ import config_proto_opensimplex as CFG
 # Global flags
 EXPORT_GIF = 0  # Export animation as a .gif to disk?
 SHOW_NOISE_IN_PLOT = 1  # [0] Only show valves,   [1] Show noise as well
-SHOW_NOISE_AS_GRAY = 0  # Show noise as [0] BW,   [1] Grayscale
+SHOW_NOISE_AS_GRAY = 1  # Show noise as [0] BW,   [1] Grayscale
 
 # Flags useful for developing. Leave both set to False for normal operation.
 LOAD_FROM_CACHE = False
 SAVE_TO_CACHE = False
+
+FONTSIZE_DEFAULT = 12
+FONTSIZE_AXESLABELS = 20
+FONTSIZE_LEGEND = 12
+FONTSIZE_TICKLABELS = 12
+FONTSIZE_TITLE = 12
+FONTSIZE_OVERRULED = 16
+
+
+plt.rcParams.update(
+    {
+        # "text.usetex": False,  # We'll use 'usetex=True' on a per label basis.
+        # "pdf.fonttype": 42,  # 42: Embed fonts
+        # #
+        # "font.size": FONTSIZE_DEFAULT,
+        # "font.family": "sans-serif",
+        "font.sans-serif": "Arial",
+        # #
+        # "figure.subplot.top": 0.9,
+        # "figure.subplot.bottom": 0.15,
+        # "figure.subplot.left": 0.15,
+        # "figure.subplot.right": 0.950,
+        # #
+        # "axes.labelsize": FONTSIZE_AXESLABELS,
+        # "axes.titlesize": FONTSIZE_TITLE,
+        # #
+        # "xtick.labelsize": FONTSIZE_TICKLABELS,
+        # "xtick.major.size": 5,
+        # "xtick.minor.size": 3,
+        # "ytick.labelsize": FONTSIZE_TICKLABELS,
+        # "ytick.major.size": 5,
+        # "ytick.minor.size": 3,
+        # #
+        # "legend.fancybox": False,
+        # "legend.framealpha": 1,
+        # "legend.edgecolor": "black",
+        # "legend.fontsize": FONTSIZE_LEGEND,
+    }
+)
+
+
+def fix_plot_layout():
+    plt.rc("text", usetex=False)
+    plt.rc("pdf", fonttype=42)
+    #
+    plt.rc("font", size=FONTSIZE_DEFAULT)
+    plt.rc("font", family="sans-serif")
+    # plt.rc("font", sansserif="Arial")
+    #
+    plt.rc("figure.subplot", top=0.95)
+    plt.rc("figure.subplot", bottom=0.163)
+    plt.rc("figure.subplot", left=0.165)
+    plt.rc("figure.subplot", right=0.970)
+    #
+    plt.rc("axes", labelsize=FONTSIZE_AXESLABELS)
+    plt.rc("axes", titlesize=FONTSIZE_TITLE)
+    #
+    plt.rc("xtick", labelsize=FONTSIZE_TICKLABELS)
+    plt.rc("xtick.major", size=5)
+    plt.rc("xtick.minor", size=3)
+    plt.rc("ytick", labelsize=FONTSIZE_TICKLABELS)
+    plt.rc("ytick.major", size=5)
+    plt.rc("ytick.minor", size=3)
+    #
+    plt.rc("legend", fancybox=False)
+    plt.rc("legend", framealpha=1)
+    plt.rc("legend", edgecolor="black")
+    plt.rc("legend", fontsize=FONTSIZE_LEGEND)
+
 
 # ------------------------------------------------------------------------------
 #  Check validity of user configurable parameters
@@ -105,17 +174,17 @@ else:
         img_stack_gray = cache["img_stack_gray"]
     print(f"done in {(perf_counter() - tick):.2f} s\n")
 
-for frame_idx, frame in enumerate(img_stack_gray):
-    plt.imsave(
-        f"temp/round_{frame_idx:03d}.png",
-        frame,
-        cmap="gray",
-        vmin=0,
-        vmax=1,
-        origin="lower",
-    )
-
-sys.exit(0)
+# for frame_idx, frame in enumerate(img_stack_gray):
+frame_idx = 0
+frame = img_stack_gray[0]
+plt.imsave(
+    f"temp/C_frame_{frame_idx:03d}.png",
+    frame,
+    cmap="gray",
+    vmin=0,
+    vmax=1,
+    origin="lower",
+)
 
 # Binarize OpenSimplex noise
 (
@@ -129,7 +198,7 @@ if SHOW_NOISE_AS_GRAY:
     img_stack_plot = img_stack_gray
 else:
     img_stack_plot = img_stack_BW
-    del img_stack_gray  # Not needed anymore -> Free up large chunk of mem
+    # del img_stack_gray  # Not needed anymore -> Free up large chunk of mem
 
 # Map OpenSimplex noise onto valve locations
 valves_stack, alpha_valves = compute_valves_stack(img_stack_BW)
@@ -147,7 +216,7 @@ _, pdf_off_adj, pdf_on_adj = valve_on_off_PDFs(valves_stack_adj, CFG.DT_FRAME)
 
 # Report transparencies
 def build_stats_str(x):
-    return f"{np.mean(x):.2f} ± {np.std(x):.3f}"
+    return f"{np.mean(x)*100:.1f} ± {np.std(x)*100:.1f}"
 
 
 stats_alpha_BW = build_stats_str(alpha_BW)
@@ -231,21 +300,50 @@ ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 # True.
 img_stack_plot = 1 - img_stack_plot
 
-if SHOW_NOISE_IN_PLOT:
-    hax_noise = ax.imshow(
-        img_stack_plot[0],
-        cmap="gray",
-        vmin=0,
-        vmax=1,
-        interpolation="none",
-        origin="lower",
-        extent=[
-            C.PCS_X_MIN - 1,
-            C.PCS_X_MAX + 1,
-            C.PCS_X_MIN - 1,
-            C.PCS_X_MAX + 1,
-        ],
-    )
+# Invert and maximize contrast for publication
+frame = 1 - img_stack_gray[0]
+in_min = np.min(frame)
+in_max = np.max(frame)
+f_norm = in_max - in_min
+np.subtract(frame, in_min, out=frame)
+np.divide(frame, f_norm, out=frame)
+
+# if SHOW_NOISE_IN_PLOT:
+hax_noise = ax.imshow(
+    frame,
+    cmap="gray",
+    vmin=0,
+    vmax=1,
+    interpolation="none",
+    origin="lower",
+    extent=[
+        C.PCS_X_MIN - 1,
+        C.PCS_X_MAX + 1,
+        C.PCS_X_MIN - 1,
+        C.PCS_X_MAX + 1,
+    ],
+)
+plt.grid(color="c")
+plt.savefig(r"temp/step_1.pdf")
+
+# Invert or publication
+frame = 1 - img_stack_BW[0]
+
+ax.imshow(
+    frame,
+    cmap="gray",
+    vmin=0,
+    vmax=1,
+    interpolation="none",
+    origin="lower",
+    extent=[
+        C.PCS_X_MIN - 1,
+        C.PCS_X_MAX + 1,
+        C.PCS_X_MIN - 1,
+        C.PCS_X_MAX + 1,
+    ],
+)
+plt.savefig(r"temp/step_2.pdf")
 
 # Valves
 # ------
@@ -273,8 +371,11 @@ for frame in range(CFG.N_FRAMES):
 ax.set_aspect("equal", adjustable="box")
 ax.set_xlim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
 ax.set_ylim(C.PCS_X_MIN - 1, C.PCS_X_MAX + 1)
-ax.grid(which="major")
+# ax.grid(which="major")
 # ax.axis("off")
+
+plt.savefig(r"temp/step_3.pdf")
+# plt.show()
 
 
 # Animation function
@@ -286,51 +387,92 @@ def animate_fig_1(j):
 
 
 # Animate figure
-anim = animation.FuncAnimation(
-    fig_1,
-    animate_fig_1,
-    frames=CFG.N_FRAMES,
-    interval=CFG.DT_FRAME * 1000,  # [ms]
-    init_func=animate_fig_1(0),
-)
+# anim = animation.FuncAnimation(
+#     fig_1,
+#     animate_fig_1,
+#     frames=CFG.N_FRAMES,
+#     interval=CFG.DT_FRAME * 1000,  # [ms]
+#     init_func=animate_fig_1(0),
+# )
 
 # 2: Transparencies
 # -----------------
 
+time = np.arange(0, CFG.N_FRAMES * CFG.DT_FRAME, CFG.DT_FRAME)
+
 fig_2 = plt.figure(2)
-fig_2.set_tight_layout(True)
-fig_2.set_size_inches(12, 4.8)
-# plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
-plt.plot(alpha_valves_adj, "k", label=f"valves adj {stats_alpha_valves_adj}")
-# plt.plot(alpha_BW, "g", label=f"noise {stats_alpha_BW}")
-plt.xlim(0, CFG.N_FRAMES)
-plt.title("transparency")
-plt.xlabel("frame #")
-plt.ylabel("alpha [0 - 1]")
+# fig_2.set_tight_layout(True)
+# fig_2.set_size_inches(12, 4.8)
+fix_plot_layout()
+
+plt.plot(
+    time,
+    alpha_BW * 100,
+    "k",
+    label=f"Binary noise: {stats_alpha_BW} %",
+)
+# plt.plot(
+#     time,
+#     alpha_valves * 100,
+#     "deeppink",
+#     label=f"valves org {stats_alpha_valves}",
+# )
+plt.plot(
+    time,
+    alpha_valves_adj * 100,
+    "deeppink",
+    label=f"Jet grid: {stats_alpha_valves_adj} %",
+)
+
+# plt.xlim(0, CFG.DT_FRAME * (CFG.N_FRAMES + 1))
+plt.xlim(0, 10)
+plt.ylim(30, 50)
+
+# plt.xlabel(r"$\mathrm{Time~(s)}$", usetex=True)
+# plt.ylabel(r"$\mathrm{Transparency~(\%)}$", usetex=True)
+plt.xlabel("Time (s)", fontsize=FONTSIZE_OVERRULED)
+plt.ylabel("Transparency (%)", fontsize=FONTSIZE_OVERRULED)
+
 plt.minorticks_on()
 plt.legend()
+
+fig_2.axes[0].yaxis.set_tick_params(which="minor", bottom=False)
+fig_2.set_tight_layout(True)
+fig_2.savefig("temp/fig_transparency.pdf")
 
 # 3: Probability densities
 # ------------------------
 
 # Plot
 fig_3, axs = plt.subplots(2)
-fig_3.set_tight_layout(True)
 
-axs[0].set_title("valve ON")
-axs[0].step(bins, pdf_on, "deeppink", where="mid", label="original")
-axs[0].step(bins, pdf_on_adj, "k", where="mid", label="adjusted")
+axs[0].step(bins, pdf_on, "k", where="mid", label="Theoretical valve")
+axs[0].step(bins, pdf_on_adj, "deeppink", where="mid", label="Jet grid valve")
 
-axs[1].set_title("valve OFF")
-axs[1].step(bins, pdf_off, "deeppink", where="mid", label="original")
-axs[1].step(bins, pdf_off_adj, "k", where="mid", label="adjusted")
+axs[1].step(bins, pdf_off, "k", where="mid", label="Theoretical valve")
+axs[1].step(bins, pdf_off_adj, "deeppink", where="mid", label="Jet grid valve")
+
+# axs[0].set_xlabel("$\mathrm{Open~duration~(s)}$", usetex=True)
+axs[0].set_xlabel("Open duration (s)", fontsize=FONTSIZE_OVERRULED)
+axs[0].set_ylim(0, 1.5)
+axs[0].minorticks_on()
+axs[0].yaxis.set_tick_params(which="minor", bottom=False)
+
+# axs[1].set_xlabel("$\mathrm{Closed~duration~(s)}$", usetex=True)
+axs[1].set_xlabel("Closed duration (s)", fontsize=FONTSIZE_OVERRULED)
+axs[1].set_ylim(0, 1)
+axs[1].minorticks_on()
+axs[1].yaxis.set_tick_params(which="minor", bottom=False)
 
 for ax in axs:
-    ax.set_xlabel("duration (s)")
-    ax.set_ylabel("PDF")
+    # ax.set_ylabel("$\mathrm{Discrete~PDF}$", usetex=True)
+    ax.set_ylabel("Discrete PDF", fontsize=FONTSIZE_OVERRULED)
     ax.set_xlim(0, 6)
     ax.legend()
     ax.grid()
+
+fig_3.set_tight_layout(True)
+fig_3.savefig("temp/fig_valve_PDFs.pdf")
 
 # Round up plots
 # --------------

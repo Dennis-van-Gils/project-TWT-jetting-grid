@@ -77,7 +77,7 @@ def noise_numba(
 
 if __name__ == "__main__":
     vicinity = 4
-    step = 0.05
+    step = 0.01
     ix = np.arange(-vicinity, vicinity, step)
     iy = np.arange(-vicinity, vicinity, step)
 
