@@ -7,12 +7,11 @@ Utility functions that operate on an `img_stack`.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "18-04-2023"
+__date__ = "13-09-2024"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter
-from typing import Tuple, Union
 
 import numpy as np
 from scipy import optimize
