@@ -80,10 +80,7 @@ if not LOAD_FROM_CACHE:
     if SAVE_TO_CACHE:
         print("Saving cache to disk...")
         tick = perf_counter()
-        np.savez(
-            "cache.npz",
-            img_stack_gray=img_stack_gray,
-        )
+        np.savez("cache.npz", img_stack_gray=img_stack_gray)
         print(f"done in {(perf_counter() - tick):.2f} s\n")
 
 else:
@@ -156,9 +153,15 @@ with open(CFG.EXPORT_PATH_NO_EXT + "_alpha.txt", "w", encoding="utf-8") as f:
             f.write("All frames did converge.\n")
     else:
         f.write("A simple BW threshold was used.\n")
-        f.write("Column `converged?` can be ignored.\n")
+        f.write("Column `Newton_solver_converged?` can be ignored.\n")
 
-    f.write("\n# frame\talpha_BW\talpha_valves_adj\tconverged?\n")
+    f.write(
+        "\n"
+        "# frame\t"
+        "transparency_binary_noise\t"
+        "transparency_jet_grid\t"
+        "Newton_solver_converged?\n"
+    )
     for i in range(CFG.N_FRAMES):
         f.write(
             f"{i:d}\t{alpha_BW[i]:.2f}\t"
@@ -186,12 +189,20 @@ np.savetxt(
     CFG.EXPORT_PATH_NO_EXT + "_pdfs.txt",
     pdfs,
     fmt="%.3f\t%.3e\t%.3e\t%.3e\t%.3e",
-    header="duration[s]\tpdf_on_orig\tpdf_on_adj\tpdf_off_orig\tpdf_off_adj",
+    header=(
+        "duration[s]\t"
+        "open_theoretical_valve\t"
+        "open_jet_grid_valve\t"
+        "closed_theoretical_valve\t"
+        "closed_jet_grid_valve"
+    ),
 )
 
 # ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
+
+plot_title = f"Protocol: {CFG.EXPORT_FILENAME}"
 
 # 1: Valve and noise animation
 # ----------------------------
@@ -277,15 +288,17 @@ anim = animation.FuncAnimation(
 fig_2 = plt.figure(2)
 fig_2.set_tight_layout(True)  # type: ignore
 fig_2.set_size_inches(12, 4.8)
-# plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
-plt.plot(alpha_valves_adj, "k", label=f"valves adj {stats_alpha_valves_adj}")
-# plt.plot(alpha_BW, "g", label=f"noise {stats_alpha_BW}")
+plt.plot(
+    alpha_valves_adj, "deeppink", label=f"Jet grid: {stats_alpha_valves_adj}"
+)
+# plt.plot(alpha_valves, "g", label=f"Valves org.: {stats_alpha_valves}")
+plt.plot(alpha_BW, "k", label=f"Binary noise: {stats_alpha_BW}")
+plt.title(plot_title)
 plt.xlim(0, CFG.N_FRAMES)
-plt.title("transparency")
-plt.xlabel("frame #")
-plt.ylabel("alpha [0 - 1]")
+plt.xlabel("Frame #")
+plt.ylabel("Transparency [0 - 1]")
 plt.minorticks_on()
-plt.legend()
+plt.legend(loc="upper right")
 
 # 3: Probability densities
 # ------------------------
@@ -294,17 +307,17 @@ plt.legend()
 fig_3, axs = plt.subplots(2)
 fig_3.set_tight_layout(True)  # type: ignore
 
-axs[0].set_title("valve ON")
-axs[0].step(bins, pdf_on, "deeppink", where="mid", label="original")
-axs[0].step(bins, pdf_on_adj, "k", where="mid", label="adjusted")
+axs[0].set_title(plot_title)
+axs[0].set_xlabel("Open duration (s)")
+axs[0].step(bins, pdf_on, "k", where="mid", label="Theoretical valve")
+axs[0].step(bins, pdf_on_adj, "deeppink", where="mid", label="Jet grid valve")
 
-axs[1].set_title("valve OFF")
-axs[1].step(bins, pdf_off, "deeppink", where="mid", label="original")
-axs[1].step(bins, pdf_off_adj, "k", where="mid", label="adjusted")
+axs[1].set_xlabel("Closed duration (s)")
+axs[1].step(bins, pdf_off, "k", where="mid", label="Theoretical valve")
+axs[1].step(bins, pdf_off_adj, "deeppink", where="mid", label="Jet grid valve")
 
 for ax in axs:
-    ax.set_xlabel("duration (s)")
-    ax.set_ylabel("PDF")
+    ax.set_ylabel("Discrete PDF")
     ax.set_xlim(0, 6)
     ax.legend()
     ax.grid()

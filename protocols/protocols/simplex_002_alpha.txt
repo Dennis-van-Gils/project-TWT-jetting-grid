@@ -1,7 +1,7 @@
 Newton solver was used to solve for a wanted transparency.
 All frames did converge.
 
-# frame	alpha_BW	alpha_valves_adj	converged?
+# frame	transparency_binary_noise	transparency_jet_grid	Newton_solver_converged?
 0	0.39	0.38	True
 1	0.40	0.38	True
 2	0.40	0.39	True

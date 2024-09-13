@@ -1,4 +1,4 @@
-# duration[s]	pdf_on_orig	pdf_on_adj	pdf_off_orig	pdf_off_adj
+# duration[s]	open_theoretical_valve	open_jet_grid_valve	closed_theoretical_valve	closed_jet_grid_valve
 0.000	0.000e+00	0.000e+00	0.000e+00	0.000e+00
 0.050	2.738e-01	0.000e+00	1.331e-01	0.000e+00
 0.100	5.140e-01	0.000e+00	2.857e-01	0.000e+00
