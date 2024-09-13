@@ -7,7 +7,7 @@ Twente Water Tunnel facility.
 Installation
 ------------
 
-1) Download the contents of this GitHub folder `here <https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/Dennis-van-Gils/project-TWT-jetting-grid/tree/main/protocols>`_ and unzip.
+1) Download the contents of this GitHub folder `here <https://download-directory.github.io/?url=https%3A%2F%2Fgithub.com%2FDennis-van-Gils%2Fproject-TWT-jetting-grid%2Ftree%2Fmain%2Fprotocols>`_ and unzip.
 2) Open Anaconda prompt and navigate into the unzipped folder.
 3) Now, we will create a separate Python environment called 'twt' to install the necessary packages and run the scripts in.
 
