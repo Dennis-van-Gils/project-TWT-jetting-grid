@@ -18,7 +18,7 @@ Usage:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "18-04-2023"
+__date__ = "13-09-2024"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -216,12 +216,12 @@ if SHOW_NOISE_IN_PLOT:
         vmax=1,
         interpolation="none",
         origin="lower",
-        extent=[
+        extent=(
             C.PCS_X_MIN - 1,
             C.PCS_X_MAX + 1,
             C.PCS_X_MIN - 1,
             C.PCS_X_MAX + 1,
-        ],
+        ),
     )
 
 # Valves
@@ -275,7 +275,7 @@ anim = animation.FuncAnimation(
 # -----------------
 
 fig_2 = plt.figure(2)
-fig_2.set_tight_layout(True)
+fig_2.set_tight_layout(True)  # type: ignore
 fig_2.set_size_inches(12, 4.8)
 # plt.plot(alpha_valves, "deeppink", label=f"valves org {stats_alpha_valves}")
 plt.plot(alpha_valves_adj, "k", label=f"valves adj {stats_alpha_valves_adj}")
@@ -292,7 +292,7 @@ plt.legend()
 
 # Plot
 fig_3, axs = plt.subplots(2)
-fig_3.set_tight_layout(True)
+fig_3.set_tight_layout(True)  # type: ignore
 
 axs[0].set_title("valve ON")
 axs[0].step(bins, pdf_on, "deeppink", where="mid", label="original")
