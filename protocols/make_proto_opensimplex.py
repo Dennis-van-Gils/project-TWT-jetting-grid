@@ -19,7 +19,7 @@ __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "13-09-2024"
-__version__ = "1.0"
+__version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
 import sys
@@ -217,14 +217,29 @@ ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 # on a white background, than it is reversed. This is opposite to a masking
 # layer in Photoshop, where a white region indicates True. Here, black indicates
 # True.
-img_stack_plot = 1 - img_stack_plot
+if SHOW_NOISE_AS_GRAY:
+    img_stack_plot = -img_stack_plot
+
+    if 0:
+        # Maximize contrast symmetrically around 0.
+        in_min = np.min(img_stack_plot)
+        in_max = np.max(img_stack_plot)
+        vmax = max([abs(in_min), abs(in_max)])
+        vmin = -vmax
+    else:
+        vmin = -1
+        vmax = 1
+else:
+    img_stack_plot = ~img_stack_plot
+    vmin = 0
+    vmax = 1
 
 if SHOW_NOISE_IN_PLOT:
     hax_noise = ax.imshow(
         img_stack_plot[0],
         cmap="gray",
-        vmin=0,
-        vmax=1,
+        vmin=vmin,
+        vmax=vmax,
         interpolation="none",
         origin="lower",
         extent=(

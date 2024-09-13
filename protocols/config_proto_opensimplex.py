@@ -44,24 +44,26 @@ SEED_A = 1
 SEED_B = 13
 
 # To determine which valves should be opened and which ones should be closed, we
-# apply a threshold function on each generated OpenSimplex noise [0-1]-grayscale
-# image frame. In essence, we binarize each noise frame into a boolean black and
-# white (BW) map. If a valve lies inside the `True` region it will get opened,
-# otherwise it will get closed.
+# must apply a threshold function on each generated OpenSimplex noise image
+# frame. Each image frame contains float values within the range [-1, 1].
+#
+# In essence, we binarize each image frame into a boolean black and white (BW)
+# map. If a valve lies inside the `True` region it will get opened, otherwise it
+# will get closed.
 #
 # Two different thresholding schemes exist.
 # --> YOU MUST SPECIFY A VALUE FOR ONE SCHEME ONLY AND SET THE OTHER TO `None`.
-#
-# 1) Constant threshold
-# ---------------------
-# The applied threshold is constant for all image frames. Grayscale values above
-# `1 - BW_threshold` will be set `True`. [grayscale value, 0-1].
+
+# SCHEME 1) Constant threshold
+# ----------------------------
+# The applied threshold is constant for all image frames. Values above
+#  `BW_threshold` will be set `True`.
 BW_THRESHOLD = None  # Leave it at None. Use `TARGET_TRANSPARENCY` instead.
 
-# 2) Newton solver
-# ----------------
-# A Newton solver is employed per image frame to try solve for the grayscale
-# threshold that would result in the given target transparency. Transparency is
+# SCHEME 2) Newton solver
+# -----------------------
+# A Newton solver is employed per image frame to try solve for the threshold
+# that would result in the given target transparency. Transparency is
 # defined as the number of `True / 1 / valve on` elements over the total number
 # of elements. This method tends to minimize the fluctuation of the resulting
 # valve transparency over each frame. [ratio, 0-1].
@@ -83,8 +85,8 @@ MIN_VALVE_DURATION = 5
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "18-04-2023"
-__version__ = "1.0"  # Export file header info. Bump when major changes occur
+__date__ = "13-09-2024"
+__version__ = "2.0"  # Export file header info. Bump when major changes occur
 
 import os as _os
 from datetime import datetime

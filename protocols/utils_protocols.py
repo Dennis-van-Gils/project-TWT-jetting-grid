@@ -8,7 +8,7 @@ __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "13-09-2024"
-__version__ = "1.0"
+__version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
 from time import perf_counter
@@ -21,7 +21,6 @@ from tqdm import trange
 from opensimplex_loops import looping_animated_2D_image
 from utils_img_stack import (
     add_stack_B_to_A,
-    rescale_stack,
     binarize_stack_using_threshold,
     binarize_stack_using_newton,
 )
@@ -36,16 +35,15 @@ import config_proto_opensimplex as CFG
 
 def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
     """Generate OpenSimplex noise as specified in `config_proto_OpenSimplex.py`.
-    Sets A and B will be mixed together into one image stack and rescaled to lie
-    within the grayscale value range [0-1].
 
     Returns:
         img_stack_out (np.ndarray):
-            2D image stack [time, y-pixel, x-pixel] containing float values.
+            2D image stack [time, y-pixel, x-pixel] containing float values
+            within the range [-1, 1].
             Array shape: [N_frames, N_pixels, N_pixels]
     """
 
-    # Pixel values range between [-1, 1]
+    # Range [-1, 1]
     img_stack_A = looping_animated_2D_image(
         N_frames=CFG.N_FRAMES,
         N_pixels_x=CFG.N_PIXELS,
@@ -57,7 +55,7 @@ def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
     print("")
 
     if CFG.FEATURE_SIZE_B > 0:
-        # Pixel values range between [-1, 1]
+        # Range [-1, 1]
         img_stack_B = looping_animated_2D_image(
             N_frames=CFG.N_FRAMES,
             N_pixels_x=CFG.N_PIXELS,
@@ -68,14 +66,9 @@ def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
         )
         print("")
 
-        # Pixel values range between [-2, 2]
-        add_stack_B_to_A(img_stack_A, img_stack_B)
+        add_stack_B_to_A(img_stack_A, img_stack_B)  # Range [-2, 2]
+        np.divide(img_stack_A, 2, out=img_stack_A)  # Range [-1, 1]
         del img_stack_B
-
-    # Rescale and offset all images in the stack to lie within the range [0, 1].
-    # Leave `symmetrically=True` to prevent biasing the pixel intensity
-    # distribution towards 0 or 1.
-    rescale_stack(img_stack_A, symmetrically=True)
 
     return img_stack_A
 
@@ -114,11 +107,11 @@ def binarize_img_stack(
 
     if CFG.BW_THRESHOLD is not None:
         # Constant BW threshold
-        # Values above `1 - BW_threshold` are set `True` (1), else `False` (0).
+        # Values above `BW_threshold` are set `True` (1), else `False` (0).
         print("Binarizing noise using a constant threshold...")
         binarize_stack_using_threshold(
             img_stack_in,
-            1 - CFG.BW_THRESHOLD,
+            CFG.BW_THRESHOLD,
             img_stack_BW,
             alpha_BW,
         )

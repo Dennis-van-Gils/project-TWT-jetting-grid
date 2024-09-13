@@ -8,7 +8,7 @@ __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
 __date__ = "13-09-2024"
-__version__ = "1.0"
+__version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring, pointless-string-statement
 
 from time import perf_counter
@@ -146,7 +146,7 @@ def binarize_stack_using_newton(
         try:
             threshold = optimize.newton(
                 _newton_fun,
-                1 - target_transparency,
+                0,
                 args=(stack_in[i], target_transparency),
                 maxiter=20,
                 tol=0.02,
