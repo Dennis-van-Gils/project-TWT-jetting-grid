@@ -2,35 +2,12 @@
 # -*- coding: utf-8 -*-
 """Quick and dirty edit of file `make_proto_opensimplex.py` to make figures
 suitable for publication.
-
-N_FRAMES = 500
-
-A:
-        FEATURE_SIZE_A = 50
-        FEATURE_SIZE_B = 0
-        T_STEP_A = 0.1
-
-B:
-        FEATURE_SIZE_A = 150
-        FEATURE_SIZE_B = 0
-        T_STEP_A = 0.04
-
-C (== A + B):
-        FEATURE_SIZE_A = 50
-        FEATURE_SIZE_B = 150
-        T_STEP_A = 0.1
-        T_STEP_B = 0.04
-
-D (== C, binarized)
-
-E (== D, with valves)
-
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "11-09-2024"
-__version__ = "1.0"
+__date__ = "13-09-2024"
+__version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
 import sys
@@ -160,10 +137,7 @@ if not LOAD_FROM_CACHE:
     if SAVE_TO_CACHE:
         print("Saving cache to disk...")
         tick = perf_counter()
-        np.savez(
-            "cache.npz",
-            img_stack_gray=img_stack_gray,
-        )
+        np.savez("cache.npz", img_stack_gray=img_stack_gray)
         print(f"done in {(perf_counter() - tick):.2f} s\n")
 
 else:
@@ -181,7 +155,7 @@ plt.imsave(
     f"temp/C_frame_{frame_idx:03d}.png",
     frame,
     cmap="gray",
-    vmin=0,
+    vmin=-1,
     vmax=1,
     origin="lower",
 )
@@ -248,9 +222,15 @@ with open(CFG.EXPORT_PATH_NO_EXT + "_alpha.txt", "w", encoding="utf-8") as f:
             f.write("All frames did converge.\n")
     else:
         f.write("A simple BW threshold was used.\n")
-        f.write("Column `converged?` can be ignored.\n")
+        f.write("Column `Newton_solver_converged?` can be ignored.\n")
 
-    f.write("\n# frame\talpha_BW\talpha_valves_adj\tconverged?\n")
+    f.write(
+        "\n"
+        "# frame\t"
+        "transparency_binary_noise\t"
+        "transparency_jet_grid\t"
+        "Newton_solver_converged?\n"
+    )
     for i in range(CFG.N_FRAMES):
         f.write(
             f"{i:d}\t{alpha_BW[i]:.2f}\t"
@@ -278,12 +258,20 @@ np.savetxt(
     CFG.EXPORT_PATH_NO_EXT + "_pdfs.txt",
     pdfs,
     fmt="%.3f\t%.3e\t%.3e\t%.3e\t%.3e",
-    header="duration[s]\tpdf_on_orig\tpdf_on_adj\tpdf_off_orig\tpdf_off_adj",
+    header=(
+        "duration[s]\t"
+        "open_theoretical_valve\t"
+        "open_jet_grid_valve\t"
+        "closed_theoretical_valve\t"
+        "closed_jet_grid_valve"
+    ),
 )
 
 # ------------------------------------------------------------------------------
 #  Plot
 # ------------------------------------------------------------------------------
+
+plot_title = f"Protocol: {CFG.EXPORT_FILENAME}"
 
 # 1: Valve and noise animation
 # ----------------------------
@@ -298,10 +286,9 @@ ax_text = ax.text(0, 1.02, "", transform=ax.transAxes)
 # on a white background, than it is reversed. This is opposite to a masking
 # layer in Photoshop, where a white region indicates True. Here, black indicates
 # True.
-img_stack_plot = 1 - img_stack_plot
 
 # Invert and maximize contrast for publication
-frame = 1 - img_stack_gray[0]
+frame = -img_stack_gray[0]
 in_min = np.min(frame)
 in_max = np.max(frame)
 f_norm = in_max - in_min
@@ -316,18 +303,18 @@ hax_noise = ax.imshow(
     vmax=1,
     interpolation="none",
     origin="lower",
-    extent=[
+    extent=(
         C.PCS_X_MIN - 1,
         C.PCS_X_MAX + 1,
         C.PCS_X_MIN - 1,
         C.PCS_X_MAX + 1,
-    ],
+    ),
 )
 plt.grid(color="c")
 plt.savefig(r"temp/step_1.pdf")
 
-# Invert or publication
-frame = 1 - img_stack_BW[0]
+# Invert for publication
+frame = ~img_stack_BW[0]
 
 ax.imshow(
     frame,
@@ -336,12 +323,12 @@ ax.imshow(
     vmax=1,
     interpolation="none",
     origin="lower",
-    extent=[
+    extent=(
         C.PCS_X_MIN - 1,
         C.PCS_X_MAX + 1,
         C.PCS_X_MIN - 1,
         C.PCS_X_MAX + 1,
-    ],
+    ),
 )
 plt.savefig(r"temp/step_2.pdf")
 
@@ -414,7 +401,7 @@ plt.plot(
 # plt.plot(
 #     time,
 #     alpha_valves * 100,
-#     "deeppink",
+#     "g",
 #     label=f"valves org {stats_alpha_valves}",
 # )
 plt.plot(
@@ -425,7 +412,7 @@ plt.plot(
 )
 
 # plt.xlim(0, CFG.DT_FRAME * (CFG.N_FRAMES + 1))
-plt.xlim(0, 10)
+plt.xlim(0, 30)
 plt.ylim(30, 50)
 
 # plt.xlabel(r"$\mathrm{Time~(s)}$", usetex=True)
