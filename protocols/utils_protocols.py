@@ -7,7 +7,7 @@ Utility functions for generating protocols.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "18-04-2023"
+__date__ = "13-09-2024"
 __version__ = "1.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -87,7 +87,7 @@ def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
 
 def binarize_img_stack(
     img_stack_in: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Binarize the passed grayscale image stack `img_stack_in` using a
     thresholding scheme as specified in `config_proto_OpenSimplex.py`.
 
