@@ -83,6 +83,16 @@ bin_centers = bin_edges[:-1] + bin_width / 2
 
 # Compare with Gaussian
 
+mu = np.mean(noise_4D.flatten())
+sigma = np.std(noise_4D.flatten())
+noise_min = np.min(noise_4D)
+noise_max = np.max(noise_4D)
+
+print(f"Mean: {mu:.2e}")
+print(f"Std : {sigma:.4f}")
+print(f"Min : {noise_min:.4f}")
+print(f"Max : {noise_max:.4f}")
+
 
 def gaussian(x, mu, sigma):
     return (
@@ -93,11 +103,7 @@ def gaussian(x, mu, sigma):
 
 
 x_gauss = np.linspace(-1, 1, 1001)
-y_gauss = gaussian(
-    x_gauss,
-    mu=np.mean(noise_4D.flatten()),
-    sigma=np.std(noise_4D.flatten()),
-)
+y_gauss = gaussian(x_gauss, mu=mu, sigma=sigma)
 
 # ------------------------------------------------------------------------------
 #   Plot
