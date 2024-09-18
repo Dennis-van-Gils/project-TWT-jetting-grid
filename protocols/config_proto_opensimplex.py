@@ -7,11 +7,11 @@ OpenSimplex noise.
 
 Two different sets of OpenSimplex noise can be mixed together: set A and set B.
 You could specify a larger typical length scale for set B than for set A,
-as specified by `FEATURE_SIZE`. Likewise the same for the typical time scale as
-specified by `T_STEP`.
+as specified by the parameter `SPATIAL_FEATURE_SIZE`. Likewise for the typical
+time scale as specified by the parameter `TEMPORAL_FEATURE_SIZE`.
 
-If `FEATURE_SIZE_B` is set to 0, set B will be completely ignored and no mixing
-will take place.
+If `SPATIAL_FEATURE_SIZE_B` is set to 0, set B will be completely ignored and no
+mixing will take place.
 
 Below settings will get stored inside the header section of the generated
 protocol textfile.
@@ -31,13 +31,18 @@ N_FRAMES = 5000  # Leave it at 5000
 # Time interval between each frame [s].
 DT_FRAME = 0.05  # Leave it at 0.05
 
-# OpenSimplex noise coherent feature size [arb. unit, try ~ 50]
-FEATURE_SIZE_A = 50
-FEATURE_SIZE_B = 100
+# Spatial feature size of the OpenSimplex noise [arb. unit, try ~ 50]
+# Larger SFS means larger coherent structures in single frames, and vice-versa.
+# If `SPATIAL_FEATURE_SIZE_B` is set to 0, set B will be completely ignored and
+# no mixing will take place.
+SPATIAL_FEATURE_SIZE_A = 50
+SPATIAL_FEATURE_SIZE_B = 100
 
-# OpenSimplex noise time step size [arb. unit, try ~ 0.1]
-T_STEP_A = 0.1
-T_STEP_B = 0.1
+# Temporal feature size of the OpenSimplex noise [arb. unit, try ~ 10]
+# Larger TFS means a single spatial structure remains coherent for a longer time
+# duration in between frames, and vice-versa.
+TEMPORAL_FEATURE_SIZE_A = 10
+TEMPORAL_FEATURE_SIZE_B = 10
 
 # OpenSimplex noise seeds
 SEED_A = 1
@@ -85,7 +90,7 @@ MIN_VALVE_DURATION = 5
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "13-09-2024"
+__date__ = "18-09-2024"
 __version__ = "2.0"  # Export file header info. Bump when major changes occur
 
 import os as _os
@@ -102,11 +107,14 @@ PCS_PIXEL_DIST = 32
 N_PIXELS = PCS_PIXEL_DIST * (C.NUMEL_PCS_AXIS + 1)
 
 # Derived
-X_STEP_A = _np.divide(1, FEATURE_SIZE_A * PCS_PIXEL_DIST / 32)
-if FEATURE_SIZE_B != 0:
-    X_STEP_B = _np.divide(1, FEATURE_SIZE_B * PCS_PIXEL_DIST / 32)
-else:
+X_STEP_A = 1 / (SPATIAL_FEATURE_SIZE_A * PCS_PIXEL_DIST / 32)
+T_STEP_A = 1 / TEMPORAL_FEATURE_SIZE_A
+if SPATIAL_FEATURE_SIZE_B == 0:
     X_STEP_B = 0
+    T_STEP_B = 0
+else:
+    X_STEP_B = 1 / (SPATIAL_FEATURE_SIZE_B * PCS_PIXEL_DIST / 32)
+    T_STEP_B = 1 / TEMPORAL_FEATURE_SIZE_B
 
 if EXPORT_SUBFOLDER.strip() == "":
     EXPORT_PATH_NO_EXT = EXPORT_FILENAME
@@ -140,7 +148,7 @@ del _os, _np
 
 
 def create_header_string() -> str:
-    w = 20
+    w = 25
     header_str = (
         f"{'TYPE':<{w}}OpenSimplex noise v{__version__}\n"
         f"{'DATE':<{w}}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
@@ -148,17 +156,19 @@ def create_header_string() -> str:
         f"{'DT_FRAME':<{w}}{DT_FRAME} s\n\n"
         f"{'BW_THRESHOLD':<{w}}{BW_THRESHOLD}\n"
         f"{'TARGET_TRANSPARENCY':<{w}}{TARGET_TRANSPARENCY}\n\n"
-        f"{'FEATURE_SIZE_A':<{w}}{FEATURE_SIZE_A}\n"
-        f"{'FEATURE_SIZE_B':<{w}}{FEATURE_SIZE_B}\n\n"
-        f"{'T_STEP_A':<{w}}{T_STEP_A}\n"
-        f"{'T_STEP_B':<{w}}{T_STEP_B}\n\n"
+        f"{'SPATIAL_FEATURE_SIZE_A':<{w}}{SPATIAL_FEATURE_SIZE_A}\n"
+        f"{'SPATIAL_FEATURE_SIZE_B':<{w}}{SPATIAL_FEATURE_SIZE_B}\n\n"
+        f"{'TEMPORAL_FEATURE_SIZE_A':<{w}}{TEMPORAL_FEATURE_SIZE_A}\n"
+        f"{'TEMPORAL_FEATURE_SIZE_B':<{w}}{TEMPORAL_FEATURE_SIZE_B}\n\n"
         f"{'SEED_A':<{w}}{SEED_A}\n"
         f"{'SEED_B':<{w}}{SEED_B}\n\n"
         f"{'MIN_VALVE_DURATION':<{w}}{MIN_VALVE_DURATION} frames\n\n"
         f"{'PCS_PIXEL_DIST':<{w}}{PCS_PIXEL_DIST}\n"
         f"{'N_PIXELS':<{w}}{N_PIXELS}\n"
         f"{'X_STEP_A':<{w}}{X_STEP_A}\n"
-        f"{'X_STEP_B':<{w}}{X_STEP_B}\n\n"
+        f"{'X_STEP_B':<{w}}{X_STEP_B}\n"
+        f"{'T_STEP_A':<{w}}{T_STEP_A}\n"
+        f"{'T_STEP_B':<{w}}{T_STEP_B}\n\n"
     )
 
     return header_str

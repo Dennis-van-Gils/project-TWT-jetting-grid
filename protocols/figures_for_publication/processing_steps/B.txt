@@ -1,11 +1,11 @@
-N_FRAMES        500
-DT_FRAME        0.05
+N_FRAMES                 500
+DT_FRAME                 0.05
 
-FEATURE_SIZE_A  150
-FEATURE_SIZE_B  0
+SPATIAL_FEATURE_SIZE_A   150
+SPATIAL_FEATURE_SIZE_B   0
 
-T_STEP_A        0.04
-T_STEP_B        0.1
+TEMPORAL_FEATURE_SIZE_A  25
+TEMPORAL_FEATURE_SIZE_B  10
 
-SEED_A          1
-SEED_B          13
+SEED_A                   1
+SEED_B                   13

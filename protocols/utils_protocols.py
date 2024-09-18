@@ -7,7 +7,7 @@ Utility functions for generating protocols.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "13-09-2024"
+__date__ = "18-09-2024"
 __version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -54,7 +54,7 @@ def generate_OpenSimplex_grayscale_img_stack() -> np.ndarray:
     )
     print("")
 
-    if CFG.FEATURE_SIZE_B > 0:
+    if CFG.SPATIAL_FEATURE_SIZE_B > 0:
         # Range [-1, 1]
         img_stack_B = looping_animated_2D_image(
             N_frames=CFG.N_FRAMES,
