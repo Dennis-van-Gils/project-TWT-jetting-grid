@@ -90,7 +90,7 @@ MIN_VALVE_DURATION = 5
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "18-09-2024"
+__date__ = "19-09-2024"
 __version__ = "2.0"  # Export file header info. Bump when major changes occur
 
 import os as _os
@@ -103,17 +103,17 @@ import constants as C
 # Pixel distance between the integer PCS coordinates.
 # Too large -> memory intense. Too small -> poor quality.
 # 32 is a good value. Leave it.
-PCS_PIXEL_DIST = 32
+PCS_PIXEL_DIST = 32  # A.k.a. PCS_UNIT_PX
 N_PIXELS = PCS_PIXEL_DIST * (C.NUMEL_PCS_AXIS + 1)
 
 # Derived
-X_STEP_A = 1 / (SPATIAL_FEATURE_SIZE_A * PCS_PIXEL_DIST / 32)
+X_STEP_A = 1 / SPATIAL_FEATURE_SIZE_A
 T_STEP_A = 1 / TEMPORAL_FEATURE_SIZE_A
 if SPATIAL_FEATURE_SIZE_B == 0:
     X_STEP_B = 0
     T_STEP_B = 0
 else:
-    X_STEP_B = 1 / (SPATIAL_FEATURE_SIZE_B * PCS_PIXEL_DIST / 32)
+    X_STEP_B = 1 / SPATIAL_FEATURE_SIZE_B
     T_STEP_B = 1 / TEMPORAL_FEATURE_SIZE_B
 
 if EXPORT_SUBFOLDER.strip() == "":
