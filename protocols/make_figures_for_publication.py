@@ -6,7 +6,7 @@ suitable for publication.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "13-09-2024"
+__date__ = "19-09-2024"
 __version__ = "2.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -152,7 +152,7 @@ else:
 frame_idx = 0
 frame = img_stack_gray[0]
 plt.imsave(
-    f"temp/C_frame_{frame_idx:03d}.png",
+    f"temp/D_frame_{frame_idx:03d}.png",
     frame,
     cmap="gray",
     vmin=-1,
@@ -413,7 +413,7 @@ plt.plot(
 
 # plt.xlim(0, CFG.DT_FRAME * (CFG.N_FRAMES + 1))
 plt.xlim(0, 30)
-plt.ylim(30, 50)
+plt.ylim(20, 40)
 
 # plt.xlabel(r"$\mathrm{Time~(s)}$", usetex=True)
 # plt.ylabel(r"$\mathrm{Transparency~(\%)}$", usetex=True)
@@ -439,9 +439,9 @@ axs[0].step(bins, pdf_on_adj, "deeppink", where="mid", label="Jet grid valve")
 axs[1].step(bins, pdf_off, "k", where="mid", label="Theoretical valve")
 axs[1].step(bins, pdf_off_adj, "deeppink", where="mid", label="Jet grid valve")
 
-# axs[0].set_xlabel("$\mathrm{Open~duration~(s)}$", usetex=True)
-axs[0].set_xlabel("Open duration (s)", fontsize=FONTSIZE_OVERRULED)
-axs[0].set_ylim(0, 1.5)
+# axs[0].set_xlabel("$\mathrm{Opened~duration~(s)}$", usetex=True)
+axs[0].set_xlabel("Opened duration (s)", fontsize=FONTSIZE_OVERRULED)
+axs[0].set_ylim(0, 2.1)
 axs[0].minorticks_on()
 axs[0].yaxis.set_tick_params(which="minor", bottom=False)
 
@@ -454,7 +454,7 @@ axs[1].yaxis.set_tick_params(which="minor", bottom=False)
 for ax in axs:
     # ax.set_ylabel("$\mathrm{Discrete~PDF}$", usetex=True)
     ax.set_ylabel("Discrete PDF", fontsize=FONTSIZE_OVERRULED)
-    ax.set_xlim(0, 6)
+    ax.set_xlim(0, 5)
     ax.legend()
     ax.grid()
 

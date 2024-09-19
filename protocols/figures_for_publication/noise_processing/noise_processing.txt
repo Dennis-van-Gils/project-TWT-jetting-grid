@@ -1,0 +1,13 @@
+N_FRAMES                 5000
+DT_FRAME                 0.05
+
+SPATIAL_FEATURE_SIZE_A   50
+SPATIAL_FEATURE_SIZE_B   150
+
+TEMPORAL_FEATURE_SIZE_A  10
+TEMPORAL_FEATURE_SIZE_B  25
+
+TRANSPARENCY             0.4
+
+SEED_A                   1
+SEED_B                   13
