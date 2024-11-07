@@ -2,7 +2,7 @@
  * @file    Main.cpp
  * @author  Dennis van Gils (vangils.dennis@gmail.com)
  * @version https://github.com/Dennis-van-Gils/project-TWT-jetting-grid
- * @date    23-08-2023
+ * @date    07-11-2024
  *
  * @brief   Firmware for the main microcontroller of the TWT Jetting Grid. See
  * `constants.h` for a detailed description.
@@ -83,14 +83,15 @@ struct Readings {
   float EMA_4;              // Exponential moving average of R Click 4 [bitval]
 
   // OMEGA pressure sensors
-  float pres_1_mA = NAN;  // OMEGA pressure sensor 1 [mA]
-  float pres_2_mA = NAN;  // OMEGA pressure sensor 2 [mA]
-  float pres_3_mA = NAN;  // OMEGA pressure sensor 3 [mA]
-  float pres_4_mA = NAN;  // OMEGA pressure sensor 4 [mA]
-  float pres_1_bar = NAN; // OMEGA pressure sensor 1 [bar]
-  float pres_2_bar = NAN; // OMEGA pressure sensor 2 [bar]
-  float pres_3_bar = NAN; // OMEGA pressure sensor 3 [bar]
-  float pres_4_bar = NAN; // OMEGA pressure sensor 4 [bar]
+  float pres_1_mA = NAN;    // OMEGA pressure sensor 1 [mA]
+  float pres_2_mA = NAN;    // OMEGA pressure sensor 2 [mA]
+  float pres_3_mA = NAN;    // OMEGA pressure sensor 3 [mA]
+  float pres_4_mA = NAN;    // OMEGA pressure sensor 4 [mA]
+  float pres_1_bar = NAN;   // OMEGA pressure sensor 1 [bar]
+  float pres_2_bar = NAN;   // OMEGA pressure sensor 2 [bar]
+  float pres_3_bar = NAN;   // OMEGA pressure sensor 3 [bar]
+  float pres_4_bar = NAN;   // OMEGA pressure sensor 4 [bar]
+  float pres_avg_bar = NAN; // Average pressure        [bar]
 };
 Readings readings; // Structure holding the sensor readings and actuator states
 
@@ -498,6 +499,49 @@ void loop() {
   }
 
   // ---------------------------------------------------------------------------
+  //   Measure manifold pressures
+  // ---------------------------------------------------------------------------
+
+  if (!NO_PERIPHERALS) {
+    if (R_click_poll_EMA_collectively()) {
+      /*
+      if (DEBUG) {
+        // DEBUG info: Show warning when obtained interval is too large.
+        // Not necessarily problematic though. The EMA will adjust for this.
+        if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
+          Serial.print("WARNING: Large DAQ DT ");
+          Serial.println(readings.DAQ_obtained_DT);
+        }
+      }
+      */
+
+      readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
+      readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
+      readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
+      readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
+      readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+      readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+      readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+      readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+    }
+  } else {
+    // Generate fake pressure data
+    float sin_value = 16.f + sin(2.f * PI * .1f * millis() / 1.e3f);
+    readings.pres_1_mA = sin_value;
+    readings.pres_2_mA = sin_value + .5;
+    readings.pres_3_mA = sin_value + 1.;
+    readings.pres_4_mA = sin_value + 1.5;
+    readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
+    readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
+    readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
+    readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
+  }
+
+  readings.pres_avg_bar = (readings.pres_1_bar + readings.pres_2_bar +
+                           readings.pres_3_bar + readings.pres_4_bar) /
+                          4;
+
+  // ---------------------------------------------------------------------------
   //   Process incoming serial commands
   // ---------------------------------------------------------------------------
 
@@ -525,28 +569,6 @@ void loop() {
 
         } else if (strcmp(str_cmd, "?") == 0) {
           // Report readings, tab delimited
-
-          if (!NO_PERIPHERALS) {
-            readings.pres_1_mA = R_click_1.bitval2mA(readings.EMA_1);
-            readings.pres_2_mA = R_click_2.bitval2mA(readings.EMA_2);
-            readings.pres_3_mA = R_click_3.bitval2mA(readings.EMA_3);
-            readings.pres_4_mA = R_click_4.bitval2mA(readings.EMA_4);
-            readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-            readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-            readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-            readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
-          } else {
-            // Generate fake pressure data
-            float sin_value = 16.f + sin(2.f * PI * .1f * millis() / 1.e3f);
-            readings.pres_1_mA = sin_value;
-            readings.pres_2_mA = sin_value + .5;
-            readings.pres_3_mA = sin_value + 1.;
-            readings.pres_4_mA = sin_value + 1.5;
-            readings.pres_1_bar = mA2bar(readings.pres_1_mA, OMEGA_1_CALIB);
-            readings.pres_2_bar = mA2bar(readings.pres_2_mA, OMEGA_2_CALIB);
-            readings.pres_3_bar = mA2bar(readings.pres_3_mA, OMEGA_3_CALIB);
-            readings.pres_4_bar = mA2bar(readings.pres_4_mA, OMEGA_4_CALIB);
-          }
 
           // NOTE:
           //   Using `snprintf()` to print a large array of formatted values
@@ -651,25 +673,6 @@ void loop() {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  //   Update R click readings
-  // ---------------------------------------------------------------------------
-
-  if (!NO_PERIPHERALS) {
-    if (R_click_poll_EMA_collectively()) {
-      /*
-      if (DEBUG) {
-        // DEBUG info: Show warning when obtained interval is too large.
-        // Not necessarily problematic though. The EMA will adjust for this.
-        if (readings.DAQ_obtained_DT > DAQ_DT * 1.05) {
-          Serial.print("WARNING: Large DAQ DT ");
-          Serial.println(readings.DAQ_obtained_DT);
-        }
-      }
-      */
-    }
-  }
-
   // Fade out all purely blue LEDs over time, i.e. previously active valves.
   // Keep in front of any other LED color assignments.
   EVERY_N_MILLIS(20) {
@@ -716,6 +719,25 @@ void loop() {
     alive_blinker_color.setHSV(alive_blinker_hue, 255, beatsin8(60, 96, 223));
     leds[p2led(P{-8, -8})] = alive_blinker_color;
     onboard_led[0] = alive_blinker_color;
+
+    // Show the pressure VU meter on the left column of the LED matrix
+    // clang-format off
+    float P = readings.pres_avg_bar;
+    leds[240] = P >= 4.33 ? CRGB(255, 0  , 0) : CRGB(0);
+    leds[241] = P >= 4.00 ? CRGB(255, 51 , 0) : CRGB(0);
+    leds[242] = P >= 3.67 ? CRGB(255, 91 , 0) : CRGB(0);
+    leds[243] = P >= 3.33 ? CRGB(255, 128, 0) : CRGB(0);
+    leds[244] = P >= 3.00 ? CRGB(255, 163, 0) : CRGB(0);
+    leds[245] = P >= 2.67 ? CRGB(255, 199, 0) : CRGB(0);
+    leds[246] = P >= 2.33 ? CRGB(255, 235, 0) : CRGB(0);
+    leds[247] = P >= 2.00 ? CRGB(238, 255, 0) : CRGB(0);
+    leds[248] = P >= 1.67 ? CRGB(201, 255, 0) : CRGB(0);
+    leds[249] = P >= 1.33 ? CRGB(164, 255, 0) : CRGB(0);
+    leds[250] = P >= 1.00 ? CRGB(129, 255, 0) : CRGB(0);
+    leds[251] = P >= 0.67 ? CRGB(93 , 255, 0) : CRGB(0);
+    leds[252] = P >= 0.33 ? CRGB(51 , 255, 0) : CRGB(0);
+    leds[253] = P >= 0.00 ? CRGB(0  , 255, 0) : CRGB(0);
+    // clang-format on
 
     // utick = micros();
     FastLED.show(); // Takes 8003 µs per call
