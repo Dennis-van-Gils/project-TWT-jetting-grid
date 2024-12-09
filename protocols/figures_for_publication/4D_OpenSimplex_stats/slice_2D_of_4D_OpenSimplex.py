@@ -5,7 +5,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/project-TWT-jetting-grid"
-__date__ = "10-09-2024"
+__date__ = "09-12-2024"
 # pylint: disable=missing-function-docstring
 
 import numpy as np
@@ -115,9 +115,11 @@ if __name__ == "__main__":
         extent=(-vicinity, vicinity, -vicinity, vicinity),
     )
     plt.colorbar(label="noise value")
-    plt.xlabel(r"$x$", usetex=True)
-    plt.ylabel(r"$y$", usetex=True)
-    plt.title("2D slice out of 4D-OpenSimplex noise\nin the plane (x, y, 0, 0)")
+    plt.xlabel(r"$x_n$", usetex=True)
+    plt.ylabel(r"$y_n$", usetex=True)
+    plt.title(
+        "2D slice out of 4D-OpenSimplex noise\nin the plane (x_n, y_n, 0, 0)"
+    )
 
     plt.savefig("slice_2D_of_4D_OpenSimplex.pdf")
     plt.show()
